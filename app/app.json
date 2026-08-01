@@ -2,14 +2,14 @@
   "expo": {
     "name": "mitsume",
     "slug": "mitsume",
-    "version": "0.5.2",
+    "version": "0.5.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "app",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.carrein.mitsume",
-      "versionCode": 19,
+      "versionCode": 20,
       "adaptiveIcon": {
         "backgroundColor": "#FFBD4F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
