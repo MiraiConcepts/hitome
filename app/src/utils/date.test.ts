@@ -27,6 +27,36 @@ describe('eventDays', () => {
       '2026-07-04',
     ]);
   });
+
+  it('keeps a small-hours end (≤ 06:00) on the start day', () => {
+    expect(
+      eventDays(new Date(2026, 6, 3, 18, 0), new Date(2026, 6, 4, 1, 30))
+    ).toEqual(['2026-07-03']);
+    expect(
+      eventDays(new Date(2026, 6, 3, 23, 0), new Date(2026, 6, 4, 6, 0))
+    ).toEqual(['2026-07-03']);
+  });
+
+  it('claims the end day once the end passes 06:00', () => {
+    expect(
+      eventDays(new Date(2026, 6, 3, 23, 0), new Date(2026, 6, 4, 6, 1))
+    ).toEqual(['2026-07-03', '2026-07-04']);
+    expect(
+      eventDays(new Date(2026, 6, 3, 23, 0), new Date(2026, 6, 4, 9, 40))
+    ).toEqual(['2026-07-03', '2026-07-04']);
+  });
+
+  it('never rolls a same-day small-hours event off its own day', () => {
+    expect(
+      eventDays(new Date(2026, 6, 4, 0, 30), new Date(2026, 6, 4, 1, 30))
+    ).toEqual(['2026-07-04']);
+  });
+
+  it('rolls only the final day back on longer spans', () => {
+    expect(
+      eventDays(new Date(2026, 6, 3, 18, 0), new Date(2026, 6, 5, 1, 30))
+    ).toEqual(['2026-07-03', '2026-07-04']);
+  });
 });
 
 describe('parseDayTime', () => {

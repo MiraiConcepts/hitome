@@ -33,7 +33,13 @@ import {
 import { rgbHex } from '@/utils/color';
 import { toTimeString } from '@/utils/date';
 
-import { groupByDay, headerDate, linkHost, type WidgetDayItem } from './format';
+import {
+  continuationEnd,
+  groupByDay,
+  headerDate,
+  linkHost,
+  type WidgetDayItem,
+} from './format';
 import type { WidgetCache, WidgetEvent } from './types';
 
 type Palette = Record<ThemeColor, string>;
@@ -163,8 +169,9 @@ function DetailLine({
 
 /**
  * One event's row for a given day; tapping deep-links the app to that day. A
- * multi-day event shows a dim `(n/N)` marker and, on continuation days, renders
- * like an all-day row (sun glyph, no time — it owns the whole day).
+ * multi-day event shows a dim `(n/N)` marker; continuation days it fully covers
+ * render like an all-day row (sun glyph, no time), and the day a timed one
+ * actually ends leads with `→ end` instead — the sun always means a whole day.
  */
 function EventRow({
   item,
@@ -178,9 +185,11 @@ function EventRow({
   const { event, dayIndex, spanDays } = item;
   const multiDay = spanDays > 1;
   const asAllDay = event.allDay || dayIndex > 1;
+  const endsThisDay = continuationEnd(item, day);
   // Markers are cumulative, not either/or. Every row reads
-  // `[time|sun] ▪ [repeat?] [alarm?] [title]` — the leading slot is the start
-  // time, or the sun for all-day rows; StatusIcons packs what follows the dot.
+  // `[time|→ time|sun] ▪ [repeat?] [alarm?] [title]` — the leading slot is the
+  // start time, `→ end` on the day a timed multi-day event finishes, or the
+  // sun for all-day rows; StatusIcons packs what follows the dot.
   return (
     <FlexWidget
       clickAction="OPEN_URI"
@@ -191,7 +200,7 @@ function EventRow({
       }}
     >
       <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {asAllDay ? (
+        {asAllDay && !endsThisDay ? (
           // Birthday-calendar events get a gift; others keep the generic sun.
           <SvgWidget
             svg={markerSvg(
@@ -202,7 +211,11 @@ function EventRow({
           />
         ) : (
           <TextWidget
-            text={toTimeString(new Date(event.start))}
+            text={
+              endsThisDay
+                ? `→ ${toTimeString(endsThisDay)}`
+                : toTimeString(new Date(event.start))
+            }
             style={rowText(palette)}
           />
         )}

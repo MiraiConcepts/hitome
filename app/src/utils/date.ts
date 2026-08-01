@@ -14,12 +14,34 @@ export function toTimeString(d: Date): string {
 }
 
 /**
- * All local days an event touches, as dateStrings. `end` is treated as exclusive at
- * exact midnight (all-day DTEND is non-inclusive; a timed event ending 00:00 shouldn't
- * mark the next day). Capped defensively for degenerate ranges.
+ * Last instant (ms) of the final local day an event claims, for day-bucketing.
+ * `end` is exclusive at exact midnight (all-day DTEND is non-inclusive), and
+ * the day begins at 06:00: a timed end in the small hours (00:00 < end ≤
+ * 06:00) rolls back to the previous day — a late night out is one evening,
+ * not two days. Never collapses before the event's own start.
+ */
+export function eventLastMs(start: Date, end: Date): number {
+  const h = end.getHours();
+  const flush =
+    end.getMinutes() === 0 &&
+    end.getSeconds() === 0 &&
+    end.getMilliseconds() === 0;
+  const afterMidnight = h > 0 || !flush;
+  const withinCutoff = h < 6 || (h === 6 && flush);
+  const last =
+    afterMidnight && withinCutoff
+      ? new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime() - 1
+      : end.getTime() - 1;
+  return Math.max(start.getTime(), last);
+}
+
+/**
+ * All local days an event touches, as dateStrings — `eventLastMs` semantics
+ * (end-exclusive midnight, 06:00 small-hours rollback). Capped defensively for
+ * degenerate ranges.
  */
 export function eventDays(start: Date, end: Date): string[] {
-  const lastMs = Math.max(start.getTime(), end.getTime() - 1);
+  const lastMs = eventLastMs(start, end);
   const days: string[] = [];
   const cursor = new Date(
     start.getFullYear(),

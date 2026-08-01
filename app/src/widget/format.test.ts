@@ -1,4 +1,12 @@
-import { dayHeader, groupByDay, headerDate, linkHost } from './format';
+import { toTimeString } from '@/utils/date';
+
+import {
+  continuationEnd,
+  dayHeader,
+  groupByDay,
+  headerDate,
+  linkHost,
+} from './format';
 import type { WidgetEvent } from './types';
 
 const ev = (
@@ -113,5 +121,88 @@ describe('groupByDay', () => {
     ]);
     expect(groups.map((g) => g.items[0].dayIndex)).toEqual([3, 4, 5]);
     expect(groups[0].items[0].spanDays).toBe(5);
+  });
+
+  it('keeps a late-night spillover as a single-day event (no continuation row)', () => {
+    const groups = groupByDay(
+      [
+        ev(new Date(2026, 6, 10, 18, 0), {
+          summary: 'party',
+          end: new Date(2026, 6, 11, 1, 30).toISOString(),
+        }),
+      ],
+      now
+    );
+    expect(groups.map((g) => g.day)).toEqual(['2026-07-10']);
+    expect(groups[0].items[0].spanDays).toBe(1);
+  });
+});
+
+describe('continuationEnd', () => {
+  it('returns the end on the final day of a timed multi-day event', () => {
+    const groups = groupByDay(
+      [
+        ev(new Date(2026, 6, 10, 23, 0), {
+          summary: 'flight',
+          end: new Date(2026, 6, 11, 9, 40).toISOString(),
+        }),
+      ],
+      now
+    );
+    const [d1, d2] = groups;
+    expect(continuationEnd(d1.items[0], d1.day)).toBeNull();
+    const end = continuationEnd(d2.items[0], d2.day);
+    expect(end && toTimeString(end)).toBe('09:40');
+  });
+
+  it('is null for all-day events on every covered day', () => {
+    const groups = groupByDay(
+      [
+        ev(new Date(2026, 6, 13, 0, 0), {
+          allDay: true,
+          end: new Date(2026, 6, 16, 0, 0).toISOString(),
+        }),
+      ],
+      now
+    );
+    expect(groups).toHaveLength(3);
+    for (const g of groups) {
+      expect(continuationEnd(g.items[0], g.day)).toBeNull();
+    }
+  });
+
+  it('is null on middle days; only the true end day shows a time', () => {
+    // Fri 18:00 → Sun 09:00: Sat is fully covered (sun), Sun leads with → end.
+    const groups = groupByDay(
+      [
+        ev(new Date(2026, 6, 10, 18, 0), {
+          end: new Date(2026, 6, 12, 9, 0).toISOString(),
+        }),
+      ],
+      now
+    );
+    expect(groups.map((g) => g.day)).toEqual([
+      '2026-07-10',
+      '2026-07-11',
+      '2026-07-12',
+    ]);
+    expect(continuationEnd(groups[1].items[0], groups[1].day)).toBeNull();
+    const end = continuationEnd(groups[2].items[0], groups[2].day);
+    expect(end && toTimeString(end)).toBe('09:00');
+  });
+
+  it('keeps the sun on a final day the event fully covers (rolled-back end)', () => {
+    // Fri 18:00 → Sun 01:30 rolls back to a Fri–Sat span; Sat ends up the last
+    // displayed day but the raw end is Sunday, so no end time prints.
+    const groups = groupByDay(
+      [
+        ev(new Date(2026, 6, 10, 18, 0), {
+          end: new Date(2026, 6, 12, 1, 30).toISOString(),
+        }),
+      ],
+      now
+    );
+    expect(groups.map((g) => g.day)).toEqual(['2026-07-10', '2026-07-11']);
+    expect(continuationEnd(groups[1].items[0], groups[1].day)).toBeNull();
   });
 });

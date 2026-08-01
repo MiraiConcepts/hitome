@@ -79,8 +79,21 @@ export type WidgetDayItem = {
   spanDays: number;
 };
 
-/** True all-day, OR a continuation day of a multi-day event — either way it owns
- * the whole day, so it sorts above timed events. */
+/**
+ * End time to print on the final day of a timed multi-day event — the day it
+ * actually ends on (small-hours ends never get here; eventDays rolls them back
+ * onto the start day). Null everywhere else: true all-day events and fully
+ * covered continuation days keep the sun.
+ */
+export function continuationEnd(item: WidgetDayItem, day: string): Date | null {
+  const { event, dayIndex, spanDays } = item;
+  if (event.allDay || dayIndex === 1 || dayIndex !== spanDays) return null;
+  const end = new Date(event.end);
+  return toDateString(end) === day ? end : null;
+}
+
+/** True all-day, OR a continuation day of a multi-day event — either way it
+ * started before the day did, so it sorts above timed events. */
 function isAllDayLike(item: WidgetDayItem): boolean {
   return item.event.allDay || item.dayIndex > 1;
 }

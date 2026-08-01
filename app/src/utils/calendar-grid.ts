@@ -1,7 +1,7 @@
 // Pure math for the scrollable month grid: week indexing over a bounded range
 // (the FlatList data), month-start jump targets, and per-week banner/chip lane
 // layout. No React or react-native imports — runs under bun test and CI jest.
-import { toDateString } from '@/utils/date';
+import { eventLastMs, toDateString } from '@/utils/date';
 
 const DAY_MS = 86_400_000;
 const WEEK_MS = 7 * DAY_MS;
@@ -145,13 +145,13 @@ export type WeekLayout<T extends GridEventLike = GridEventLike> = {
 
 /**
  * All-day events and anything touching more than one local day render as
- * spanning banners. Computed from raw start/end (`end` exclusive at exact
- * midnight, matching eventDays) — NOT via eventDays(), whose 62-day cap would
- * truncate very long events.
+ * spanning banners. Day coverage comes from eventLastMs (end-exclusive
+ * midnight, 06:00 small-hours rollback — matching eventDays) but NOT via
+ * eventDays(), whose 62-day cap would truncate very long events.
  */
 export function isBanner(event: GridEventLike): boolean {
   if (event.allDay) return true;
-  const lastMs = Math.max(event.start.getTime(), event.end.getTime() - 1);
+  const lastMs = eventLastMs(event.start, event.end);
   return toDateString(event.start) !== toDateString(new Date(lastMs));
 }
 
@@ -189,7 +189,7 @@ export function layoutWeek<T extends GridEventLike>(
   const banners: BannerPlacement<T>[] = [];
   const chipsByCol: T[][] = [[], [], [], [], [], [], []];
   for (const event of events) {
-    const lastMs = Math.max(event.start.getTime(), event.end.getTime() - 1);
+    const lastMs = eventLastMs(event.start, event.end);
     if (event.start.getTime() >= weekEndMs || lastMs < weekStartMs) continue;
     if (isBanner(event)) {
       const startDay = dayDiff(weekStart, event.start);
