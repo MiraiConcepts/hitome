@@ -170,8 +170,8 @@ function DetailLine({
 /**
  * One event's row for a given day; tapping deep-links the app to that day. A
  * multi-day event shows a dim `(n/N)` marker; continuation days it fully covers
- * render like an all-day row (sun glyph, no time), and the day a timed one
- * actually ends leads with `→ end` instead — the sun always means a whole day.
+ * render like an all-day row (sun glyph, no time), and the day a timed one ends
+ * leads with `→ end` instead — the sun always means a whole day.
  */
 function EventRow({
   item,

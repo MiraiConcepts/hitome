@@ -80,10 +80,11 @@ export type WidgetDayItem = {
 };
 
 /**
- * End time to print on the final day of a timed multi-day event — the day it
- * actually ends on (small-hours ends never get here; eventDays rolls them back
- * onto the start day). Null everywhere else: true all-day events and fully
- * covered continuation days keep the sun.
+ * End time to print on the final day of a timed multi-day event. Null
+ * everywhere else — all-day events and the middle days a timed one fully
+ * covers keep the sun, so the sun always means a whole day. `day` guards the
+ * case where earlier days were dropped as past and the last one is also the
+ * first shown.
  */
 export function continuationEnd(item: WidgetDayItem, day: string): Date | null {
   const { event, dayIndex, spanDays } = item;

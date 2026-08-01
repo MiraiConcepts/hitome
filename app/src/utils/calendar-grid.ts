@@ -145,9 +145,9 @@ export type WeekLayout<T extends GridEventLike = GridEventLike> = {
 
 /**
  * All-day events and anything touching more than one local day render as
- * spanning banners. Day coverage comes from eventLastMs (end-exclusive
- * midnight, 06:00 small-hours rollback — matching eventDays) but NOT via
- * eventDays(), whose 62-day cap would truncate very long events.
+ * spanning banners. Day coverage comes from eventLastMs (end exclusive at
+ * exact midnight, matching eventDays) but NOT via eventDays(), whose 62-day
+ * cap would truncate very long events.
  */
 export function isBanner(event: GridEventLike): boolean {
   if (event.allDay) return true;

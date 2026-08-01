@@ -123,7 +123,7 @@ describe('groupByDay', () => {
     expect(groups[0].items[0].spanDays).toBe(5);
   });
 
-  it('keeps a late-night spillover as a single-day event (no continuation row)', () => {
+  it('expands a late-night spillover onto the day it ends', () => {
     const groups = groupByDay(
       [
         ev(new Date(2026, 6, 10, 18, 0), {
@@ -133,8 +133,8 @@ describe('groupByDay', () => {
       ],
       now
     );
-    expect(groups.map((g) => g.day)).toEqual(['2026-07-10']);
-    expect(groups[0].items[0].spanDays).toBe(1);
+    expect(groups.map((g) => g.day)).toEqual(['2026-07-10', '2026-07-11']);
+    expect(groups[0].items[0].spanDays).toBe(2);
   });
 });
 
@@ -191,18 +191,17 @@ describe('continuationEnd', () => {
     expect(end && toTimeString(end)).toBe('09:00');
   });
 
-  it('keeps the sun on a final day the event fully covers (rolled-back end)', () => {
-    // Fri 18:00 → Sun 01:30 rolls back to a Fri–Sat span; Sat ends up the last
-    // displayed day but the raw end is Sunday, so no end time prints.
+  it('prints a small-hours end on the day it lands', () => {
+    // Fri 18:00 → Sat 01:30: Saturday leads with the end, not the sun.
     const groups = groupByDay(
       [
         ev(new Date(2026, 6, 10, 18, 0), {
-          end: new Date(2026, 6, 12, 1, 30).toISOString(),
+          end: new Date(2026, 6, 11, 1, 30).toISOString(),
         }),
       ],
       now
     );
-    expect(groups.map((g) => g.day)).toEqual(['2026-07-10', '2026-07-11']);
-    expect(continuationEnd(groups[1].items[0], groups[1].day)).toBeNull();
+    const end = continuationEnd(groups[1].items[0], groups[1].day);
+    expect(end && toTimeString(end)).toBe('01:30');
   });
 });

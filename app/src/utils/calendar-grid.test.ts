@@ -147,15 +147,9 @@ describe('isBanner', () => {
     ).toBe(false);
   });
 
-  it('is false for a timed event ending in the small hours (≤ 06:00)', () => {
+  it('is true for a timed event crossing midnight', () => {
     expect(
       isBanner(ev('a', new Date(2026, 6, 8, 23), new Date(2026, 6, 9, 1)))
-    ).toBe(false);
-  });
-
-  it('is true for a timed event crossing midnight past 06:00', () => {
-    expect(
-      isBanner(ev('a', new Date(2026, 6, 8, 23), new Date(2026, 6, 9, 9)))
     ).toBe(true);
   });
 });
