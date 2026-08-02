@@ -17,8 +17,8 @@ import {
 import { davConfigured } from '@/config';
 import {
   AddOutlineBody,
-  ArrowRightOutlineBody,
   GiftOutlineBody,
+  MoonOutlineBody,
   NotificationOutlineBody,
   RefreshOutlineBody,
   SunOutlineBody,
@@ -56,21 +56,20 @@ const basilSvg = (fill: string, body: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${body.replace(/currentColor/g, fill)}</svg>`;
 const ADD_ICON = basilSvg(OnAccentColor, AddOutlineBody);
 const REFRESH_ICON = basilSvg(OnAccentColor, RefreshOutlineBody);
-// "Runs until" arrow before an end time. Fixed accent rather than the event's
-// calendar color: it marks the row's temporal role — the same job the accent
-// does for day headings — not which calendar the event came from.
-const ENDS_ICON = basilSvg(AccentColor, ArrowRightOutlineBody);
 
-/** A per-event marker glyph (sun / repeat / alarm), tinted by the event's
- *  source-calendar color (alpha stripped for the SVG fill); uncolored /
- *  default-calendar events keep the theme accent. */
+/** An event's source-calendar color, alpha stripped for SVG fills / ColorProp;
+ *  uncolored / default-calendar events keep the theme accent. */
+const markerColor = (color: string | undefined) => rgbHex(color ?? AccentColor);
+
+/** A per-event marker glyph (sun / moon / repeat / alarm), tinted by the
+ *  event's source-calendar color. */
 const markerSvg = (color: string | undefined, body: string) =>
-  basilSvg(rgbHex(color ?? AccentColor), body);
+  basilSvg(markerColor(color), body);
 
 // Shared style fragments — the widget's tiny design system. Sizes are plain
 // literals by convention (the widget is its own design surface; see the
 // Spacing note in constants/theme.ts).
-/** Sun / repeat / alarm marker glyph size. */
+/** Sun / moon / repeat / alarm marker glyph size. */
 const MARKER_ICON = { width: 14, height: 14 } as const;
 /** An event row's primary line — time, dot, title. */
 const rowText = (palette: Palette) => ({
@@ -176,7 +175,7 @@ function DetailLine({
  * One event's row for a given day; tapping deep-links the app to that day. A
  * multi-day event shows a dim `(n/N)` marker; continuation days it fully covers
  * render like an all-day row (sun glyph, no time), and the day a timed one ends
- * leads with `→ end` instead — the sun always means a whole day.
+ * leads with a moon + that end time instead — the sun always means a whole day.
  */
 function EventRow({
   item,
@@ -192,8 +191,8 @@ function EventRow({
   const asAllDay = event.allDay || dayIndex > 1;
   const endsThisDay = continuationEnd(item, day);
   // Markers are cumulative, not either/or. Every row reads
-  // `[time|→ time|sun] ▪ [repeat?] [alarm?] [title]` — the leading slot is the
-  // start time, an accent arrow + end time on the day a timed multi-day event
+  // `[time|moon time|sun] ▪ [repeat?] [alarm?] [title]` — the leading slot is
+  // the start time, a moon + end time on the day a timed multi-day event
   // finishes, or the sun for all-day rows; StatusIcons packs what follows the
   // dot.
   return (
@@ -216,13 +215,21 @@ function EventRow({
             style={MARKER_ICON}
           />
         ) : endsThisDay ? (
+          // Moon + end time: this day inherited the event overnight. Both carry
+          // the calendar color, like the sun / repeat / alarm markers.
           <FlexWidget
             style={{ flexDirection: 'row', alignItems: 'center', flexGap: 3 }}
           >
-            <SvgWidget svg={ENDS_ICON} style={MARKER_ICON} />
+            <SvgWidget
+              svg={markerSvg(event.color, MoonOutlineBody)}
+              style={MARKER_ICON}
+            />
             <TextWidget
               text={toTimeString(endsThisDay)}
-              style={{ ...rowText(palette), color: hex(AccentColor) }}
+              style={{
+                ...rowText(palette),
+                color: hex(markerColor(event.color)),
+              }}
             />
           </FlexWidget>
         ) : (
