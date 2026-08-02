@@ -22,6 +22,11 @@ export const CaretLeftOutlineBody =
 export const CaretRightOutlineBody =
   '<path fill="currentColor" fill-rule="evenodd" d="M9.97 7.47a.75.75 0 0 1 1.06 0l4 4a.75.75 0 0 1 0 1.06l-4 4a.75.75 0 1 1-1.06-1.06L13.44 12L9.97 8.53a.75.75 0 0 1 0-1.06" clip-rule="evenodd"/>';
 
+// "Runs until" marker — the widget puts it before the end time on the final day
+// of a timed multi-day event, where the all-day sun would otherwise lie.
+export const ArrowRightOutlineBody =
+  '<path fill="currentColor" d="M13.47 8.53a.75.75 0 0 1 1.06-1.06l4 4a.75.75 0 0 1 0 1.06l-4 4a.75.75 0 1 1-1.06-1.06l2.72-2.72H6.5a.75.75 0 0 1 0-1.5h9.69z"/>';
+
 // Birthday-calendar marker (basil gift-outline; Basil has no cake) — shared by
 // the widget's all-day glyph and the notes CanvasBar picker below.
 export const GiftOutlineBody =

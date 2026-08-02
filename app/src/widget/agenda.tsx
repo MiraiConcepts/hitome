@@ -17,6 +17,7 @@ import {
 import { davConfigured } from '@/config';
 import {
   AddOutlineBody,
+  ArrowRightOutlineBody,
   GiftOutlineBody,
   NotificationOutlineBody,
   RefreshOutlineBody,
@@ -55,6 +56,10 @@ const basilSvg = (fill: string, body: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${body.replace(/currentColor/g, fill)}</svg>`;
 const ADD_ICON = basilSvg(OnAccentColor, AddOutlineBody);
 const REFRESH_ICON = basilSvg(OnAccentColor, RefreshOutlineBody);
+// "Runs until" arrow before an end time. Fixed accent rather than the event's
+// calendar color: it marks the row's temporal role — the same job the accent
+// does for day headings — not which calendar the event came from.
+const ENDS_ICON = basilSvg(AccentColor, ArrowRightOutlineBody);
 
 /** A per-event marker glyph (sun / repeat / alarm), tinted by the event's
  *  source-calendar color (alpha stripped for the SVG fill); uncolored /
@@ -188,8 +193,9 @@ function EventRow({
   const endsThisDay = continuationEnd(item, day);
   // Markers are cumulative, not either/or. Every row reads
   // `[time|→ time|sun] ▪ [repeat?] [alarm?] [title]` — the leading slot is the
-  // start time, `→ end` on the day a timed multi-day event finishes, or the
-  // sun for all-day rows; StatusIcons packs what follows the dot.
+  // start time, an accent arrow + end time on the day a timed multi-day event
+  // finishes, or the sun for all-day rows; StatusIcons packs what follows the
+  // dot.
   return (
     <FlexWidget
       clickAction="OPEN_URI"
@@ -209,13 +215,19 @@ function EventRow({
             )}
             style={MARKER_ICON}
           />
+        ) : endsThisDay ? (
+          <FlexWidget
+            style={{ flexDirection: 'row', alignItems: 'center', flexGap: 3 }}
+          >
+            <SvgWidget svg={ENDS_ICON} style={MARKER_ICON} />
+            <TextWidget
+              text={toTimeString(endsThisDay)}
+              style={{ ...rowText(palette), color: hex(AccentColor) }}
+            />
+          </FlexWidget>
         ) : (
           <TextWidget
-            text={
-              endsThisDay
-                ? `→ ${toTimeString(endsThisDay)}`
-                : toTimeString(new Date(event.start))
-            }
+            text={toTimeString(new Date(event.start))}
             style={rowText(palette)}
           />
         )}
