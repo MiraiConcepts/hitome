@@ -5,7 +5,7 @@ name: Android APK
 # LOCALLY via tooling/android-builder/sign-release.sh — the keystore never
 # leaves the maintainer's machine and this repo holds no secrets.
 #
-# The baked server URL comes from the repo Actions VARIABLE `MITSUME_DAV_URL`
+# The baked server URL comes from the repo Actions VARIABLE `HITOME_DAV_URL`
 # (a variable, not a secret — the URL is public-by-decision; see docs/Release.md).
 
 on:
@@ -47,7 +47,7 @@ jobs:
       - name: Build release APK (unsigned, universal)
         working-directory: app/android
         env:
-          EXPO_PUBLIC_DAV_URL: ${{ vars.MITSUME_DAV_URL }}
+          EXPO_PUBLIC_DAV_URL: ${{ vars.HITOME_DAV_URL }}
         run: ./gradlew :app:assembleRelease
 
       - name: Zipalign + stage signing tool
@@ -56,15 +56,15 @@ jobs:
           VERSION=$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("app/app.json","utf8")).expo.version)')
           "$BT/zipalign" -f 4 \
             app/android/app/build/outputs/apk/release/app-release-unsigned.apk \
-            "mitsume-v$VERSION-unsigned.apk"
+            "hitome-v$VERSION-unsigned.apk"
           cp "$BT/lib/apksigner.jar" .
-          echo "built mitsume-v$VERSION-unsigned.apk (aligned)"
+          echo "built hitome-v$VERSION-unsigned.apk (aligned)"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mitsume-unsigned-apk
+          name: hitome-unsigned-apk
           path: |
-            mitsume-v*-unsigned.apk
+            hitome-v*-unsigned.apk
             apksigner.jar
           if-no-files-found: error
           retention-days: 30

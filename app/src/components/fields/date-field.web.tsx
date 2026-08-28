@@ -22,7 +22,7 @@ export function DateField({
   return (
     <input
       type="date"
-      className="mitsume-field-input"
+      className="hitome-field-input"
       data-testid={testID}
       value={value}
       min={min}

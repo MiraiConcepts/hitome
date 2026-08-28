@@ -24,7 +24,7 @@ trap 'docker compose down -v >/dev/null 2>&1' EXIT
 
 mkdir -p artifacts
 docker run --rm --ipc=host \
-  --network mitsume-e2e_default \
+  --network hitome-e2e_default \
   -e TZ="${HOST_TZ:-UTC}" \
   -e CI=1 \
   -v "$PWD":/e2e -w /e2e \

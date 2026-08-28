@@ -36,9 +36,9 @@ export default function RootLayout() {
     return () => clearTimeout(timer);
   }, []);
   // Hold a full-page spinner until the shell can render truthfully: hydration
-  // (window width is unreadable before it — the static HTML would otherwise
-  // flash the narrow layout's Notes|Calendar picker on wide screens) and fonts
-  // (no Satoshi swap mid-boot). fontError falls through so a failed font load
+  // (window width is unreadable before it, and the event editor picks its
+  // bottom-sheet vs centered-dialog form from that width) and fonts (no
+  // Satoshi swap mid-boot). fontError falls through so a failed font load
   // degrades to fallback fonts instead of a stuck spinner.
   const ready = hydrated && (fontsLoaded || !!fontError);
   return (

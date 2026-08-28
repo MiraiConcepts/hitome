@@ -1,10 +1,10 @@
-// Web backend for snapshot-cache: one IndexedDB store keyed by snapshot key
-// (same idiom as notes/blob-cache.web.ts). Values must stay JSON-serializable
+// Web backend for snapshot-cache: one IndexedDB store keyed by snapshot key.
+// Values must stay JSON-serializable
 // so both platforms round-trip identically. Best-effort: failures cost
 // freshness only.
 import { openDB, type IDBPDatabase } from 'idb';
 
-const DB_NAME = 'mitsume-snapshots';
+const DB_NAME = 'hitome-snapshots';
 const STORE = 'snapshots';
 
 let dbPromise: Promise<IDBPDatabase> | null = null;

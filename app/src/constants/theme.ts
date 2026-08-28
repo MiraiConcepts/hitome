@@ -65,7 +65,8 @@ export const Spacing = {
 } as const;
 
 export const MaxContentWidth = 800;
-/** Minimum window width for the side-by-side notes + calendar layout. */
+/** Minimum window width treated as "wide" — the event editor renders as a
+ * centered dialog above this and a bottom sheet below it. */
 export const WideLayoutMinWidth = 768;
 
 /**

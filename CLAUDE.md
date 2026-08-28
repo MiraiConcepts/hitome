@@ -1,21 +1,24 @@
-# mitsume
+# hitome
 
-Personal, single-user, local-first notes + calendar app. Expo SDK 56 / RN 0.85
-(+ RN Web) client; self-hosted backend (Radicale for calendar; Hocuspocus for
-notes doc sync + a content-addressed blob store for pasted images). Targets
-web + Android (Obtainium) — no iOS.
+Personal, single-user, local-first calendar app. Expo SDK 56 / RN 0.85 (+ RN
+Web) client against self-hosted Radicale over CalDAV, with an Android home-screen
+agenda widget and exact alarms. Targets web + Android (Obtainium) — no iOS.
+
+Split out of [mitsume](https://github.com/MiraiConcepts/mitsume) (notes), which
+keeps the notes canvas and its Hocuspocus/blob backend. The two apps share a
+design language via `MiraiConcepts/tokens`; the shared primitives in
+`src/constants/theme.ts` and `src/components/` are currently a **verbatim copy**
+of mitsume's — keep them byte-identical until both apps move onto
+`MiraiConcepts/components`.
 
 ## Layout
 
 - `app/` — the Expo client (all product code; has its own CLAUDE.md).
-- `docs/` — `Requirements.md` (spec + decisions log), `Deploy.md` (web +
-  same-origin Caddy + notes backend), `Release.md` (Android APK pipeline).
-- `server/` — notes backend: `sync/` (Hocuspocus v4 + SQLite, Node) and
-  `blobs/` (Caddy + webdav, SHA-256-named files); merge-ready `compose.yml`
-  for the host stack (see its README).
-- `tooling/` — `dev-proxy/` (dockerized same-origin Caddy for web dev; also
-  runs the notes backend locally), `android-builder/` (local sign + release
-  scripts).
+- `docs/` — `Deploy.md` (web + same-origin Caddy), `Release.md` (Android APK
+  pipeline).
+- `tooling/` — `dev-proxy/` (dockerized same-origin Caddy for web dev),
+  `e2e/` (dockerized Playwright + throwaway Radicale),
+  `android-builder/` (local sign + release scripts).
 - `.claude/plans/` — implementation plans and build logs (historical record).
 
 ## Dev loop (bun for scripts/checks; Metro and Gradle run under node)
@@ -23,27 +26,24 @@ web + Android (Obtainium) — no iOS.
 Bun runs checks, tests, and package installs. Metro and the Android build both
 need real node: `--bun` shims node→bun, and bun can't load fsevents (Metro's
 macOS file watcher — edits silently never reach the bundle) or run the Gradle
-helper scripts. See the web and Android bullets below.
+helper scripts.
 
 - Always `cd app/` first, then plain `bun run web:proxy` — NOT `--bun`
-  (breaks file watching → stale bundles; found 2026-07-12). `web:proxy`
-  forces the same-origin `/dav/` URL; plain `web` bakes the tailnet URL from
-  `app/.env` into the bundle and CORS-breaks behind the proxy. Edits then
-  ship on save; only metro.config.js changes need a Metro restart.
+  (breaks file watching → stale bundles). `web:proxy` forces the same-origin
+  `/dav/` URL and Metro on :8082; plain `web` bakes the tailnet URL from
+  `app/.env` into the bundle and CORS-breaks behind the proxy.
+- Browse the dockerized dev proxy at `http://localhost:8882` (injects DAV
+  auth), NOT Metro's `:8082` directly (CORS). Start it from
+  `tooling/dev-proxy/`: `docker compose up -d` (needs its gitignored `.env`;
+  see `.env.example`). Docker runtime is colima.
 - Web e2e: `tooling/e2e/run.sh` — dockerized Playwright + a throwaway Radicale
   behind its own Caddy on :8881 (never touches the real calendar). Needs Metro
   running (`web:proxy`).
 - Android hot reload: plain `bun run android:dev` — do NOT add `--bun`. The
   Gradle steps shell out to `node` (expo autolinking, entry resolution), and
-  `--bun` shims `node`→bun and breaks the build in ~3s at `settings.gradle`
-  (`command 'node' … exit value 1`).
-  (debug build under `com.carrein.mitsume.dev`, coexists with the release app;
-  needs the local Android SDK — installed 2026-07-07 via Android Studio, env in
-  `~/.zshrc`.)
-- Browse the dockerized dev proxy at `http://localhost:8880` (injects DAV
-  auth), NOT Metro's `:8081` directly (CORS). Start it from
-  `tooling/dev-proxy/`: `docker compose up -d` (needs its gitignored `.env`;
-  see `.env.example`). Docker runtime is colima.
+  `--bun` breaks the build in ~3s at `settings.gradle`.
+  (debug build under `com.miraiconcepts.hitome.dev`, coexists with the release
+  app; needs the local Android SDK.)
 - Checks from `app/`: `bun run typecheck`, `bun run lint`, `bun run
   format:check`.
 - Tests: local jest is broken under bun's runtime — run `bun test <files>`
@@ -67,5 +67,7 @@ helper scripts. See the web and Android bullets below.
   bundles, GitHub secrets, or devices. The host Caddy injects Authorization on
   `/dav/*` (password lives only in the server `.env`). Never reintroduce
   credential baking or client-side credential storage as defaults.
-- Port 8080 on this Mac belongs to an unrelated dev server; mitsume tooling
-  uses 8880.
+- Rounded UI is 4px (`Spacing.one`; literal `4` in the widget). Exception:
+  month-grid banners and chip bars are square and flush.
+- Ports on this Mac: 8080 is an unrelated dev server, 8880 is mitsume's dev
+  proxy, 8881 is this repo's e2e proxy, 8882 is this repo's dev proxy.

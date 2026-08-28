@@ -16,9 +16,9 @@ if (typeof g.atob === 'undefined') g.atob = atobPolyfill;
 if (typeof g.TextEncoder === 'undefined') g.TextEncoder = TextEncoderPolyfill;
 if (typeof g.TextDecoder === 'undefined') g.TextDecoder = TextDecoderPolyfill;
 
-// yjs (via lib0) wants crypto.getRandomValues for collision-resistant client
-// ids and falls back to Math.random without it; Hermes has no global crypto.
-// expo-crypto's implementation is synchronous, so it slots straight in.
+// Hermes has no global crypto at all, and the randomUUID fallback below is
+// built on getRandomValues — so this has to land first. expo-crypto's
+// implementation is synchronous, so it slots straight in.
 const cryptoLike = (g.crypto ?? (g.crypto = {})) as Record<string, unknown>;
 if (typeof cryptoLike.getRandomValues === 'undefined')
   cryptoLike.getRandomValues = getRandomValues;

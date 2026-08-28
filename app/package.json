@@ -1,11 +1,10 @@
 {
-  "name": "app",
+  "name": "hitome",
   "main": "index.ts",
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~56.0.17",
     "@gorhom/bottom-sheet": "5.2.14",
-    "@hocuspocus/provider": "^4.3.0",
     "base-64": "^1.0.0",
     "expo": "~56.0.11",
     "expo-constants": "~56.0.18",
@@ -13,14 +12,12 @@
     "expo-file-system": "~56.0.8",
     "expo-font": "~56.0.6",
     "expo-glass-effect": "~56.0.4",
-    "expo-image": "~56.0.11",
     "expo-linking": "~56.0.14",
     "expo-notifications": "~56.0.21",
     "expo-router": "~56.2.10",
     "expo-splash-screen": "~56.0.10",
     "expo-status-bar": "~56.0.4",
     "expo-system-ui": "~56.0.5",
-    "expo-web-browser": "~56.0.5",
     "ical-expander": "^3.2.0",
     "ical.js": "^2.2.1",
     "idb": "^8.0.3",
@@ -36,9 +33,7 @@
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.8.3",
     "text-encoding": "^0.7.0",
-    "tsdav": "^2.3.0",
-    "y-indexeddb": "^9.0.12",
-    "yjs": "^13.6.31"
+    "tsdav": "^2.3.0"
   },
   "devDependencies": {
     "@types/base-64": "^1.0.2",
@@ -60,7 +55,7 @@
     "android:dev": "APP_VARIANT=development expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "web:proxy": "EXPO_PUBLIC_DAV_URL=/dav/ expo start --web",
+    "web:proxy": "EXPO_PUBLIC_DAV_URL=/dav/ expo start --web --port 8082",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest",
@@ -69,10 +64,7 @@
   },
   "private": true,
   "jest": {
-    "preset": "jest-expo",
-    "moduleNameMapper": {
-      "^isomorphic-webcrypto/src/react-native$": "<rootDir>/src/shims/lib0-webcrypto.cjs"
-    }
+    "preset": "jest-expo"
   },
   "patchedDependencies": {
     "react-native-android-widget@0.20.3": "patches/react-native-android-widget@0.20.3.patch"

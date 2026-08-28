@@ -18,10 +18,10 @@ echo "==> wire release signing"
 node /work/tools/patch-signing.mjs android/app/build.gradle
 # keystore.properties: keyAlias / storePassword / keyPassword (key=value lines)
 set -a; source /keys/keystore.properties; set +a
-export MITSUME_STORE_FILE=/keys/release.keystore
-export MITSUME_KEY_ALIAS="$keyAlias"
-export MITSUME_STORE_PASSWORD="$storePassword"
-export MITSUME_KEY_PASSWORD="$keyPassword"
+export HITOME_STORE_FILE=/keys/release.keystore
+export HITOME_KEY_ALIAS="$keyAlias"
+export HITOME_STORE_PASSWORD="$storePassword"
+export HITOME_KEY_PASSWORD="$keyPassword"
 
 echo "==> install Maven Central mirror fallback (Sonatype 403s some networks)"
 mkdir -p ~/.gradle/init.d

@@ -10,16 +10,16 @@ export function ensureFieldCss(): void {
   injected = true;
   const style = document.createElement('style');
   style.textContent = `
-.mitsume-field-input {
+.hitome-field-input {
   appearance: none;
   -webkit-appearance: none;
   border: none;
   cursor: pointer;
 }
-.mitsume-field-input::-webkit-calendar-picker-indicator {
+.hitome-field-input::-webkit-calendar-picker-indicator {
   display: none;
 }
-.mitsume-field-input:focus-visible {
+.hitome-field-input:focus-visible {
   outline: 2px solid ${AccentColor};
   outline-offset: -2px;
 }

@@ -8,18 +8,18 @@
 #   http://localhost:8881/dav/*   → test Radicale (this stack, anonymous volume)
 #
 # `docker compose down -v` wipes the test calendar completely.
-name: mitsume-e2e
+name: hitome-e2e
 
 services:
   radicale:
-    container_name: mitsume-e2e-radicale
+    container_name: hitome-e2e-radicale
     image: tomsquest/docker-radicale
     volumes:
       - ./radicale-config:/config/config:ro
       - /data # anonymous volume; run.sh always downs with -v so runs start empty
 
   e2e-proxy:
-    container_name: mitsume-e2e-proxy
+    container_name: hitome-e2e-proxy
     image: caddy:2-alpine
     ports:
       - '8881:8881'

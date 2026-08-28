@@ -12,8 +12,8 @@ const MIN_INTERVAL_MS = 5000;
 
 /**
  * App-lifecycle alarm reconciliation (mount + return-to-foreground) and the
- * notification-tap → `?day=` deep link. Lives in the root layout so it
- * survives the narrow layout's Notes↔Calendar pane switching.
+ * notification-tap → `?day=` deep link. Lives in the root layout so it runs
+ * app-wide, independent of which route is mounted.
  */
 export function useAlarmReconcile(): void {
   const lastRun = useRef(0);

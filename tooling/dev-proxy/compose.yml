@@ -1,13 +1,10 @@
-# Local same-origin dev proxy (see Caddyfile header for usage), plus a local
-# notes backend (sync + blobs, built from server/) so web dev exercises the
-# real sync/blob flow. Dev notes data lives in the named volumes below —
-# `docker compose down -v` wipes it.
+# Local same-origin dev proxy for hitome (see Caddyfile header for usage).
 services:
   dev-proxy:
-    container_name: mitsume-dev-proxy
+    container_name: hitome-dev-proxy
     image: caddy:2-alpine
     ports:
-      - '8880:8880'
+      - '8882:8882'
     environment:
       # From tooling/dev-proxy/.env (gitignored; see .env.example).
       RADICALE_ORIGIN: ${RADICALE_ORIGIN:?set RADICALE_ORIGIN in tooling/dev-proxy/.env}
@@ -15,23 +12,6 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     extra_hosts:
-      # Lets the container reach the Mac (Metro on :8081); works on colima and
+      # Lets the container reach the Mac (Metro on :8082); works on colima and
       # Docker Desktop alike.
       - host.docker.internal:host-gateway
-
-  # Same images the server runs (see server/compose.yml), built locally.
-  mitsume-sync:
-    container_name: mitsume-dev-sync
-    build: ../../server/sync
-    volumes:
-      - dev-sync-data:/data
-
-  mitsume-blobs:
-    container_name: mitsume-dev-blobs
-    build: ../../server/blobs
-    volumes:
-      - dev-blobs-data:/blobs
-
-volumes:
-  dev-sync-data:
-  dev-blobs-data:

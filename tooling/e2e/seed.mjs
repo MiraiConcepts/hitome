@@ -23,7 +23,7 @@ function vevent({ uid, summary, start, end, allDay = false }) {
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//mitsume e2e//EN',
+    'PRODID:-//hitome e2e//EN',
     'BEGIN:VEVENT',
     `UID:${uid}`,
     `DTSTAMP:${icsDate(new Date())}T000000Z`,

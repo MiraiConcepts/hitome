@@ -6,7 +6,7 @@
 // builds never set APP_VARIANT and use app.json verbatim.
 const IS_DEV = process.env.APP_VARIANT === 'development';
 
-// Relabel the agenda widget for dev builds so the two "mitsume" entries are
+// Relabel the agenda widget for dev builds so the two "hitome" entries are
 // distinguishable in the launcher's widget picker (react-native-android-widget
 // sets the receiver label from widgets[].label).
 function withDevWidgetLabel(plugins) {
@@ -31,8 +31,8 @@ module.exports = ({ config }) => ({
   ...(IS_DEV
     ? {
         // Launcher app label comes from expo.name (@string/app_name).
-        name: 'mitsume (dev)',
-        android: { ...config.android, package: 'com.carrein.mitsume.dev' },
+        name: 'hitome (dev)',
+        android: { ...config.android, package: 'com.miraiconcepts.hitome.dev' },
         plugins: withDevWidgetLabel(config.plugins),
       }
     : {}),

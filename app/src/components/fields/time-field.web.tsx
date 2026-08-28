@@ -16,7 +16,7 @@ export function TimeField({ value, onChange, testID }: TimeFieldProps) {
   return (
     <input
       type="time"
-      className="mitsume-field-input"
+      className="hitome-field-input"
       data-testid={testID}
       value={value}
       onChange={(e) => onChange(e.target.value)}

@@ -1,6 +1,6 @@
 # Static web image: bun build → Caddy file server. Build context = app/.
 #
-#   docker build -t ghcr.io/carrein/mitsume:latest app/
+#   docker build -t ghcr.io/miraiconcepts/hitome:latest app/
 #
 # CREDENTIAL-FREE by design: the host Caddy injects Authorization on /dav/*
 # (see docs/Deploy.md), so no username/password is ever baked here. The only

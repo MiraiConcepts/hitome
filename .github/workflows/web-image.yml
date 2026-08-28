@@ -1,6 +1,6 @@
 name: Web image
 
-# Build the static web app into ghcr.io/carrein/mitsume:latest on every release
+# Build the static web app into ghcr.io/miraiconcepts/hitome:latest on every release
 # tag (v*) — the same trigger as the Android APK workflow, so web and Android
 # always ship the same versioned commit. Watchtower on the server polls GHCR
 # and redeploys automatically (see docs/Deploy.md, docs/Release.md).
@@ -36,7 +36,7 @@ jobs:
           context: app
           push: true
           tags: |
-            ghcr.io/carrein/mitsume:latest
-            ghcr.io/carrein/mitsume:${{ github.ref_name }}
+            ghcr.io/miraiconcepts/hitome:latest
+            ghcr.io/miraiconcepts/hitome:${{ github.ref_name }}
           build-args: |
             EXPO_PUBLIC_DAV_URL=/dav/

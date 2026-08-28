@@ -1,17 +1,17 @@
-# Deploy — mitsume web + Radicale (same-origin)
+# Deploy — hitome web + Radicale (same-origin)
 
 > First-cut deployment for the calendar web app. Android/Obtainium is a separate
 > track — see `docs/Release.md`.
 
 ## Shape
 
-One new container (`mitsume`, static web app) plus one new site block on the existing
+One new container (`hitome`, static web app) plus one new site block on the existing
 host Caddy. The app and Radicale share ONE origin — the app is served at `/` and
 Radicale is proxied under `/dav/` — so the browser never makes a cross-origin CalDAV
 request and **no CORS configuration is needed anywhere**.
 
 **Credentials are server-side only.** Clients (web *and* the Android app) send no
-Authorization; Caddy injects it on `/dav/*` from `MITSUME_DAV_B64` in the server's
+Authorization; Caddy injects it on `/dav/*` from `HITOME_DAV_B64` in the server's
 `.env`. Consequence, explicitly accepted: **tailnet reachability = calendar access**
 on this origin (single-user tailnet, secured devices — Requirements §9.10 posture).
 Optional hardening: a Tailscale ACL restricting which devices may reach this port.
@@ -21,11 +21,11 @@ Revisit if the tailnet ever gains other users.
 web browser ──┐  /dav/* (no credentials)                       ┌─► radicale:5232
               ├───────────────► host Caddy ──[+ Authorization]──┤
 Android app ──┘                     ▲                           └  (X-Script-Name /dav)
-                      MITSUME_DAV_B64 in server .env
+                      HITOME_DAV_B64 in server .env
 ```
 
 CD is release-gated (symmetric with Android — see `docs/Release.md`): a `v*` tag
-builds `ghcr.io/carrein/mitsume:latest` (`.github/workflows/web-image.yml`) and
+builds `ghcr.io/miraiconcepts/hitome:latest` (`.github/workflows/web-image.yml`) and
 Watchtower redeploys it. Pushes to `main` deploy nothing.
 
 ## 1. Compose service
@@ -33,9 +33,9 @@ Watchtower redeploys it. Pushes to `main` deploy nothing.
 Add to `docker-compose.yml` (mirrors the stack's hardening conventions):
 
 ```yaml
-  mitsume:
-    container_name: mitsume
-    image: ghcr.io/carrein/mitsume:latest
+  hitome:
+    container_name: hitome
+    image: ghcr.io/miraiconcepts/hitome:latest
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -49,27 +49,27 @@ Add to `docker-compose.yml` (mirrors the stack's hardening conventions):
           memory: 64M
     labels:
       - flame.type=application
-      - flame.name=mitsume
+      - flame.name=hitome
       - flame.icon=custom
       - com.centurylinklabs.watchtower.enable=true
 ```
 
-And new env vars + a port mapping on the `caddy` service (`MITSUME_DAV_B64` is
+And new env vars + a port mapping on the `caddy` service (`HITOME_DAV_B64` is
 `base64(user:app-password)` — generate with `printf '%s:%s' 'carrein' 'app-password' | base64`
 and put it in the server `.env`):
 
 ```yaml
     environment:
-      MITSUME_REVERSE_PROXY_PORT: ${MITSUME_REVERSE_PROXY_PORT}
-      MITSUME_DAV_B64: ${MITSUME_DAV_B64}
+      HITOME_REVERSE_PROXY_PORT: ${HITOME_REVERSE_PROXY_PORT}
+      HITOME_DAV_B64: ${HITOME_DAV_B64}
     ports:
-      - ${MITSUME_REVERSE_PROXY_PORT}:${MITSUME_REVERSE_PROXY_PORT}
+      - ${HITOME_REVERSE_PROXY_PORT}:${HITOME_REVERSE_PROXY_PORT}
 ```
 
 ## 2. Host Caddyfile site block
 
 ```caddyfile
-{$TAILNET_DOMAIN}.{$TAILNET_DNS_NAME}:{$MITSUME_REVERSE_PROXY_PORT} {
+{$TAILNET_DOMAIN}.{$TAILNET_DNS_NAME}:{$HITOME_REVERSE_PROXY_PORT} {
 	# CalDAV, same-origin: strip /dav before proxying; X-Script-Name makes
 	# Radicale emit hrefs under /dav so discovery resolves through this block.
 	# Server-side credential injection: replaces any client Authorization.
@@ -77,12 +77,12 @@ and put it in the server `.env`):
 	handle_path /dav/* {
 		reverse_proxy radicale:5232 {
 			header_up X-Script-Name /dav
-			header_up Authorization "Basic {$MITSUME_DAV_B64}"
+			header_up Authorization "Basic {$HITOME_DAV_B64}"
 		}
 	}
 
 	handle {
-		reverse_proxy mitsume:80
+		reverse_proxy hitome:80
 	}
 }
 ```
@@ -97,13 +97,13 @@ to the same Radicale.
 client device.** The only baked value is `EXPO_PUBLIC_DAV_URL=/dav/` (a relative
 URL that resolves against the page origin at runtime).
 
-- The password lives in exactly one place: `MITSUME_DAV_B64` in the server `.env`
+- The password lives in exactly one place: `HITOME_DAV_B64` in the server `.env`
   (base64 of `user:app-password`); Caddy attaches it upstream on `/dav/*`.
 - Rotating the password = update Radicale + the `.env` value → restart caddy.
   No image rebuild, no client changes.
 - The Android app points at this same origin (`https://<host>:<port>/dav/`) and is
   likewise credential-less; its server URL is baked at APK build time — in CI from
-  the repo Actions **variable** `MITSUME_DAV_URL` (a variable, not a secret; see
+  the repo Actions **variable** `HITOME_DAV_URL` (a variable, not a secret; see
   `docs/Release.md`), or locally from `app/.env` (never committed).
 - Dev fallback: `EXPO_PUBLIC_DAV_USER`/`_PASS` in `app/.env` make the client attach
   Basic auth itself (e.g. Android dev pointing straight at Radicale). Optional.
@@ -119,69 +119,11 @@ curl -s -o /dev/null -w '%{http_code}\n' -X PROPFIND -H 'Depth: 0' \
   https://<host>:{$RADICALE_REVERSE_PROXY_PORT}/   # 401 (direct Radicale still guarded)
 ```
 
-A `401` on the mitsume `/dav/` means `MITSUME_DAV_B64` is missing/wrong in the
+A `401` on the hitome `/dav/` means `HITOME_DAV_B64` is missing/wrong in the
 caddy env; a `207` on the direct Radicale port would mean injection leaked onto the
 wrong site block (it must not).
 
 Then run the smoke tests in `.claude/plans/caldav-calendar-plan.md` §Smoke tests.
-
-## Notes backend (sync + blobs)
-
-Two more containers on the same origin (docs/Requirements.md §9.4–9.5,
-decisions #10–12): `mitsume-sync` (Hocuspocus v4, Yjs doc sync over websocket,
-SQLite on a volume) and `mitsume-blobs` (Caddy + webdav, flat SHA-256-named
-image files on a volume). Both are **authless by design** — same posture as
-`/dav/`: tailnet reachability = access, zero client credentials. Images build
-from `server/sync/` and `server/blobs/` on every `v*` tag
-(`.github/workflows/server-images.yml`); Watchtower redeploys.
-
-### 1. Compose services
-
-Merge `server/compose.yml` into the host `docker-compose.yml` (it follows the
-stack's hardening conventions) and add to the server `.env`:
-
-```sh
-MITSUME_SYNC_VOLUME=...   # host dir for the sync SQLite file — uid 1000 writable
-MITSUME_BLOBS_VOLUME=...  # host dir for the image blobs — uid 1000 writable
-```
-
-### 2. Host Caddyfile — add INSIDE the existing mitsume site block, before `handle`
-
-```caddyfile
-	# Notes doc sync (websocket). The client connects to bare /sync (no
-	# trailing slash), which handle_path /sync/* would NOT match — hence the
-	# explicit two-form matcher.
-	@sync path /sync /sync/*
-	handle @sync {
-		uri strip_prefix /sync
-		reverse_proxy mitsume-sync:1234
-	}
-
-	# Image blobs by SHA-256. Immutable Cache-Control is set by the blobs
-	# container itself (only on files that exist — never on 404s).
-	handle_path /blobs/* {
-		request_body {
-			max_size 64MB
-		}
-		reverse_proxy mitsume-blobs:8080
-	}
-```
-
-### 3. Verify after deploy
-
-```sh
-curl -s -o /dev/null -w '%{http_code}\n' https://<host>:<port>/sync/health   # 200
-H=$(printf 'notes-verify' | shasum -a 256 | cut -d' ' -f1)
-printf 'notes-verify' | curl -s -o /dev/null -w '%{http_code}\n' \
-  -X PUT --data-binary @- https://<host>:<port>/blobs/$H                     # 201
-curl -s https://<host>:<port>/blobs/$H                                       # notes-verify
-curl -s -o /dev/null -w '%{http_code}\n' -X DELETE \
-  https://<host>:<port>/blobs/$H                                             # 204
-```
-
-Backup = your existing volume-snapshot routine now also covers
-`MITSUME_SYNC_VOLUME` (one SQLite file) and `MITSUME_BLOBS_VOLUME` (flat
-files; restore = copy back).
 
 ## Android APK
 

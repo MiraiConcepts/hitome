@@ -1,5 +1,5 @@
-import { HomeScreen } from '@/components/home/home-screen';
+import { MonthScreen } from '@/components/calendar/month-screen';
 
 export default function HomeRoute() {
-  return <HomeScreen />;
+  return <MonthScreen />;
 }

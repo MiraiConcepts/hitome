@@ -1,7 +1,7 @@
 // Adjust signing in the expo-prebuild-generated android/app/build.gradle.
 // Prebuild regenerates that file every build, so this patch is applied each time.
 //
-//   default:     wire release signing to the MITSUME_* env vars (local Docker builds)
+//   default:     wire release signing to the HITOME_* env vars (local Docker builds)
 //   --unsigned:  strip signing from the release buildType entirely — Gradle then
 //                emits app-release-unsigned.apk (CI builds; signing happens locally
 //                afterwards via sign-release.sh)
@@ -29,10 +29,10 @@ if (unsigned) {
 } else {
   const releaseConfig = `signingConfigs {
         release {
-            storeFile file(System.getenv("MITSUME_STORE_FILE"))
-            storePassword System.getenv("MITSUME_STORE_PASSWORD")
-            keyAlias System.getenv("MITSUME_KEY_ALIAS")
-            keyPassword System.getenv("MITSUME_KEY_PASSWORD")
+            storeFile file(System.getenv("HITOME_STORE_FILE"))
+            storePassword System.getenv("HITOME_STORE_PASSWORD")
+            keyAlias System.getenv("HITOME_KEY_ALIAS")
+            keyPassword System.getenv("HITOME_KEY_PASSWORD")
         }`;
   if (!gradle.includes('signingConfigs {')) throw new Error('signingConfigs block not found');
   gradle = gradle.replace('signingConfigs {', releaseConfig);
@@ -42,5 +42,5 @@ if (unsigned) {
     'signingConfig signingConfigs.release' +
     gradle.slice(relast + needle.length);
   writeFileSync(path, gradle);
-  console.log(`patched ${path}: release buildType signs with MITSUME_* keystore`);
+  console.log(`patched ${path}: release buildType signs with HITOME_* keystore`);
 }

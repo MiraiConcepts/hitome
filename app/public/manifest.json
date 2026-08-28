@@ -1,7 +1,7 @@
 {
-  "name": "Mitsume",
-  "short_name": "Mitsume",
-  "description": "Personal, local-first notes.",
+  "name": "Hitome",
+  "short_name": "Hitome",
+  "description": "Personal calendar.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

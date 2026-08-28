@@ -2,8 +2,8 @@ import { resolveDavUrl } from '../resolve-url';
 
 describe('resolveDavUrl', () => {
   it('resolves a relative URL against the origin', () => {
-    expect(resolveDavUrl('/dav/', 'https://mitsume.example:8443')).toBe(
-      'https://mitsume.example:8443/dav/'
+    expect(resolveDavUrl('/dav/', 'https://hitome.example:8443')).toBe(
+      'https://hitome.example:8443/dav/'
     );
   });
 

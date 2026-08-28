@@ -96,7 +96,7 @@ function toTimePair(start: Date, end: Date, allDay: boolean) {
  */
 export function buildEventICS(input: EventInput, uid: string): string {
   const vcalendar = new ICAL.Component(['vcalendar', [], []]);
-  vcalendar.updatePropertyWithValue('prodid', '-//mitsume//caldav//EN');
+  vcalendar.updatePropertyWithValue('prodid', '-//hitome//caldav//EN');
   vcalendar.updatePropertyWithValue('version', '2.0');
 
   const vevent = new ICAL.Component('vevent');
