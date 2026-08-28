@@ -8,8 +8,8 @@ cd "$(dirname "$0")"
 # Must match the @playwright/test version in package.json.
 PLAYWRIGHT_TAG=v1.55.0-noble
 
-if ! curl -sf -o /dev/null http://localhost:8081; then
-  echo "Metro is not running on :8081. Start it from app/ with:" >&2
+if ! curl -sf -o /dev/null http://localhost:8082; then
+  echo "Metro is not running on :8082. Start it from app/ with:" >&2
   echo "  bun run web:proxy" >&2
   exit 1
 fi
