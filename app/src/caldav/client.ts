@@ -73,6 +73,17 @@ export function calendarName(calendar: DAVCalendar): string {
   return decodeURIComponent(tail) || calendar.url;
 }
 
+/** The calendar's CalDAV color, or undefined when it has none.
+ *
+ * tsdav types `calendarColor` as a string, but it comes from parsed XML: a
+ * calendar with no `<calendar-color>` (or an empty one) yields a truthy
+ * non-string instead of undefined, which then slips past a `?? fallback` guard
+ * and reaches the hex parsers. Same reason calendarName() checks its type. */
+export function calendarColor(calendar: DAVCalendar): string | undefined {
+  const color = calendar.calendarColor;
+  return typeof color === 'string' && color.trim() ? color.trim() : undefined;
+}
+
 /** The calendar's marker glyph (CALENDAR_ICON), or undefined for the generic
  *  sun/repeat/alarm markers. */
 export function calendarIcon(calendar: DAVCalendar): EventIcon | undefined {

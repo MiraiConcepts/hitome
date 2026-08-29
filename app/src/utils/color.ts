@@ -31,6 +31,7 @@ export function rgbHex(hex: string): string {
 
 /** [r, g, b] 0–255 from a hex string, or null when it isn't valid hex. */
 function parseHex(hex: string): [number, number, number] | null {
+  if (typeof hex !== 'string') return null;
   let h = hex.replace(/^#/, '');
   if (h.length === 3)
     h = h

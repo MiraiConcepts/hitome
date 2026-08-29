@@ -3,6 +3,7 @@
 import * as Crypto from 'expo-crypto';
 
 import {
+  calendarColor,
   calendarIcon,
   calendarName,
   getCalendarFor,
@@ -50,7 +51,7 @@ export async function fetchMonth(
         timeRange,
       });
       const source = {
-        color: calendar.calendarColor,
+        color: calendarColor(calendar),
         icon: calendarIcon(calendar),
       };
       const events: CalEvent[] = [];
@@ -79,7 +80,7 @@ export async function listCalendars(): Promise<CalendarChoice[]> {
   return calendars.map((c) => ({
     url: c.url,
     name: calendarName(c),
-    ...(c.calendarColor ? { color: c.calendarColor } : {}),
+    ...(calendarColor(c) ? { color: calendarColor(c) } : {}),
   }));
 }
 

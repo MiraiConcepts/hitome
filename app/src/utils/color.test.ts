@@ -45,3 +45,19 @@ describe('rgbHex', () => {
     expect(rgbHex('nope')).toBe('nope');
   });
 });
+
+// tsdav types calendarColor as a string, but an absent <calendar-color> parses
+// to a truthy non-string. calendarColor() in caldav/client.ts now normalizes it
+// away; these guard the parsers themselves so a bad value can never crash a
+// render again (it used to throw "hex.replace is not a function").
+describe('non-string input', () => {
+  const junk = [{}, [], 0, null, undefined, true] as unknown as string[];
+
+  it('readableTextColor falls back to the dark default', () => {
+    for (const v of junk) expect(readableTextColor(v)).toBe('#1C1B22');
+  });
+
+  it('rgbHex returns the input unchanged rather than throwing', () => {
+    for (const v of junk) expect(() => rgbHex(v)).not.toThrow();
+  });
+});
