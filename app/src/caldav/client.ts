@@ -17,8 +17,8 @@ let calendarsPromise: Promise<DAVCalendar[]> | null = null;
 const DEFAULT_CALENDAR_NAME = 'carrein-calendar';
 
 // Per-calendar marker glyph, by calendar name — the one place (with
-// DEFAULT_CALENDAR_NAME) that personal calendar identity is hardcoded. Basil has
-// no cake, so the birthday calendar draws a gift instead of the generic sun.
+// DEFAULT_CALENDAR_NAME) that personal calendar identity is hardcoded. The
+// birthday calendar draws a gift instead of the generic sun.
 const CALENDAR_ICON: Record<string, EventIcon> = { 'carrein-birthday': 'gift' };
 
 async function connect(): Promise<DAVClient> {

@@ -56,6 +56,10 @@ function monthDelta(
  */
 export function useMonthEvents(visibleMonth: Date) {
   const [store, setStore] = useState<MonthStore<CalEvent>>(() => new Map());
+  /** When the server last answered — the freshness stamp both the header and
+   *  the widget show. Only a landed fetch moves it; a failure leaves the last
+   *  good time standing, which is what makes it meaningful when offline. */
+  const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
   const [loading, setLoading] = useState(davConfigured);
   const [error, setError] = useState<string | null>(null);
   // Guards loading/error against out-of-order settled-month fetches; landed
@@ -107,6 +111,7 @@ export function useMonthEvents(visibleMonth: Date) {
         setStore((prev) =>
           applyFetch(prev, monthKey, range, result, Date.now())
         );
+        setFetchedAt(new Date());
         writeSnapshot(cacheKey(monthKey), serializeEvents(result));
       } catch (err) {
         if (primary && seq.current === ticket) {
@@ -207,5 +212,5 @@ export function useMonthEvents(visibleMonth: Date) {
 
   const events = useMemo(() => mergeEvents(store), [store]);
 
-  return { events, loading, error, refresh };
+  return { events, loading, error, refresh, fetchedAt };
 }

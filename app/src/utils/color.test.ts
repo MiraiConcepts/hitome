@@ -7,23 +7,23 @@ describe('readableTextColor', () => {
   });
 
   it('picks dark text on light fills', () => {
-    expect(readableTextColor('#FFFFFF')).toBe('#1C1B22');
-    expect(readableTextColor('#FFBD4F')).toBe('#1C1B22'); // amber accent
+    expect(readableTextColor('#FFFFFF')).toBe('#000000');
+    expect(readableTextColor('#FFBD4F')).toBe('#000000'); // amber accent
   });
 
   it('ignores the alpha byte in #RRGGBBAA', () => {
-    expect(readableTextColor('#ffbd4fff')).toBe('#1C1B22');
+    expect(readableTextColor('#ffbd4fff')).toBe('#000000');
     expect(readableTextColor('#f8708cff')).toBe(readableTextColor('#f8708c'));
   });
 
   it('expands #RGB shorthand', () => {
     expect(readableTextColor('#000')).toBe('#FFFFFF');
-    expect(readableTextColor('#fff')).toBe('#1C1B22');
+    expect(readableTextColor('#fff')).toBe('#000000');
   });
 
   it('falls back to dark on a malformed string', () => {
-    expect(readableTextColor('nope')).toBe('#1C1B22');
-    expect(readableTextColor('')).toBe('#1C1B22');
+    expect(readableTextColor('nope')).toBe('#000000');
+    expect(readableTextColor('')).toBe('#000000');
   });
 });
 
@@ -54,7 +54,7 @@ describe('non-string input', () => {
   const junk = [{}, [], 0, null, undefined, true] as unknown as string[];
 
   it('readableTextColor falls back to the dark default', () => {
-    for (const v of junk) expect(readableTextColor(v)).toBe('#1C1B22');
+    for (const v of junk) expect(readableTextColor(v)).toBe('#000000');
   });
 
   it('rgbHex returns the input unchanged rather than throwing', () => {

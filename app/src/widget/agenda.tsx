@@ -18,10 +18,10 @@ import { davConfigured } from '@/config';
 import {
   AddOutlineBody,
   GiftOutlineBody,
-  MoonOutlineBody,
-  NotificationOutlineBody,
   RefreshOutlineBody,
   SunOutlineBody,
+  SunriseOutlineBody,
+  SunsetOutlineBody,
 } from '@/constants/icon-paths';
 import {
   AccentColor,
@@ -41,47 +41,55 @@ import {
   linkHost,
   type WidgetDayItem,
 } from './format';
-import type { WidgetCache, WidgetEvent } from './types';
+import type { WidgetCache } from './types';
 
 type Palette = Record<ThemeColor, string>;
+
+/** The rule under each day heading — the widget's only divider. Fixed rather
+ *  than a palette token so it matches the app grid's lines, which land on the
+ *  same value for the same reason: a mid grey reads on either scheme. */
+const DIVIDER = '#60646C';
 
 /** Theme colors are plain strings; widget ColorProp wants a hex template type. */
 const hex = (c: string) => c as `#${string}`;
 
-// Basil icons (https://icon-sets.iconify.design/basil/) — the app's icon set,
+// Tabler icons (https://icon-sets.iconify.design/tabler/) — the app's icon set,
 // rendered via SvgWidget. The in-app screens render the same add / refresh glyphs
 // via components/icons.tsx; shared 24x24 path data lives in constants/icon-paths.
-// Basil bodies are fill-based, so we swap `currentColor` for the actual color.
-const basilSvg = (fill: string, body: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${body.replace(/currentColor/g, fill)}</svg>`;
-const ADD_ICON = basilSvg(OnAccentColor, AddOutlineBody);
-const REFRESH_ICON = basilSvg(OnAccentColor, RefreshOutlineBody);
+// Tabler bodies stroke with `currentColor`, so we swap it for the actual color.
+const iconSvg = (color: string, body: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${body.replace(/currentColor/g, color)}</svg>`;
+const ADD_ICON = iconSvg(OnAccentColor, AddOutlineBody);
+const REFRESH_ICON = iconSvg(OnAccentColor, RefreshOutlineBody);
 
 /** An event's source-calendar color, alpha stripped for SVG fills / ColorProp;
  *  uncolored / default-calendar events keep the theme accent. */
 const markerColor = (color: string | undefined) => rgbHex(color ?? AccentColor);
 
-/** A per-event marker glyph (sun / moon / repeat / alarm), tinted by the
+/** A per-event marker glyph (sun / sunrise / sunset / gift), tinted by the
  *  event's source-calendar color. */
 const markerSvg = (color: string | undefined, body: string) =>
-  basilSvg(markerColor(color), body);
+  iconSvg(markerColor(color), body);
+
+/** The location chip's fill — Firefox brand blue, fixed rather than
+ *  palette.link because the dark scheme's link (#5B9DFF) is far too light to
+ *  carry white text. This holds roughly 5:1 against white in either scheme. */
+const LOCATION_FILL = '#0060E0';
 
 // Shared style fragments — the widget's tiny design system. Sizes are plain
 // literals by convention (the widget is its own design surface; see the
 // Spacing note in constants/theme.ts).
-/** Sun / moon / repeat / alarm marker glyph size. */
-const MARKER_ICON = { width: 14, height: 14 } as const;
+/** Marker glyph size. The sub-dp nudge is optical: Android centers a
+ *  TextView's whole line box, and Satoshi's ascent + font padding (1.026em)
+ *  outweighs its descent (0.224em), so the box's middle sits ~0.043em above
+ *  where digits and caps actually look centered — a box-centered glyph reads
+ *  high next to the row's text without it. Scales with the row's font size. */
+const MARKER_ICON = { width: 14, height: 14, marginTop: 0.5 } as const;
 /** An event row's primary line — time, dot, title. */
 const rowText = (palette: Palette) => ({
   fontSize: 13,
   fontFamily: FontFamily,
   color: hex(palette.text),
-});
-/** Tappable secondary lines under a row — location, plain link. */
-const linkText = (palette: Palette) => ({
-  fontSize: 11,
-  fontFamily: FontFamily,
-  color: hex(palette.link),
 });
 
 /** Heading that opens a day group, e.g. 'Mon 13 July'. */
@@ -90,9 +98,9 @@ function DayHeader({ label, palette }: { label: string; palette: Palette }) {
     <FlexWidget
       style={{
         width: 'match_parent',
-        paddingBottom: 5,
+        paddingBottom: 6,
         borderBottomWidth: 1,
-        borderBottomColor: hex(palette.backgroundSelected),
+        borderBottomColor: hex(DIVIDER),
       }}
     >
       <TextWidget
@@ -108,46 +116,24 @@ function DayHeader({ label, palette }: { label: string; palette: Palette }) {
 }
 
 /**
- * Status glyphs that follow the row's ▪ dot — repeat, alarm, and any future
- * markers of that kind live here. Packed tighter than the row's other spacing.
- * Only rendered when at least one marker applies: RNAW calls components as raw
- * functions and crashes on a `null` return, so the caller must guard.
+ * Tappable pill under an event row — every secondary action on an event is
+ * one of these, told apart by fill: accent for the meeting link, blue for the
+ * location, the flat element color for a bare link. Callers must guard
+ * rendering — RNAW calls components as raw functions and crashes on a `null`
+ * return.
  */
-function StatusIcons({ event }: { event: WidgetEvent }) {
-  const icons = [
-    ...(event.recurring ? [markerSvg(event.color, RefreshOutlineBody)] : []),
-    ...(event.alarm ? [markerSvg(event.color, NotificationOutlineBody)] : []),
-  ];
-  return (
-    <FlexWidget
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        flexGap: 2,
-        marginRight: 4,
-      }}
-    >
-      {icons.map((svg, i) => (
-        <SvgWidget key={i} svg={svg} style={MARKER_ICON} />
-      ))}
-    </FlexWidget>
-  );
-}
-
-/**
- * Tappable secondary line under an event row (location, plain link). Callers
- * must guard rendering — RNAW components cannot return null (see StatusIcons).
- */
-function DetailLine({
+function Chip({
   uri,
   label,
   text,
-  palette,
+  background,
+  color,
 }: {
   uri: string;
   label: string;
   text: string;
-  palette: Palette;
+  background: string;
+  color: string;
 }) {
   return (
     <FlexWidget
@@ -155,17 +141,24 @@ function DetailLine({
       clickActionData={{ uri }}
       accessibilityLabel={label}
       style={{
-        width: 'match_parent',
         flexDirection: 'row',
         alignItems: 'center',
-        paddingTop: 2,
+        marginTop: 3,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        backgroundColor: hex(background),
+        borderRadius: 4,
       }}
     >
       <TextWidget
         text={text}
         maxLines={1}
         truncate="END"
-        style={linkText(palette)}
+        style={{
+          fontSize: 11,
+          fontFamily: FontFamily,
+          color: hex(color),
+        }}
       />
     </FlexWidget>
   );
@@ -173,9 +166,9 @@ function DetailLine({
 
 /**
  * One event's row for a given day; tapping deep-links the app to that day. A
- * multi-day event shows a dim `(n/N)` marker; continuation days it fully covers
- * render like an all-day row (sun glyph, no time), and the day a timed one ends
- * leads with a moon + that end time instead — the sun always means a whole day.
+ * multi-day event shows a dim `(n/N)` marker; days it fully covers render like
+ * an all-day row (sun glyph, no time), and a timed one marks its own edges with
+ * sunrise / sunset — the sun always means a whole day.
  */
 function EventRow({
   item,
@@ -190,11 +183,16 @@ function EventRow({
   const multiDay = spanDays > 1;
   const asAllDay = event.allDay || dayIndex > 1;
   const endsThisDay = continuationEnd(item, day);
-  // Markers are cumulative, not either/or. Every row reads
-  // `[time|moon time|sun] ▪ [repeat?] [alarm?] [title]` — the leading slot is
-  // the start time, a moon + end time on the day a timed multi-day event
-  // finishes, or the sun for all-day rows; StatusIcons packs what follows the
-  // dot.
+  const wholeDay = asAllDay && !endsThisDay;
+  // A whole-day row has no time to separate from, so it drops the dot and reads
+  // `[sun] [title]`. Every other row reads `[time] ▪ [title]`, and when it is an
+  // edge of a timed multi-day event the time picks up the matching glyph —
+  // sunrise on the day it starts, sunset on the day it ends.
+  const spanEdge = endsThisDay
+    ? { body: SunsetOutlineBody, at: endsThisDay }
+    : multiDay && !event.allDay && dayIndex === 1
+      ? { body: SunriseOutlineBody, at: new Date(event.start) }
+      : null;
   return (
     <FlexWidget
       clickAction="OPEN_URI"
@@ -202,34 +200,34 @@ function EventRow({
       style={{
         width: 'match_parent',
         flexDirection: 'column',
+        flexGap: 2,
       }}
     >
       <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {asAllDay && !endsThisDay ? (
+        {wholeDay ? (
           // Birthday-calendar events get a gift; others keep the generic sun.
+          // Carries the dot's spacing, since the row drops the dot itself.
           <SvgWidget
             svg={markerSvg(
               event.color,
               event.icon === 'gift' ? GiftOutlineBody : SunOutlineBody
             )}
-            style={MARKER_ICON}
+            style={{ ...MARKER_ICON, marginRight: 6 }}
           />
-        ) : endsThisDay ? (
-          // Moon + end time: this day inherited the event overnight. Both carry
-          // the calendar color, like the sun / repeat / alarm markers.
+        ) : spanEdge ? (
+          // Glyph + time on the edges of a timed multi-day event. Only the
+          // glyph carries the calendar color; the time stays row text, so a
+          // time reads the same wherever it appears.
           <FlexWidget
             style={{ flexDirection: 'row', alignItems: 'center', flexGap: 3 }}
           >
             <SvgWidget
-              svg={markerSvg(event.color, MoonOutlineBody)}
+              svg={markerSvg(event.color, spanEdge.body)}
               style={MARKER_ICON}
             />
             <TextWidget
-              text={toTimeString(endsThisDay)}
-              style={{
-                ...rowText(palette),
-                color: hex(markerColor(event.color)),
-              }}
+              text={toTimeString(spanEdge.at)}
+              style={rowText(palette)}
             />
           </FlexWidget>
         ) : (
@@ -238,11 +236,12 @@ function EventRow({
             style={rowText(palette)}
           />
         )}
-        <TextWidget
-          text="▪"
-          style={{ ...rowText(palette), marginHorizontal: 6 }}
-        />
-        {event.recurring || event.alarm ? <StatusIcons event={event} /> : null}
+        {wholeDay ? null : (
+          <TextWidget
+            text="▪"
+            style={{ ...rowText(palette), marginHorizontal: 6 }}
+          />
+        )}
         <FlexWidget style={{ flex: 1 }}>
           <TextWidget
             text={event.summary || '(untitled)'}
@@ -264,45 +263,32 @@ function EventRow({
         ) : null}
       </FlexWidget>
       {event.location && dayIndex === 1 ? (
-        <DetailLine
+        <Chip
           uri={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`}
           label="Open location in maps"
           text={event.location}
-          palette={palette}
+          background={LOCATION_FILL}
+          color={Colors.dark.text}
         />
       ) : null}
       {event.meetingLink && dayIndex === 1 ? (
-        <FlexWidget
-          clickAction="OPEN_URI"
-          clickActionData={{ uri: event.meetingLink }}
-          accessibilityLabel="Join meeting"
-          style={{
-            flexDirection: 'row',
-            marginTop: 3,
-            paddingHorizontal: 6,
-            paddingVertical: 2,
-            backgroundColor: hex(AccentColor),
-            borderRadius: 4,
-          }}
-        >
-          <TextWidget
-            text="Join Meeting"
-            style={{
-              fontSize: 11,
-              fontFamily: FontFamily,
-              color: hex(OnAccentColor),
-            }}
-          />
-        </FlexWidget>
+        <Chip
+          uri={event.meetingLink}
+          label="Join meeting"
+          text="Join Meeting"
+          background={AccentColor}
+          color={OnAccentColor}
+        />
       ) : null}
       {event.link && dayIndex === 1 ? (
         // Only non-meeting URLs land here (meeting links become the Join
         // chip above), rendered as the bare host.
-        <DetailLine
+        <Chip
           uri={event.link}
           label="Open event link"
           text={linkHost(event.link)}
-          palette={palette}
+          background={palette.backgroundElement}
+          color={palette.text}
         />
       ) : null}
     </FlexWidget>
@@ -320,9 +306,9 @@ function EventsWrapper({ children }: { children: ReactNode }) {
       style={{
         width: 'match_parent',
         flexDirection: 'column',
-        paddingTop: 5,
+        paddingTop: 6,
         paddingBottom: 10,
-        flexGap: 5,
+        flexGap: 8,
       }}
     >
       {children}
@@ -459,7 +445,7 @@ function Agenda({
           flex: 1,
           paddingHorizontal: 16,
           paddingTop: 10,
-          paddingBottom: 4,
+          paddingBottom: 10,
         }}
       >
         <Body cache={cache} now={now} palette={palette} />

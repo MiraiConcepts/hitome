@@ -19,9 +19,11 @@ export type WidgetEvent = {
   /** Joinable meeting URL (CONFERENCE prop, meeting-host URL prop, or a
    * meeting-host link found in the description) — rendered as a Join chip. */
   meetingLink?: string;
-  /** Occurrence of a recurring series — rendered as a small repeat marker. */
+  /** Occurrence of a recurring series. Cached, but the widget row no longer
+   * draws a marker for it. */
   recurring?: boolean;
-  /** A reminder is armed (VALARM present) — rendered as a bell marker. */
+  /** A reminder is armed (VALARM present). Cached, but the widget row no longer
+   * draws a marker for it. */
   alarm?: boolean;
   /** Source calendar's CalDAV color (#RRGGBBAA) — tints the row's markers. */
   color?: string;

@@ -15,9 +15,22 @@ const monthTitle = (d: Date) =>
 const now = new Date();
 const target = (day: number) =>
   new Date(now.getFullYear(), now.getMonth() + 3, day);
-/** Local-midnight Sunday of the week containing d (grid weeks start Sunday). */
-const sundayOf = (d: Date) =>
-  new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay());
+/** Local-midnight Monday of the week containing d (grid weeks start Monday). */
+const weekStartOf = (d: Date) =>
+  new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate() - ((d.getDay() + 6) % 7)
+  );
+
+/**
+ * Grid queries must be scoped to one month's page. The grid pages by month and
+ * every page draws six week rows starting at the week of the 1st, so the week
+ * straddling two months is drawn by both — a boundary day cell, and any chip
+ * or banner sitting in it, exists twice in the DOM.
+ */
+const gridPage = (page: Page, d: Date) =>
+  page.getByTestId(`month-page-${d.getFullYear()}-${pad(d.getMonth() + 1)}`);
 
 async function shot(page: Page, name: string) {
   await page.screenshot({ path: `artifacts/${name}.png`, fullPage: true });
@@ -48,7 +61,7 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
       monthTitle(now),
       { timeout: 30_000 }
     );
-    await expect(page.getByText('🧪 E2E Today')).toBeVisible({
+    await expect(gridPage(page, now).getByText('🧪 E2E Today')).toBeVisible({
       timeout: 30_000,
     });
     await shot(page, '01-initial-today');
@@ -60,14 +73,14 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
       monthTitle(target(1)),
       { timeout: 30_000 }
     );
-    await expect(page.getByText('🧪 E2E Morning')).toBeVisible({
-      timeout: 30_000,
-    });
+    await expect(
+      gridPage(page, target(1)).getByText('🧪 E2E Morning')
+    ).toBeVisible({ timeout: 30_000 });
 
     // The week containing the 1st settles at the grid's top edge.
     const gridBox = await page.getByTestId('month-grid').boundingBox();
-    const firstWeekCell = page.getByTestId(
-      `day-cell-${dateString(sundayOf(target(1)))}`
+    const firstWeekCell = gridPage(page, target(1)).getByTestId(
+      `day-cell-${dateString(weekStartOf(target(1)))}`
     );
     await expect
       .poll(async () => {
@@ -81,13 +94,13 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
   await test.step('banners: span days 8–10, stack above chips, break per week', async () => {
     // Some segment of the multi-day banner horizontally overlaps each covered
     // day cell (the span may break across a week edge on some run dates).
-    const segments = page.getByText('🧪 E2E Multi-day');
+    const segments = gridPage(page, target(1)).getByText('🧪 E2E Multi-day');
     const segmentBoxes = [];
     for (let i = 0; i < (await segments.count()); i++) {
       segmentBoxes.push(await segments.nth(i).boundingBox());
     }
     for (const day of [8, 9, 10]) {
-      const cell = await page
+      const cell = await gridPage(page, target(1))
         .getByTestId(`day-cell-${dateString(target(day))}`)
         .boundingBox();
       expect(
@@ -98,21 +111,33 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
     }
 
     // All-day banner renders above the timed chip on day 6.
-    const allDayBox = await page.getByText('🧪 E2E All-day').boundingBox();
-    const morningBox = await page.getByText('🧪 E2E Morning').boundingBox();
+    const allDayBox = await gridPage(page, target(1))
+      .getByText('🧪 E2E All-day')
+      .boundingBox();
+    const morningBox = await gridPage(page, target(1))
+      .getByText('🧪 E2E Morning')
+      .boundingBox();
     expect(allDayBox!.y).toBeLessThan(morningBox!.y);
 
     // A 9-day banner always crosses a week boundary → ≥2 segments.
-    expect(await page.getByText('🧪 E2E Longspan').count()).toBeGreaterThanOrEqual(
-      2
-    );
+    expect(
+      await gridPage(page, target(1)).getByText('🧪 E2E Longspan').count()
+    ).toBeGreaterThanOrEqual(2);
     await shot(page, '03-banners');
   });
 
-  await test.step('"+N more" → day popover → edit editor', async () => {
-    const more = page.getByTestId(`more-${dateString(target(27))}`);
-    await expect(more).toHaveText(/\+\d+ more/);
-    await more.click();
+  await test.step('long-press a day → popover → edit editor', async () => {
+    // The overflow counter is a label, not a button — the cell underneath owns
+    // both gestures: tap creates an event, long press opens the day.
+    const day = gridPage(page, target(1));
+    await expect(day.getByTestId(`more-${dateString(target(27))}`)).toHaveText(
+      /\+\d+/
+    );
+    // Aim at the day-number corner: the cell is full of chips, and those do
+    // capture their own pixels.
+    await day
+      .getByTestId(`day-cell-${dateString(target(27))}`)
+      .click({ delay: 700, position: { x: 10, y: 6 } });
     const popover = page.getByTestId('day-popover');
     await expect(popover).toBeVisible();
     await expect(popover.getByText(/🧪 Busy/)).toHaveCount(10);
@@ -127,7 +152,9 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
   });
 
   await test.step('empty day tap → create editor dated that day', async () => {
-    await page.getByTestId(`day-cell-${dateString(target(15))}`).click();
+    await gridPage(page, target(1))
+      .getByTestId(`day-cell-${dateString(target(15))}`)
+      .click();
     await expect(page.getByTestId('event-editor')).toBeVisible();
     // Native date input: value is locale-independent ISO.
     await expect(page.getByTestId('editor-start-date')).toHaveValue(
@@ -141,7 +168,7 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
   });
 
   await test.step('chip tap → edit editor', async () => {
-    await page.getByText('🧪 E2E Morning').click();
+    await gridPage(page, target(1)).getByText('🧪 E2E Morning').click();
     await expect(page.getByTestId('event-editor')).toBeVisible();
     await expect(page.getByTestId('editor-summary')).toHaveValue(
       '🧪 E2E Morning'
@@ -151,7 +178,9 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
   });
 
   await test.step('recurring create → daily ×3 → chips on three days → delete series', async () => {
-    await page.getByTestId(`day-cell-${dateString(target(15))}`).click();
+    await gridPage(page, target(1))
+      .getByTestId(`day-cell-${dateString(target(15))}`)
+      .click();
     await expect(page.getByTestId('event-editor')).toBeVisible();
     await page.getByTestId('editor-summary').fill('🧪 E2E Recurring');
     await page.getByTestId('editor-repeat-preset-daily').click();
@@ -160,18 +189,18 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
     await page.getByTestId('editor-save').click();
     await expect(page.getByTestId('event-editor')).toHaveCount(0);
     // One occurrence chip on each of the three days.
-    await expect(page.getByText('🧪 E2E Recurring')).toHaveCount(3, {
-      timeout: 30_000,
-    });
+    await expect(
+      gridPage(page, target(1)).getByText('🧪 E2E Recurring')
+    ).toHaveCount(3, { timeout: 30_000 });
     await shot(page, '06b-recurring-chips');
 
     // Whole-series delete from any occurrence.
-    await page.getByText('🧪 E2E Recurring').nth(1).click();
+    await gridPage(page, target(1)).getByText('🧪 E2E Recurring').nth(1).click();
     await expect(page.getByTestId('editor-delete')).toHaveText('Delete series');
     await page.getByTestId('editor-delete').click();
-    await expect(page.getByText('🧪 E2E Recurring')).toHaveCount(0, {
-      timeout: 30_000,
-    });
+    await expect(
+      gridPage(page, target(1)).getByText('🧪 E2E Recurring')
+    ).toHaveCount(0, { timeout: 30_000 });
   });
 
   await test.step('next month is empty', async () => {
@@ -217,7 +246,7 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
     await expect(page.getByTestId('calendar-header-label')).toHaveText(
       monthTitle(now)
     );
-    await expect(page.getByText('🧪 E2E Today')).toBeVisible({
+    await expect(gridPage(page, now).getByText('🧪 E2E Today')).toBeVisible({
       timeout: 30_000,
     });
     await shot(page, '08-today');

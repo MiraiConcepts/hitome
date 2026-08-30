@@ -1,10 +1,10 @@
-// Pure math for the scrollable month grid: week indexing over a bounded range
-// (the FlatList data), month-start jump targets, and per-week banner/chip lane
-// layout. No React or react-native imports — runs under bun test and CI jest.
+// Pure math for the paged month grid: the bounded month ribbon (the list
+// data, one entry per page), the six week rows a page draws, and per-week
+// banner/chip lane layout. No React or react-native imports — runs under bun
+// test and CI jest.
 import { eventLastMs, toDateString } from '@/utils/date';
 
 const DAY_MS = 86_400_000;
-const WEEK_MS = 7 * DAY_MS;
 
 /** Grid range: today ± this many years of week rows. */
 const RANGE_YEARS = 5;
@@ -14,88 +14,97 @@ export function addDays(d: Date, n: number): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 }
 
-/** Local-midnight Sunday of the week containing `d` (weeks start Sunday). */
+/** Local-midnight Monday of the week containing `d` (weeks start Monday).
+ *  getDay() counts from Sunday, so it is rotated before subtracting. */
 export function weekStartOf(d: Date): Date {
-  return addDays(d, -d.getDay());
-}
-
-/**
- * Whole weeks between two local-midnight week starts (Sundays). Math.round
- * absorbs the ±1h drift a DST transition introduces into the raw ms
- * difference.
- */
-export function weeksBetween(fromWeekStart: Date, toWeekStart: Date): number {
-  return Math.round(
-    (toWeekStart.getTime() - fromWeekStart.getTime()) / WEEK_MS
-  );
-}
-
-/**
- * The bounded week ribbon: Sunday dateStrings from the week containing
- * (today − RANGE_YEARS) through the week containing (today + RANGE_YEARS).
- * The array is the FlatList data; each entry doubles as its key.
- */
-export function buildWeekRange(today: Date): {
-  rangeStart: Date;
-  weeks: string[];
-} {
-  const rangeStart = weekStartOf(
-    new Date(
-      today.getFullYear() - RANGE_YEARS,
-      today.getMonth(),
-      today.getDate()
-    )
-  );
-  const rangeEnd = weekStartOf(
-    new Date(
-      today.getFullYear() + RANGE_YEARS,
-      today.getMonth(),
-      today.getDate()
-    )
-  );
-  const count = weeksBetween(rangeStart, rangeEnd) + 1;
-  const weeks: string[] = [];
-  for (let i = 0; i < count; i++) {
-    weeks.push(toDateString(addDays(rangeStart, i * 7)));
-  }
-  return { rangeStart, weeks };
-}
-
-/** Row index of the week containing `day` (negative / past-end when out of range). */
-export function weekIndexOfDay(day: Date, rangeStart: Date): number {
-  return weeksBetween(rangeStart, weekStartOf(day));
-}
-
-/** Row index of the week containing the 1st of (year, month0) — the scrollToMonth target. */
-export function monthStartWeekIndex(
-  year: number,
-  month0: number,
-  rangeStart: Date
-): number {
-  return weekIndexOfDay(new Date(year, month0, 1), rangeStart);
+  return addDays(d, -((d.getDay() + 6) % 7));
 }
 
 /** A calendar month reference (month0 is 0-based like Date#getMonth). */
 export type MonthAnchor = { year: number; month0: number };
 
+/** Months are addressed by their absolute ordinal, so index math is exact. */
+const ordinalOf = ({ year, month0 }: MonthAnchor) => year * 12 + month0;
+
 /**
- * The month that "owns" a week row = the month of the week's Saturday. With
- * Sunday-start weeks, the week containing a month's 1st always has its
- * Saturday in that month, and every following week up to (excluding) the next
- * month's start week does too — so this drives both the header label and day
- * dimming.
+ * The bounded month ribbon: every month from RANGE_YEARS before `today`
+ * through RANGE_YEARS after. One entry per page of the grid — the list data.
  */
-export function monthAnchorOf(weekStart: Date): MonthAnchor {
-  const saturday = addDays(weekStart, 6);
-  return { year: saturday.getFullYear(), month0: saturday.getMonth() };
+export function buildMonthRange(today: Date): MonthAnchor[] {
+  const first = ordinalOf({
+    year: today.getFullYear() - RANGE_YEARS,
+    month0: today.getMonth(),
+  });
+  const count = RANGE_YEARS * 2 * 12 + 1;
+  return Array.from({ length: count }, (_, i) => ({
+    year: Math.floor((first + i) / 12),
+    month0: (first + i) % 12,
+  }));
+}
+
+/** Page index of `anchor` in a ribbon starting at `first`; out of range when
+ *  negative or past the ribbon's end, so callers clamp. */
+export function monthIndexIn(first: MonthAnchor, anchor: MonthAnchor): number {
+  return ordinalOf(anchor) - ordinalOf(first);
+}
+
+/** Stable page key, e.g. '2026-08'. */
+export function monthKey({ year, month0 }: MonthAnchor): string {
+  return `${year}-${String(month0 + 1).padStart(2, '0')}`;
+}
+
+/**
+ * The six week-starts a month page renders: the week containing the 1st, plus
+ * five. Six always covers a month (a 31-day month starting Sunday is the worst
+ * case, at exactly six), and always rendering six — rather than the four or
+ * five a month may strictly need — is what keeps every page the same height,
+ * which is what makes one swipe equal one month.
+ */
+export function weeksOfMonth({ year, month0 }: MonthAnchor): string[] {
+  const first = weekStartOf(new Date(year, month0, 1));
+  return Array.from({ length: 6 }, (_, i) =>
+    toDateString(addDays(first, i * 7))
+  );
+}
+
+// What it takes to flip a month. The platform's own rule is "drag past half
+// the page, or fling hard enough that its predicted landing crosses the
+// halfway mark" — on a full-screen page that is a very long drag, which is
+// what made paging feel like work. These replace it: a drag flips once it has
+// covered this fraction of a page, or is let go with this much speed behind
+// it (dp/ms, the unit Android and iOS both report). Neither can move more
+// than one month, because the decision is always "the page the drag started
+// on, plus or minus one".
+const FLIP_FRACTION = 0.15;
+const FLIP_VELOCITY = 0.3;
+
+/**
+ * Where a gesture lands: the page it began on, plus or minus one. Both
+ * platforms run this same rule, so a drag that flips the month on the phone
+ * flips it in the browser too. Direction comes from the distance moved rather
+ * than the velocity's sign, which differs between platforms.
+ */
+export function landingIndex(
+  from: number,
+  offset: number,
+  height: number,
+  velocity: number
+): number {
+  const moved = offset - from * height;
+  const direction = Math.sign(moved);
+  if (direction === 0) return from;
+  const flips =
+    Math.abs(moved) >= height * FLIP_FRACTION ||
+    Math.abs(velocity) >= FLIP_VELOCITY;
+  return flips ? from + direction : from;
 }
 
 /**
  * Fetch window covering a settled month's full 6-row viewport:
  * [weekStart(1st) − 7d, weekStart(1st) + 49d). Unlike the old
  * [1st−7d, last+7d) window, this covers the 6th grid row even for short
- * months starting on Sunday (e.g. Feb 2026 shows through Mar 14 but last+7d
- * ends Mar 7).
+ * short months (e.g. a February whose grid runs two weeks into March, where
+ * last+7d would stop a week early).
  */
 export function gridFetchRange(
   year: number,

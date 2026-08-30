@@ -24,7 +24,7 @@ import {
   MonthGrid,
   type MonthGridHandle,
 } from '@/components/calendar/month-grid';
-import { MonthHeader } from '@/components/calendar/month-header';
+import { HEADER_GROUND, MonthHeader } from '@/components/calendar/month-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { davConfigured } from '@/config';
@@ -75,8 +75,7 @@ export function MonthScreen() {
   const [initialMonth] = useState<MonthAnchor>(() =>
     monthOfDay(dayParam, new Date())
   );
-  const [visibleMonth, setVisibleMonth] = useState<MonthAnchor>(initialMonth);
-  const [settledMonth, setSettledMonth] = useState<MonthAnchor>(initialMonth);
+  const [month, setMonth] = useState<MonthAnchor>(initialMonth);
   const [editor, setEditor] = useState<EditorState>(
     newParam ? { mode: 'create', day: today } : { mode: 'closed' }
   );
@@ -133,11 +132,12 @@ export function MonthScreen() {
     gridRef.current?.scrollToMonth(target.year, target.month0, false);
   }, [pendingScrollDay, gridSize]);
 
-  const settledDate = useMemo(
-    () => new Date(settledMonth.year, settledMonth.month0, 1),
-    [settledMonth]
+  const monthDate = useMemo(
+    () => new Date(month.year, month.month0, 1),
+    [month]
   );
-  const { events, loading, error, refresh } = useMonthEvents(settledDate);
+  const { events, loading, error, refresh, fetchedAt } =
+    useMonthEvents(monthDate);
 
   // Auto-dismiss the snackbar.
   useEffect(() => {
@@ -146,12 +146,8 @@ export function MonthScreen() {
     return () => clearTimeout(timer);
   }, [snack]);
 
-  const onVisibleMonthChange = useCallback((anchor: MonthAnchor) => {
-    setVisibleMonth((prev) => (sameMonth(prev, anchor) ? prev : anchor));
-  }, []);
-
-  const onSettledMonthChange = useCallback((anchor: MonthAnchor) => {
-    setSettledMonth((prev) => (sameMonth(prev, anchor) ? prev : anchor));
+  const onMonthChange = useCallback((anchor: MonthAnchor) => {
+    setMonth((prev) => (sameMonth(prev, anchor) ? prev : anchor));
   }, []);
 
   const onPressDay = useCallback(
@@ -164,7 +160,7 @@ export function MonthScreen() {
     setEditor({ mode: 'edit', event });
   }, []);
 
-  const onPressMore = useCallback((day: string) => setPopoverDay(day), []);
+  const onLongPressDay = useCallback((day: string) => setPopoverDay(day), []);
 
   function goToday() {
     const target = monthOfDay(null, new Date());
@@ -215,9 +211,9 @@ export function MonthScreen() {
 
   const weekdayLabels = useMemo(
     () =>
-      // 2024-01-07 is a Sunday; weeks start Sunday.
+      // 2024-01-01 is a Monday; weeks start Monday.
       Array.from({ length: 7 }, (_, i) =>
-        new Date(2024, 0, 7 + i).toLocaleDateString(undefined, {
+        new Date(2024, 0, 1 + i).toLocaleDateString(undefined, {
           weekday: 'short',
         })
       ),
@@ -246,11 +242,10 @@ export function MonthScreen() {
     );
   }
 
-  const monthLabel = new Date(
-    visibleMonth.year,
-    visibleMonth.month0,
-    1
-  ).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const monthLabel = monthDate.toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  });
 
   return (
     <ThemedView style={styles.container}>
@@ -258,11 +253,13 @@ export function MonthScreen() {
         <View style={styles.content}>
           <MonthHeader
             label={monthLabel}
-            monthIndex={visibleMonth.year * 12 + visibleMonth.month0}
+            monthIndex={month.year * 12 + month.month0}
             loading={loading && events.length === 0}
             refreshing={manualRefreshing}
+            fetchedAt={fetchedAt}
             onToday={goToday}
             onRefresh={onManualRefresh}
+            onAdd={() => setEditor({ mode: 'create', day: today })}
           />
 
           {error && (
@@ -280,14 +277,15 @@ export function MonthScreen() {
 
           <View style={styles.weekdays}>
             {weekdayLabels.map((label) => (
-              <ThemedText
-                key={label}
-                type="small"
-                themeColor="textSecondary"
-                style={styles.weekday}
-              >
-                {label}
-              </ThemedText>
+              // The column is the View, as in the grid's own rows. Putting flex
+              // on the Text instead sizes each label to its own word plus an
+              // equal share of the slack, which spaces the labels evenly from
+              // each other rather than aligning them to the columns beneath.
+              <View key={label} style={styles.weekdayCell}>
+                <ThemedText type="small" style={styles.weekday}>
+                  {label}
+                </ThemedText>
+              </View>
             ))}
           </View>
 
@@ -310,13 +308,11 @@ export function MonthScreen() {
                 events={events}
                 today={today}
                 initialMonth={initialMonth}
-                focusedMonth={visibleMonth}
-                onVisibleMonthChange={onVisibleMonthChange}
-                onSettledMonthChange={onSettledMonthChange}
+                onMonthChange={onMonthChange}
                 onAnchored={onGridAnchored}
                 onPressDay={onPressDay}
                 onPressEvent={onPressEvent}
-                onPressMore={onPressMore}
+                onLongPressDay={onLongPressDay}
               />
             )}
             {(!gridAnchored || !gridSize) && (
@@ -406,19 +402,24 @@ const styles = StyleSheet.create({
   errorText: {
     flex: 1,
   },
+  // Continues the accent bar above it, so the header reads as one block down
+  // to the grid. No separator of its own: the grid's first row already draws a
+  // rule directly beneath, and a second line would double it.
   weekdays: {
     flexDirection: 'row',
-    paddingBottom: Spacing.one,
-    borderBottomWidth: 1,
-    borderBottomColor: AccentColor,
+    backgroundColor: HEADER_GROUND,
+    paddingBottom: Spacing.two,
+  },
+  weekdayCell: {
+    flex: 1,
+    // Matches the day number's own inset (2 margin + 4 padding) so each label
+    // sits directly above its column's number.
+    paddingLeft: 6,
   },
   weekday: {
-    flex: 1,
-    textAlign: 'right',
-    paddingRight: Spacing.three,
-    fontSize: 12,
-    color: Colors.light.text,
+    fontSize: 16,
     fontWeight: 'bold',
+    color: AccentColor,
   },
   gridWrap: {
     flex: 1,

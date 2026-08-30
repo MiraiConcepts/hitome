@@ -11,12 +11,10 @@ import { ThemedText } from '@/components/themed-text';
 import { AccentColor, Spacing } from '@/constants/theme';
 import type { BannerPlacement } from '@/utils/calendar-grid';
 import { readableTextColor } from '@/utils/color';
-import { toTimeString } from '@/utils/date';
 
 type ChipProps = {
   event: CalEvent;
   /** Show the start time — only when cells are wide enough to afford it. */
-  showTime: boolean;
   /** Title lines the layout granted this chip; >1 renders the stacked form. */
   titleLines: number;
   /** Absolute slot position, supplied by the week row. */
@@ -30,13 +28,7 @@ type ChipProps = {
  * to the granted lines. Without a time it's the title alone, wrapping only
  * when granted extra lines.
  */
-export function EventChip({
-  event,
-  showTime,
-  titleLines,
-  style,
-  onPress,
-}: ChipProps) {
+export function EventChip({ event, titleLines, style, onPress }: ChipProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -50,35 +42,24 @@ export function EventChip({
           { backgroundColor: event.color ?? AccentColor },
         ]}
       />
-      {showTime ? (
-        <View style={styles.chipStack}>
-          <ThemedText
-            type="small"
-            themeColor="textSecondary"
-            style={styles.chipTime}
-          >
-            {toTimeString(event.start)}
-          </ThemedText>
-          <ThemedText
-            type="small"
-            numberOfLines={titleLines}
-            style={styles.chipTitleWrapped}
-          >
-            {event.summary || '(untitled)'}
-          </ThemedText>
-        </View>
-      ) : titleLines > 1 ? (
+      {titleLines > 1 ? (
         <View style={styles.chipStack}>
           <ThemedText
             type="small"
             numberOfLines={titleLines}
+            textBreakStrategy="simple"
             style={styles.chipTitleWrapped}
           >
             {event.summary || '(untitled)'}
           </ThemedText>
         </View>
       ) : (
-        <ThemedText type="small" numberOfLines={1} style={styles.chipTitle}>
+        <ThemedText
+          type="small"
+          numberOfLines={1}
+          textBreakStrategy="simple"
+          style={styles.chipTitle}
+        >
           {event.summary || '(untitled)'}
         </ThemedText>
       )}
@@ -123,6 +104,7 @@ export function EventBanner({
       <ThemedText
         type="small"
         numberOfLines={titleLines}
+        textBreakStrategy="simple"
         style={[styles.bannerTitle, { color: readableTextColor(fill) }]}
       >
         {event.summary || '(untitled)'}
@@ -130,6 +112,11 @@ export function EventBanner({
     </Pressable>
   );
 }
+
+/** Every event's text — chip title, wrapped title, start time, banner title.
+ *  week-row's width estimate is derived from this, so the two move together. */
+export const EVENT_FONT_SIZE = 12;
+const EVENT_LINE_HEIGHT = 15;
 
 const styles = StyleSheet.create({
   chip: {
@@ -140,24 +127,23 @@ const styles = StyleSheet.create({
   },
   chipBar: {
     width: 3,
+    // No vertical inset: the bar fills the chip's slot exactly, so a timed
+    // event's marker stands the same height as an all-day banner beside it.
     alignSelf: 'stretch',
-    marginVertical: 2,
   },
   chipStack: {
     flex: 1,
   },
+  // One size and line box for every kind of event text, so a timed chip, a
+  // wrapped chip and an all-day banner all sit on the same baseline.
   chipTitle: {
     flex: 1,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: EVENT_FONT_SIZE,
+    lineHeight: EVENT_LINE_HEIGHT,
   },
   chipTitleWrapped: {
-    fontSize: 11,
-    lineHeight: 14,
-  },
-  chipTime: {
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: EVENT_FONT_SIZE,
+    lineHeight: EVENT_LINE_HEIGHT,
   },
   banner: {
     justifyContent: 'center',
@@ -168,7 +154,7 @@ const styles = StyleSheet.create({
     marginRight: 0,
   },
   bannerTitle: {
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: EVENT_FONT_SIZE,
+    lineHeight: EVENT_LINE_HEIGHT,
   },
 });

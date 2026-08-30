@@ -1,20 +1,20 @@
 import {
   addDays,
-  buildWeekRange,
+  buildMonthRange,
   gridFetchRange,
+  landingIndex,
   isBanner,
   layoutWeek,
-  monthAnchorOf,
-  monthStartWeekIndex,
-  weekIndexOfDay,
+  monthIndexIn,
+  monthKey,
   weekStartOf,
-  weeksBetween,
+  weeksOfMonth,
   type GridEventLike,
 } from './calendar-grid';
 import { toDateString } from './date';
 
-// Sun 2026-07-05 .. Sat 2026-07-11 — the reference week for layout tests.
-const WEEK = new Date(2026, 6, 5);
+// Mon 2026-07-06 .. Sun 2026-07-12 — the reference week for layout tests.
+const WEEK = new Date(2026, 6, 6);
 
 const ev = (
   id: string,
@@ -24,107 +24,155 @@ const ev = (
 ): GridEventLike => ({ id, start, end, allDay });
 
 describe('weekStartOf', () => {
-  it('maps every day of a week to its Sunday', () => {
+  it('maps every day of a week to its Monday', () => {
     for (let i = 0; i < 7; i++) {
-      expect(toDateString(weekStartOf(addDays(WEEK, i)))).toBe('2026-07-05');
+      expect(toDateString(weekStartOf(addDays(WEEK, i)))).toBe('2026-07-06');
     }
+  });
+
+  it('keeps Sunday in the week that began the day before', () => {
+    // Sunday is the last column now, not the first: Sun 2026-07-12 belongs to
+    // the week of Mon 2026-07-06, not the one starting the next day.
+    expect(toDateString(weekStartOf(new Date(2026, 6, 12)))).toBe('2026-07-06');
   });
 
   it('crosses month and year boundaries', () => {
-    // Fri 2027-01-01 belongs to the week of Sun 2026-12-27.
-    expect(toDateString(weekStartOf(new Date(2027, 0, 1)))).toBe('2026-12-27');
+    // Fri 2027-01-01 belongs to the week of Mon 2026-12-28.
+    expect(toDateString(weekStartOf(new Date(2027, 0, 1)))).toBe('2026-12-28');
   });
 });
 
-describe('weeksBetween / weekIndexOfDay', () => {
-  it('counts whole weeks between week starts', () => {
-    expect(weeksBetween(WEEK, WEEK)).toBe(0);
-    expect(weeksBetween(WEEK, addDays(WEEK, 7))).toBe(1);
-    expect(weeksBetween(WEEK, addDays(WEEK, 70))).toBe(10);
-    expect(weeksBetween(addDays(WEEK, 7), WEEK)).toBe(-1);
-  });
-
-  it('increments once per 7 days across a year boundary (DST-safe)', () => {
-    const rangeStart = new Date(2026, 9, 4); // Sun 2026-10-04
-    for (let i = 0; i < 26; i++) {
-      expect(weekIndexOfDay(addDays(rangeStart, i * 7 + 3), rangeStart)).toBe(
-        i
-      );
-    }
-  });
-});
-
-describe('buildWeekRange', () => {
+describe('buildMonthRange', () => {
   const today = new Date(2026, 6, 12);
-  const { rangeStart, weeks } = buildWeekRange(today);
+  const months = buildMonthRange(today);
 
-  it('starts on a Sunday and spans ~10 years of weeks', () => {
-    expect(rangeStart.getDay()).toBe(0);
-    expect(weeks[0]).toBe(toDateString(rangeStart));
-    expect(weeks.length).toBeGreaterThan(500);
-    expect(weeks.length).toBeLessThan(550);
+  it('spans today ± 5 years, one entry per month', () => {
+    expect(months.length).toBe(121);
+    expect(months[0]).toEqual({ year: 2021, month0: 6 });
+    expect(months[months.length - 1]).toEqual({ year: 2031, month0: 6 });
   });
 
-  it('lists consecutive Sundays and contains today’s week', () => {
-    expect(weeks[1]).toBe(toDateString(addDays(rangeStart, 7)));
-    const todayIndex = weekIndexOfDay(today, rangeStart);
-    expect(weeks[todayIndex]).toBe(toDateString(weekStartOf(today)));
-  });
-});
-
-describe('monthStartWeekIndex', () => {
-  const rangeStart = new Date(2026, 0, 4); // Sun 2026-01-04
-
-  it('targets the week containing the 1st', () => {
-    // Jul 1 2026 is a Wednesday — its week starts Sun Jun 28.
-    const index = monthStartWeekIndex(2026, 6, rangeStart);
-    expect(toDateString(addDays(rangeStart, index * 7))).toBe('2026-06-28');
-  });
-
-  it('is negative for a month starting before the range', () => {
-    // Jan 2026's 1st falls before rangeStart.
-    expect(monthStartWeekIndex(2026, 0, rangeStart)).toBeLessThan(0);
+  it('advances one month at a time across year boundaries', () => {
+    for (let i = 1; i < months.length; i++) {
+      const prev = months[i - 1];
+      const step = new Date(prev.year, prev.month0 + 1, 1);
+      expect(months[i]).toEqual({
+        year: step.getFullYear(),
+        month0: step.getMonth(),
+      });
+    }
   });
 });
 
-describe('monthAnchorOf', () => {
-  it('assigns the week containing the 1st to that month, for any weekday 1st', () => {
-    // Months starting Mon..Sun: Feb 2027 (Mon), Sep 2026 (Tue), Jul 2026 (Wed),
-    // Oct 2026 (Thu), May 2026 (Fri), Aug 2026 (Sat), Mar 2026 (Sun).
-    const cases: [number, number][] = [
-      [2027, 1],
-      [2026, 8],
-      [2026, 6],
-      [2026, 9],
-      [2026, 4],
-      [2026, 7],
-      [2026, 2],
-    ];
-    for (const [year, month0] of cases) {
-      const anchor = monthAnchorOf(weekStartOf(new Date(year, month0, 1)));
-      expect([anchor.year, anchor.month0]).toEqual([year, month0]);
+describe('monthIndexIn', () => {
+  const first = { year: 2021, month0: 6 };
+
+  it('counts months from the ribbon start', () => {
+    expect(monthIndexIn(first, { year: 2021, month0: 6 })).toBe(0);
+    expect(monthIndexIn(first, { year: 2021, month0: 7 })).toBe(1);
+    expect(monthIndexIn(first, { year: 2026, month0: 6 })).toBe(60);
+  });
+
+  it('is negative before the ribbon start, so callers clamp', () => {
+    expect(monthIndexIn(first, { year: 2021, month0: 5 })).toBe(-1);
+  });
+
+  it('round-trips through buildMonthRange', () => {
+    const months = buildMonthRange(new Date(2026, 6, 12));
+    for (const month of [months[0], months[47], months[120]]) {
+      expect(months[monthIndexIn(months[0], month)]).toEqual(month);
+    }
+  });
+});
+
+describe('monthKey', () => {
+  it('zero-pads the month', () => {
+    expect(monthKey({ year: 2026, month0: 0 })).toBe('2026-01');
+    expect(monthKey({ year: 2026, month0: 11 })).toBe('2026-12');
+  });
+});
+
+describe('weeksOfMonth', () => {
+  it('starts on the Monday of the week containing the 1st', () => {
+    // Jul 1 2026 is a Wednesday — its week starts Mon Jun 29.
+    expect(weeksOfMonth({ year: 2026, month0: 6 })[0]).toBe('2026-06-29');
+    // Jun 1 2026 is itself a Monday.
+    expect(weeksOfMonth({ year: 2026, month0: 5 })[0]).toBe('2026-06-01');
+    // Mar 1 2026 is a Sunday — the last column, so its week began Feb 23.
+    expect(weeksOfMonth({ year: 2026, month0: 2 })[0]).toBe('2026-02-23');
+  });
+
+  it('always lists six consecutive Mondays, so every page is one height', () => {
+    for (let month0 = 0; month0 < 12; month0++) {
+      const weeks = weeksOfMonth({ year: 2026, month0 });
+      expect(weeks.length).toBe(6);
+      for (let i = 1; i < 6; i++) {
+        const prev = new Date(weeks[i - 1]);
+        expect(weeks[i]).toBe(toDateString(addDays(prev, 7)));
+      }
     }
   });
 
-  it('keeps the preceding week in the previous month', () => {
-    const firstWeek = weekStartOf(new Date(2026, 6, 1));
-    const anchor = monthAnchorOf(addDays(firstWeek, -7));
-    expect([anchor.year, anchor.month0]).toEqual([2026, 5]);
+  it('covers the whole month, worst case included', () => {
+    // Mar 2026: 31 days starting Sunday — the six-row worst case now that
+    // Sunday is the last column, so the 1st sits alone in row one.
+    const weeks = weeksOfMonth({ year: 2026, month0: 2 });
+    const last = addDays(new Date(weeks[5]), 6);
+    expect(weeks[0] <= '2026-03-01').toBe(true);
+    expect(toDateString(last) >= '2026-03-31').toBe(true);
+  });
+});
+
+describe('landingIndex', () => {
+  const H = 800; // page height
+  const from = 60;
+  const at = (fraction: number) => (from + fraction) * H;
+
+  it('stays put below the distance threshold with no speed', () => {
+    expect(landingIndex(from, at(0.14), H, 0)).toBe(from);
+    expect(landingIndex(from, at(-0.14), H, 0)).toBe(from);
+  });
+
+  it('flips once the drag passes the threshold, in either direction', () => {
+    expect(landingIndex(from, at(0.15), H, 0)).toBe(from + 1);
+    expect(landingIndex(from, at(-0.15), H, 0)).toBe(from - 1);
+  });
+
+  it('flips on speed alone, however short the drag', () => {
+    expect(landingIndex(from, at(0.01), H, 0.3)).toBe(from + 1);
+    expect(landingIndex(from, at(-0.01), H, -0.3)).toBe(from - 1);
+  });
+
+  it('takes direction from the drag, not the velocity sign', () => {
+    // Platforms disagree on the sign of scroll velocity; a fast drag forward
+    // must page forward whichever sign arrives with it.
+    expect(landingIndex(from, at(0.02), H, -5)).toBe(from + 1);
+    expect(landingIndex(from, at(-0.02), H, 5)).toBe(from - 1);
+  });
+
+  it('never moves more than one month, however far or fast', () => {
+    expect(landingIndex(from, at(4), H, 12)).toBe(from + 1);
+    expect(landingIndex(from, at(-4), H, -12)).toBe(from - 1);
+  });
+
+  it('holds the page when nothing moved', () => {
+    expect(landingIndex(from, at(0), H, 0)).toBe(from);
+    expect(landingIndex(from, at(0), H, 9)).toBe(from);
   });
 });
 
 describe('gridFetchRange', () => {
-  it('covers all six grid rows of a Sunday-starting short month', () => {
-    // Feb 2026 starts Sun — the settled grid shows through Sat Mar 14.
+  it('covers all six grid rows of a short month', () => {
+    // Feb 2026's grid starts Mon Jan 26 and runs six rows, through Mar 8.
     const { start, end } = gridFetchRange(2026, 1);
-    expect(toDateString(start)).toBe('2026-01-25');
-    expect(end.getTime()).toBeGreaterThan(new Date(2026, 2, 15).getTime() - 1);
+    expect(toDateString(start)).toBe('2026-01-19');
+    expect(end.getTime()).toBeGreaterThan(new Date(2026, 2, 9).getTime() - 1);
   });
 
   it('is one week of slack either side of the month’s first week', () => {
-    const { start, end } = gridFetchRange(2026, 6); // first week Sun Jun 28
-    expect(toDateString(start)).toBe('2026-06-21');
-    expect(toDateString(end)).toBe('2026-08-16');
+    const { start, end } = gridFetchRange(2026, 6); // first week Mon Jun 29
+    expect(toDateString(start)).toBe('2026-06-22');
+    expect(toDateString(end)).toBe('2026-08-17');
   });
 });
 
@@ -160,7 +208,7 @@ describe('layoutWeek', () => {
   it('places a timed event as a chip in its column', () => {
     const layout = layoutWeek(
       WEEK,
-      [ev('a', new Date(2026, 6, 8, 10), new Date(2026, 6, 8, 11))],
+      [ev('a', new Date(2026, 6, 9, 10), new Date(2026, 6, 9, 11))],
       SLOTS
     );
     expect(layout.banners).toEqual([]);
@@ -171,7 +219,7 @@ describe('layoutWeek', () => {
   it('spans a multi-day timed event across its columns', () => {
     const layout = layoutWeek(
       WEEK,
-      [ev('a', new Date(2026, 6, 8, 10), new Date(2026, 6, 10, 11))],
+      [ev('a', new Date(2026, 6, 9, 10), new Date(2026, 6, 11, 11))],
       SLOTS
     );
     expect(layout.banners).toMatchObject([
@@ -188,7 +236,7 @@ describe('layoutWeek', () => {
   it('clamps banners at week edges and flags continuation', () => {
     const layout = layoutWeek(
       WEEK,
-      [ev('a', new Date(2026, 6, 4), new Date(2026, 6, 15), true)],
+      [ev('a', new Date(2026, 6, 5), new Date(2026, 6, 16), true)],
       SLOTS
     );
     expect(layout.banners).toMatchObject([
@@ -199,7 +247,7 @@ describe('layoutWeek', () => {
   it('treats all-day DTEND as exclusive (single covered day)', () => {
     const layout = layoutWeek(
       WEEK,
-      [ev('a', new Date(2026, 6, 8), new Date(2026, 6, 9), true)],
+      [ev('a', new Date(2026, 6, 9), new Date(2026, 6, 10), true)],
       SLOTS
     );
     expect(layout.banners).toMatchObject([{ startCol: 3, span: 1 }]);
@@ -209,10 +257,10 @@ describe('layoutWeek', () => {
     const layout = layoutWeek(
       WEEK,
       [
-        ev('before', new Date(2026, 6, 1, 10), new Date(2026, 6, 1, 11)),
+        ev('before', new Date(2026, 6, 2, 10), new Date(2026, 6, 2, 11)),
         // Timed event ending exactly at the week's first midnight — exclusive.
-        ev('edge', new Date(2026, 6, 4, 22), new Date(2026, 6, 5, 0, 0)),
-        ev('after', new Date(2026, 6, 13, 10), new Date(2026, 6, 13, 11)),
+        ev('edge', new Date(2026, 6, 5, 22), new Date(2026, 6, 6, 0, 0)),
+        ev('after', new Date(2026, 6, 14, 10), new Date(2026, 6, 14, 11)),
       ],
       SLOTS
     );
@@ -224,9 +272,9 @@ describe('layoutWeek', () => {
     const layout = layoutWeek(
       WEEK,
       [
-        ev('a', new Date(2026, 6, 6), new Date(2026, 6, 9), true), // Mon–Wed
-        ev('b', new Date(2026, 6, 7), new Date(2026, 6, 10), true), // Tue–Thu
-        ev('c', new Date(2026, 6, 9), new Date(2026, 6, 11), true), // Thu–Fri
+        ev('a', new Date(2026, 6, 7), new Date(2026, 6, 10), true), // Mon–Wed
+        ev('b', new Date(2026, 6, 8), new Date(2026, 6, 11), true), // Tue–Thu
+        ev('c', new Date(2026, 6, 10), new Date(2026, 6, 12), true), // Thu–Fri
       ],
       SLOTS
     );
@@ -240,8 +288,8 @@ describe('layoutWeek', () => {
     const layout = layoutWeek(
       WEEK,
       [
-        ev('short', new Date(2026, 6, 6), new Date(2026, 6, 8), true),
-        ev('long', new Date(2026, 6, 6), new Date(2026, 6, 11), true),
+        ev('short', new Date(2026, 6, 7), new Date(2026, 6, 9), true),
+        ev('long', new Date(2026, 6, 7), new Date(2026, 6, 12), true),
       ],
       SLOTS
     );
@@ -255,9 +303,9 @@ describe('layoutWeek', () => {
     const layout = layoutWeek(
       WEEK,
       [
-        ev('banner', new Date(2026, 6, 6), new Date(2026, 6, 9), true), // Mon–Wed
-        ev('under', new Date(2026, 6, 7, 9), new Date(2026, 6, 7, 10)), // Tue
-        ev('clear', new Date(2026, 6, 10, 9), new Date(2026, 6, 10, 10)), // Fri
+        ev('banner', new Date(2026, 6, 7), new Date(2026, 6, 10), true), // Mon–Wed
+        ev('under', new Date(2026, 6, 8, 9), new Date(2026, 6, 8, 10)), // Tue
+        ev('clear', new Date(2026, 6, 11, 9), new Date(2026, 6, 11, 10)), // Fri
       ],
       SLOTS
     );
@@ -270,8 +318,8 @@ describe('layoutWeek', () => {
     const layout = layoutWeek(
       WEEK,
       [
-        ev('late', new Date(2026, 6, 8, 15), new Date(2026, 6, 8, 16)),
-        ev('early', new Date(2026, 6, 8, 9), new Date(2026, 6, 8, 10)),
+        ev('late', new Date(2026, 6, 9, 15), new Date(2026, 6, 9, 16)),
+        ev('early', new Date(2026, 6, 9, 9), new Date(2026, 6, 9, 10)),
       ],
       SLOTS
     );
@@ -285,9 +333,9 @@ describe('layoutWeek', () => {
     const layout = layoutWeek(
       WEEK,
       [
-        ev('a', new Date(2026, 6, 8, 9), new Date(2026, 6, 8, 10)),
-        ev('b', new Date(2026, 6, 8, 10), new Date(2026, 6, 8, 11)),
-        ev('c', new Date(2026, 6, 8, 11), new Date(2026, 6, 8, 12)),
+        ev('a', new Date(2026, 6, 9, 9), new Date(2026, 6, 9, 10)),
+        ev('b', new Date(2026, 6, 9, 10), new Date(2026, 6, 9, 11)),
+        ev('c', new Date(2026, 6, 9, 11), new Date(2026, 6, 9, 12)),
       ],
       2
     );
@@ -299,8 +347,8 @@ describe('layoutWeek', () => {
     const layout = layoutWeek(
       WEEK,
       [
-        ev('a', new Date(2026, 6, 8, 9), new Date(2026, 6, 8, 10)),
-        ev('b', new Date(2026, 6, 8, 10), new Date(2026, 6, 8, 11)),
+        ev('a', new Date(2026, 6, 9, 9), new Date(2026, 6, 9, 10)),
+        ev('b', new Date(2026, 6, 9, 10), new Date(2026, 6, 9, 11)),
       ],
       2
     );
@@ -316,10 +364,10 @@ describe('layoutWeek', () => {
     const layout = layoutWeek(
       WEEK,
       [
-        ev('A', new Date(2026, 6, 6), new Date(2026, 6, 13), true), // Mon–Sun
-        ev('B', new Date(2026, 6, 6), new Date(2026, 6, 8), true), // Mon–Tue
-        ev('C', new Date(2026, 6, 6), new Date(2026, 6, 10), true), // Mon–Thu
-        ev('chip', new Date(2026, 6, 8, 9), new Date(2026, 6, 8, 10)), // Wed
+        ev('A', new Date(2026, 6, 7), new Date(2026, 6, 14), true), // Mon–Sun
+        ev('B', new Date(2026, 6, 7), new Date(2026, 6, 9), true), // Mon–Tue
+        ev('C', new Date(2026, 6, 7), new Date(2026, 6, 11), true), // Mon–Thu
+        ev('chip', new Date(2026, 6, 9, 9), new Date(2026, 6, 9, 10)), // Wed
       ],
       2
     );
@@ -332,8 +380,8 @@ describe('layoutWeek', () => {
     const layout = layoutWeek(
       WEEK,
       [
-        ev('tall', new Date(2026, 6, 8, 9), new Date(2026, 6, 8, 10)),
-        ev('short', new Date(2026, 6, 8, 10), new Date(2026, 6, 8, 11)),
+        ev('tall', new Date(2026, 6, 9, 9), new Date(2026, 6, 9, 10)),
+        ev('short', new Date(2026, 6, 9, 10), new Date(2026, 6, 9, 11)),
       ],
       SLOTS,
       (e) => (e.id === 'tall' ? 3 : 1)
@@ -348,9 +396,9 @@ describe('layoutWeek', () => {
     const layout = layoutWeek(
       WEEK,
       [
-        ev('banner', new Date(2026, 6, 8), new Date(2026, 6, 9), true), // Wed
-        ev('tall', new Date(2026, 6, 8, 9), new Date(2026, 6, 8, 10)),
-        ev('after', new Date(2026, 6, 8, 10), new Date(2026, 6, 8, 11)),
+        ev('banner', new Date(2026, 6, 9), new Date(2026, 6, 10), true), // Wed
+        ev('tall', new Date(2026, 6, 9, 9), new Date(2026, 6, 9, 10)),
+        ev('after', new Date(2026, 6, 9, 10), new Date(2026, 6, 9, 11)),
       ],
       SLOTS,
       (e) => (e.id === 'tall' ? 2 : 1)
@@ -364,7 +412,7 @@ describe('layoutWeek', () => {
   it('keeps a spanning chip that exactly fills the visible slots', () => {
     const layout = layoutWeek(
       WEEK,
-      [ev('a', new Date(2026, 6, 8, 9), new Date(2026, 6, 8, 10))],
+      [ev('a', new Date(2026, 6, 9, 9), new Date(2026, 6, 9, 10))],
       3,
       () => 3
     );
@@ -376,8 +424,8 @@ describe('layoutWeek', () => {
     const layout = layoutWeek(
       WEEK,
       [
-        ev('a', new Date(2026, 6, 8, 9), new Date(2026, 6, 8, 10)),
-        ev('b', new Date(2026, 6, 8, 10), new Date(2026, 6, 8, 11)),
+        ev('a', new Date(2026, 6, 9, 9), new Date(2026, 6, 9, 10)),
+        ev('b', new Date(2026, 6, 9, 10), new Date(2026, 6, 9, 11)),
       ],
       3,
       (e) => (e.id === 'b' ? 3 : 1)
@@ -391,8 +439,8 @@ describe('layoutWeek', () => {
     const layout = layoutWeek(
       WEEK,
       [
-        ev('a', new Date(2026, 6, 8, 9), new Date(2026, 6, 8, 10)),
-        ev('b', new Date(2026, 6, 6), new Date(2026, 6, 9), true),
+        ev('a', new Date(2026, 6, 9, 9), new Date(2026, 6, 9, 10)),
+        ev('b', new Date(2026, 6, 7), new Date(2026, 6, 10), true),
       ],
       0
     );
@@ -405,8 +453,8 @@ describe('layoutWeek', () => {
     const layout = layoutWeek(
       WEEK,
       [
-        ev('banner', new Date(2026, 6, 8), new Date(2026, 6, 9), true),
-        ev('chip', new Date(2026, 6, 8, 10), new Date(2026, 6, 8, 11)),
+        ev('banner', new Date(2026, 6, 9), new Date(2026, 6, 10), true),
+        ev('chip', new Date(2026, 6, 9, 10), new Date(2026, 6, 9, 11)),
       ],
       10,
       undefined,
@@ -423,7 +471,7 @@ describe('layoutWeek', () => {
     layoutWeek(
       WEEK,
       // Wed Jul 8 → Tue Jul 14, clipped to Wed..Sat (4 columns) this week.
-      [ev('a', new Date(2026, 6, 8), new Date(2026, 6, 15), true)],
+      [ev('a', new Date(2026, 6, 9), new Date(2026, 6, 16), true)],
       10,
       undefined,
       (_event, spanCols) => {
@@ -437,7 +485,7 @@ describe('layoutWeek', () => {
   it('keeps a wrapped banner whose full run fits the visible slots', () => {
     const layout = layoutWeek(
       WEEK,
-      [ev('tall', new Date(2026, 6, 7), new Date(2026, 6, 9), true)],
+      [ev('tall', new Date(2026, 6, 8), new Date(2026, 6, 10), true)],
       2,
       undefined,
       () => 2
@@ -449,7 +497,7 @@ describe('layoutWeek', () => {
   it('hides a wrapped banner that cannot fully fit and counts it per column', () => {
     const layout = layoutWeek(
       WEEK,
-      [ev('tall', new Date(2026, 6, 7), new Date(2026, 6, 9), true)],
+      [ev('tall', new Date(2026, 6, 8), new Date(2026, 6, 10), true)],
       1,
       undefined,
       () => 2

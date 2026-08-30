@@ -10,10 +10,10 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { RefreshIcon } from '@/components/icons';
+import { AddIcon, RefreshIcon } from '@/components/icons';
 import { ThemedText } from '@/components/themed-text';
-import { AccentColor, BrandColor, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { AccentColor, FontFamilyBold, Spacing } from '@/constants/theme';
+import { toTimeString } from '@/utils/date';
 
 type Props = {
   /** e.g. "July 2026" — tracks the visible month while scrolling. */
@@ -25,9 +25,41 @@ type Props = {
   loading: boolean;
   /** Spin the refresh icon (a button-pressed refresh is in flight). */
   refreshing: boolean;
+  /** When the server last answered; null until the first landed fetch. */
+  fetchedAt: Date | null;
   onToday: () => void;
   onRefresh: () => void;
+  onAdd: () => void;
 };
+
+/**
+ * The header bar's measurements. Deliberately the app's own: the widget draws
+ * a bar that looks like this one but sizes its text for a home-screen tile, so
+ * the two are kept apart on purpose — changing a number here must not move the
+ * widget, and vice versa.
+ */
+const Bar = {
+  paddingHorizontal: 16,
+  paddingVertical: 28,
+  titleSize: 32,
+  /** A ratio, not a number, so it cannot fall behind the size above: a line
+   *  box shorter than the font clips the glyphs. Satoshi's own box is 1.25em;
+   *  this rounds up from it for descender room. */
+  titleLineRatio: 1.3,
+  subtitleSize: 14,
+  labelGap: 4,
+  iconSize: 24,
+  iconPadding: 6,
+  iconGap: 6,
+} as const;
+
+/**
+ * The header block's ground — this bar and the weekday row directly beneath
+ * it, which read as one piece. Blacker than the screen behind the grid on
+ * purpose, so the chrome sits back from the calendar instead of merging into
+ * it. month-screen imports it for the weekday row.
+ */
+export const HEADER_GROUND = '#000000';
 
 /** Label slide-through when the visible month changes mid-scroll. */
 const LABEL_FADE_OUT_MS = 100;
@@ -44,11 +76,11 @@ export function MonthHeader({
   monthIndex,
   loading,
   refreshing,
+  fetchedAt,
   onToday,
   onRefresh,
+  onAdd,
 }: Props) {
-  const theme = useTheme();
-
   // The displayed label trails the prop through a directional slide-fade:
   // scrolling to a later month carries the old label up and out and the new
   // one rises in from below (reversed for earlier months). A change landing
@@ -117,29 +149,50 @@ export function MonthHeader({
 
   return (
     <View style={styles.header}>
-      <View style={styles.labelWrap}>
-        <Pressable
-          testID="calendar-today"
-          onPress={onToday}
-          hitSlop={8}
-          accessibilityLabel="Go to today"
-        >
-          <Animated.View style={labelStyle}>
-            <ThemedText
-              type="subtitle"
-              testID="calendar-header-label"
-              style={styles.label}
-            >
-              {shown.label}
-            </ThemedText>
-          </Animated.View>
-        </Pressable>
-        {loading && <ActivityIndicator size="small" color={AccentColor} />}
+      <View style={styles.labelColumn}>
+        <View style={styles.labelWrap}>
+          <Pressable
+            testID="calendar-today"
+            onPress={onToday}
+            hitSlop={8}
+            accessibilityLabel="Go to today"
+          >
+            <Animated.View style={labelStyle}>
+              <ThemedText
+                type="subtitle"
+                testID="calendar-header-label"
+                style={styles.label}
+              >
+                {shown.label}
+              </ThemedText>
+            </Animated.View>
+          </Pressable>
+          {loading && <ActivityIndicator size="small" color={AccentColor} />}
+        </View>
+        {fetchedAt ? (
+          <ThemedText testID="calendar-updated" style={styles.updated}>
+            Last Updated: {toTimeString(fetchedAt)}
+          </ThemedText>
+        ) : null}
       </View>
       <View style={styles.controls}>
-        <Pressable onPress={onRefresh} hitSlop={8} accessibilityLabel="Refresh">
+        <Pressable
+          testID="calendar-add"
+          onPress={onAdd}
+          hitSlop={8}
+          style={styles.iconButton}
+          accessibilityLabel="Add event"
+        >
+          <AddIcon size={Bar.iconSize} color={AccentColor} />
+        </Pressable>
+        <Pressable
+          onPress={onRefresh}
+          hitSlop={8}
+          style={styles.iconButton}
+          accessibilityLabel="Refresh"
+        >
           <Animated.View style={spinStyle}>
-            <RefreshIcon size={20} color={theme.textSecondary} />
+            <RefreshIcon size={Bar.iconSize} color={AccentColor} />
           </Animated.View>
         </Pressable>
       </View>
@@ -148,15 +201,29 @@ export function MonthHeader({
 }
 
 const styles = StyleSheet.create({
+  // The widget's header inverted: dark ground, accent ink. On a full screen
+  // the orange reads better as the text than as the background.
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: Spacing.three,
-    gap: Spacing.three,
+    paddingHorizontal: Bar.paddingHorizontal,
+    paddingVertical: Bar.paddingVertical,
+    gap: Bar.paddingHorizontal,
+    backgroundColor: HEADER_GROUND,
   },
   label: {
-    color: BrandColor,
+    fontFamily: FontFamilyBold,
+    color: AccentColor,
+    // Explicit, so the text preset's own size and line height do not leak in.
+    // The box is derived from the size, so raising one cannot clip the other.
+    fontSize: Bar.titleSize,
+    lineHeight: Math.round(Bar.titleSize * Bar.titleLineRatio),
+  },
+  labelColumn: {
+    flexDirection: 'column',
+    gap: Bar.labelGap,
+    flexShrink: 1,
   },
   labelWrap: {
     flexDirection: 'row',
@@ -164,9 +231,17 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     flexShrink: 1,
   },
+  updated: {
+    color: AccentColor,
+    fontSize: Bar.subtitleSize,
+    lineHeight: Bar.subtitleSize + 4,
+  },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
+    gap: Bar.iconGap,
+  },
+  iconButton: {
+    padding: Bar.iconPadding,
   },
 });

@@ -6,16 +6,16 @@
  * change the fill's perceived lightness against the card). A bad string yields
  * the dark default. Returns literal theme colors (dark OnAccent / white).
  */
-export function readableTextColor(hex: string): '#1C1B22' | '#FFFFFF' {
+export function readableTextColor(hex: string): '#000000' | '#FFFFFF' {
   const rgb = parseHex(hex);
-  if (!rgb) return '#1C1B22';
+  if (!rgb) return '#000000';
   const [r, g, b] = rgb.map((c) => {
     const s = c / 255;
     return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
   });
   const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   // 0.179 ≈ the luminance where black/white text contrast ratios cross over.
-  return luminance > 0.179 ? '#1C1B22' : '#FFFFFF';
+  return luminance > 0.179 ? '#000000' : '#FFFFFF';
 }
 
 /**

@@ -21,7 +21,7 @@ index 2d88172e426ccd70288005d4b7c15d7b534d20d9..c61353ad72abceeaaa5a0edffa0a10d7
      }
  
      private void registerClickTask(int id, ClickableView clickableView, RemoteViews widgetView, Integer button) {
-+        // mitsume patch: OPEN_APP taps use a direct activity PendingIntent, like any
++        // hitome patch: OPEN_APP taps use a direct activity PendingIntent, like any
 +        // native widget. The stock broadcast->receiver->startActivity path requires
 +        // spawning the app process in the background, which OEM process killers
 +        // (ColorOS "Hans"/prcl, MIUI) terminate before it can act (see upstream #108).
@@ -39,7 +39,7 @@ index 2d88172e426ccd70288005d4b7c15d7b534d20d9..c61353ad72abceeaaa5a0edffa0a10d7
 +                return;
 +            }
 +        }
-+        // mitsume patch: same direct-PendingIntent treatment for OPEN_URI (see
++        // hitome patch: same direct-PendingIntent treatment for OPEN_URI (see
 +        // RNWidgetUtil.createOpenUriPendingIntent for the rationale).
 +        if ("OPEN_URI".equals(clickableView.getClickAction())
 +            && clickableView.getClickActionData() != null
@@ -65,7 +65,7 @@ index 2bdbab9fe634d23e90a4b0b58d591de7745b18c2..ad27ab05bee61693fd1482ce3025b1ef
      }
  
      private PendingIntent createPendingIntent(Bundle clickableArea) {
-+        // mitsume patch: OPEN_URI taps in list items also get a direct ACTION_VIEW
++        // hitome patch: OPEN_URI taps in list items also get a direct ACTION_VIEW
 +        // PendingIntent (see RNWidgetUtil.createOpenUriPendingIntent for rationale).
 +        if ("OPEN_URI".equals(clickableArea.getString("clickAction"))) {
 +            Bundle clickActionData = clickableArea.getBundle("clickActionData");
@@ -92,7 +92,7 @@ index 647d8f43d744d1e4b6a9c66de2d6a7f6861cbe04..d06b9b0b6e7d4e216967859f4351ed98
          try {
              Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
              intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-+            // mitsume patch: pin URIs this app can handle to this package —
++            // hitome patch: pin URIs this app can handle to this package —
 +            // Android ignores per-item setOnClickPendingIntent in collection
 +            // widgets, so taps land here via the broadcast template, and an
 +            // unpinned app:// deep link opens a chooser (or the wrong app)
@@ -126,12 +126,12 @@ index a057c09736ee40464ca7d9d618079114bdd5518c..fcd56449ab2b36ec2f6af76d87a5058c
  import java.util.List;
  
  public class RNWidgetUtil {
-+    // mitsume patch: OPEN_URI taps use a direct ACTION_VIEW activity PendingIntent,
++    // hitome patch: OPEN_URI taps use a direct ACTION_VIEW activity PendingIntent,
 +    // like OPEN_APP. The stock broadcast->receiver->startActivity path requires
 +    // spawning the app process in the background, which OEM process killers
 +    // (ColorOS "Hans"/prcl, MIUI) terminate before it can act (see upstream #108).
 +    // Own-app deep links (any URI this app resolves) stay pinned to this package so
-+    // installing a second variant (com.carrein.mitsume.dev) never shows a chooser.
++    // installing a second variant (com.miraiconcepts.hitome.dev) never shows a chooser.
 +    public static PendingIntent createOpenUriPendingIntent(Context context, String uri, int requestCode) {
 +        try {
 +            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
@@ -193,7 +193,7 @@ index a057c09736ee40464ca7d9d618079114bdd5518c..fcd56449ab2b36ec2f6af76d87a5058c
 +        return height;
 +    }
 +
-+    // mitsume patch: launchers occasionally report zero size options for a bound
++    // hitome patch: launchers occasionally report zero size options for a bound
 +    // widget (observed on Lawnchair after a home-screen rearrange, 2026-07-15) —
 +    // stock RNAW then aborts every render ("ListWidget width and height must be
 +    // > 0") until the widget is re-added. Fall back to the provider's declared

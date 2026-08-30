@@ -2,21 +2,30 @@ import { memo, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { CalEvent } from '@/caldav/types';
-import { CellStipple } from '@/components/calendar/cell-stipple';
-import { EventBanner, EventChip } from '@/components/calendar/event-chip';
+import {
+  EVENT_FONT_SIZE,
+  EventBanner,
+  EventChip,
+} from '@/components/calendar/event-chip';
 import { ThemedText } from '@/components/themed-text';
-import { AccentColor, OnAccentColor, Spacing } from '@/constants/theme';
+import { AccentColor, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addDays, layoutWeek } from '@/utils/calendar-grid';
-import { parseDay, toDateString } from '@/utils/date';
+import { eventDays, parseDay, toDateString } from '@/utils/date';
 
 /** Height of one banner/chip slot inside a day cell. */
 export const SLOT_HEIGHT = 18;
+/** Clearance under the overflow counter. Slots divide the row by whole
+ *  SLOT_HEIGHTs, so the leftover beneath the last one can be as little as 2dp
+ *  — pinning the counter to that slot's top leaves it flush with the cell's
+ *  bottom edge. Anchoring from the bottom instead guarantees this gap. */
+const MORE_BOTTOM_INSET = 4;
+
 /** Height of the day-number line at the top of each cell. */
 export const DAY_NUMBER_HEIGHT = 22;
 
 type WeekRowProps = {
-  /** Week-start (Sunday) dateString — the row's identity. */
+  /** Week-start (Monday) dateString — the row's identity. */
   weekStart: string;
   rowHeight: number;
   /** Day-cell width in px — drives the chip title wrap estimate. */
@@ -29,10 +38,11 @@ type WeekRowProps = {
   /** The settled/visible month — days outside it render dimmed. */
   focusedYear: number;
   focusedMonth0: number;
-  showChipTime: boolean;
   onPressDay: (day: string) => void;
   onPressEvent: (event: CalEvent) => void;
-  onPressMore: (day: string) => void;
+  /** Long-press a cell to see everything on that day. Empty days have
+   *  nothing to show, so they do not arm the gesture at all. */
+  onLongPressDay: (day: string) => void;
 };
 
 const pct = (n: number) => `${(n / 7) * 100}%` as const;
@@ -41,10 +51,12 @@ const pct = (n: number) => `${(n / 7) * 100}%` as const;
 // estimated from an averaged glyph width of the 11px title font. A title that
 // fits beside its inline time keeps the one-slot form; an overflowing one
 // takes the stacked form (time line, then the title wrapping to two lines).
-// 11px Satoshi averages ~6px/glyph in mixed case; estimating slightly wide
+// Satoshi averages ~0.56em/glyph in mixed case; estimating slightly wide
 // biases borderline titles toward wrapping (an extra slot) instead of
-// ellipsizing, which is the failure users actually notice.
-const CHIP_CHAR_PX = 6.2;
+// ellipsizing, which is the failure users actually notice. Derived from the
+// event font size rather than hard-coded, because an estimate left behind by a
+// larger font silently clips the second line of every wrapped title.
+const CHIP_CHAR_PX = EVENT_FONT_SIZE * 0.56;
 /** Horizontal chrome inside a chip: 3px bar + 3px gap + 3px right padding. */
 const CHIP_CHROME_PX = 9;
 
@@ -64,10 +76,35 @@ function bannerTitleLines(summary: string, widthPx: number): number {
   return title.length * CHIP_CHAR_PX > widthPx - BANNER_CHROME_PX ? 2 : 1;
 }
 
-// Cell washes (translucent, so they read in both themes): weekends get a
-// Firefox-blue tint; days outside the focused month a grey stippling — which
-// takes precedence when a day is both.
-const WEEKEND_TINT = 'rgba(0, 96, 224, 0.08)';
+// Cell fills, solid rather than translucent washes so each cell renders
+// exactly its stated color whatever sits behind it. Today outranks the
+// neighbouring months — it keeps the blue even when it falls on their page —
+// and every other day, weekend included, is left to the screen's background.
+const TODAY_FILL = '#0060E0';
+const OTHER_MONTH_FILL = '#2E3135';
+
+/** The working week ends after this many columns — weeks start Monday, so
+ *  five is the end of Friday. */
+const WEEK_SPLIT_AFTER_COL = 5;
+
+// Grid rules — every line in the grid.
+//
+// Opaque and a whole dp wide, both deliberately, so every line renders
+// identically. A translucent rule composites with the cell wash behind it, and
+// a hairline lands on a fractional device pixel — row height is the pane over
+// six — so it is drawn at partial coverage and blends with that wash anyway.
+// Either alone leaves the lines visibly disagreeing across plain, weekend,
+// today and out-of-month cells; together they cover whole pixels in one flat
+// color. One value serves both schemes: a mid grey reads against either
+// background, so there is nothing left for the scheme to decide.
+export const GRID_RULE = '#60646C';
+
+/** Rule thickness. A border only covers a whole pixel once it spans two of
+ *  them; anything thinner straddles a boundary, is antialiased into the cell
+ *  behind it, and the lines stop matching. Two pixels needs 0.77dp at 2.625x
+ *  and 0.58dp at 3.5x, so a whole dp clears it on any screen at 2x or denser
+ *  — every modern phone — with room to spare rather than by a hair. */
+export const RULE_WIDTH = 1;
 
 export const WeekRow = memo(function WeekRow({
   weekStart,
@@ -78,10 +115,9 @@ export const WeekRow = memo(function WeekRow({
   todayStr,
   focusedYear,
   focusedMonth0,
-  showChipTime,
   onPressDay,
   onPressEvent,
-  onPressMore,
+  onLongPressDay,
 }: WeekRowProps) {
   const theme = useTheme();
 
@@ -90,23 +126,28 @@ export const WeekRow = memo(function WeekRow({
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   }, [weekStart]);
 
+  // Days this week that any event touches — the same reach the popover uses
+  // to pick its list, so a cell arms the long press exactly when the popover
+  // would have something in it. Multi-day events count on every day they
+  // cover, not just the one their chip lands in.
+  const daysWithEvents = useMemo(() => {
+    const set = new Set<string>();
+    for (const event of events) {
+      for (const day of eventDays(event.start, event.end)) set.add(day);
+    }
+    return set;
+  }, [events]);
+
   const layout = useMemo(() => {
-    // With times shown every chip stacks (time line on top), so the span is
-    // the title's lines plus one; without times it's just the title lines.
     const chipSpan = (event: CalEvent) =>
-      chipTitleLines(event.summary, cellWidth) + (showChipTime ? 1 : 0);
+      chipTitleLines(event.summary, cellWidth);
     const bannerRows = (event: CalEvent, spanCols: number) =>
       bannerTitleLines(event.summary, spanCols * cellWidth);
     return layoutWeek(days[0], events, slotCount, chipSpan, bannerRows);
-  }, [days, events, slotCount, cellWidth, showChipTime]);
+  }, [days, events, slotCount, cellWidth]);
 
   return (
-    <View
-      style={[
-        styles.row,
-        { height: rowHeight, borderTopColor: theme.backgroundSelected },
-      ]}
-    >
+    <View style={[styles.row, { height: rowHeight }]}>
       <View style={styles.cells}>
         {days.map((day, col) => {
           const dateString = toDateString(day);
@@ -114,8 +155,11 @@ export const WeekRow = memo(function WeekRow({
           const inMonth =
             day.getFullYear() === focusedYear &&
             day.getMonth() === focusedMonth0;
-          const isWeekend = col === 0 || col === 6; // Sunday-start: cols 0/6 = Sun/Sat
-          const tint = inMonth && isWeekend ? WEEKEND_TINT : undefined;
+          const tint = isToday
+            ? TODAY_FILL
+            : !inMonth
+              ? OTHER_MONTH_FILL
+              : undefined;
           const label =
             day.getDate() === 1
               ? `1 ${day.toLocaleDateString(undefined, { month: 'short' })}`
@@ -125,28 +169,26 @@ export const WeekRow = memo(function WeekRow({
               key={dateString}
               testID={`day-cell-${dateString}`}
               onPress={() => onPressDay(dateString)}
+              onLongPress={
+                daysWithEvents.has(dateString)
+                  ? () => onLongPressDay(dateString)
+                  : undefined
+              }
               style={[
                 styles.cell,
                 tint != null && { backgroundColor: tint },
-                col < 6 && {
-                  borderRightWidth: StyleSheet.hairlineWidth,
-                  borderRightColor: theme.backgroundSelected,
-                },
+                col < 6 && styles.cellRule,
               ]}
             >
-              {!inMonth && <CellStipple />}
-              <View style={[styles.dayNumberWrap, isToday && styles.todayPill]}>
+              <View style={styles.dayNumberWrap}>
                 <ThemedText
                   type="small"
                   numberOfLines={1}
                   style={[
                     styles.dayNumber,
                     {
-                      color: isToday
-                        ? OnAccentColor
-                        : inMonth
-                          ? theme.text
-                          : theme.textSecondary,
+                      color:
+                        isToday || inMonth ? theme.text : theme.textSecondary,
                     },
                   ]}
                 >
@@ -158,8 +200,21 @@ export const WeekRow = memo(function WeekRow({
         })}
       </View>
 
+      {/* The weekend split, drawn between the cells and the events: above the
+          cells so no row's rule chops it up, below the events so a banner
+          spanning the weekend is not sliced by it. Pulled up by its own width
+          to bridge the row's top border and read as one continuous line. */}
+      <View
+        pointerEvents="none"
+        style={[
+          styles.weekSplit,
+          { left: cellWidth * WEEK_SPLIT_AFTER_COL - RULE_WIDTH },
+        ]}
+      />
+
       {/* box-none: empty-area taps fall through to the day cells; only the
-          chips/banners/"+N more" Pressables capture their own pixels. */}
+          chips and banners capture their own pixels. The overflow counter is
+          a plain label, so the cell keeps both gestures underneath it. */}
       <View style={styles.overlay}>
         {layout.banners.map((banner) => (
           <EventBanner
@@ -182,8 +237,7 @@ export const WeekRow = memo(function WeekRow({
           <EventChip
             key={chip.event.id}
             event={chip.event}
-            showTime={showChipTime}
-            titleLines={Math.min(2, showChipTime ? chip.span - 1 : chip.span)}
+            titleLines={Math.min(2, chip.span)}
             onPress={() => onPressEvent(chip.event)}
             style={{
               position: 'absolute',
@@ -197,28 +251,25 @@ export const WeekRow = memo(function WeekRow({
         {slotCount >= 1 &&
           layout.overflow.map((count, col) =>
             count > 0 ? (
-              <Pressable
+              // A label, not a target: the cell underneath owns both the tap
+              // and the long press, so the counter must not swallow either.
+              <View
                 key={`more-${col}`}
                 testID={`more-${toDateString(days[col])}`}
-                onPress={() => onPressMore(toDateString(days[col]))}
+                pointerEvents="none"
                 style={{
                   position: 'absolute',
                   left: pct(col),
                   width: pct(1),
-                  top: (slotCount - 1) * SLOT_HEIGHT,
+                  bottom: MORE_BOTTOM_INSET,
                   height: SLOT_HEIGHT - 2,
                   justifyContent: 'center',
                 }}
               >
-                <ThemedText
-                  type="small"
-                  themeColor="textSecondary"
-                  numberOfLines={1}
-                  style={styles.more}
-                >
-                  +{count} more
+                <ThemedText numberOfLines={1} style={styles.more}>
+                  +{count}
                 </ThemedText>
-              </Pressable>
+              </View>
             ) : null
           )}
       </View>
@@ -228,7 +279,8 @@ export const WeekRow = memo(function WeekRow({
 
 const styles = StyleSheet.create({
   row: {
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: RULE_WIDTH,
+    borderTopColor: GRID_RULE,
   },
   cells: {
     flex: 1,
@@ -239,6 +291,10 @@ const styles = StyleSheet.create({
     paddingTop: 2,
     alignItems: 'flex-start',
   },
+  cellRule: {
+    borderRightWidth: RULE_WIDTH,
+    borderRightColor: GRID_RULE,
+  },
   dayNumberWrap: {
     minWidth: DAY_NUMBER_HEIGHT - 4,
     paddingHorizontal: Spacing.one,
@@ -246,12 +302,16 @@ const styles = StyleSheet.create({
     marginLeft: 2,
     alignItems: 'center',
   },
-  todayPill: {
-    backgroundColor: AccentColor,
-  },
   dayNumber: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  weekSplit: {
+    position: 'absolute',
+    top: -RULE_WIDTH,
+    bottom: 0,
+    width: RULE_WIDTH,
+    backgroundColor: AccentColor,
   },
   overlay: {
     position: 'absolute',
@@ -262,8 +322,10 @@ const styles = StyleSheet.create({
     pointerEvents: 'box-none',
   },
   more: {
-    fontSize: 10,
-    lineHeight: 12,
+    fontSize: 12,
+    // Explicit, so the text centres in the slot rather than inheriting a line
+    // box taller than it and drifting low.
+    lineHeight: 14,
     paddingLeft: 5,
   },
 });
