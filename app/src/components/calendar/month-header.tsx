@@ -127,14 +127,14 @@ export function MonthHeader({
     transform: [{ translateY: labelShift.value }],
   }));
 
-  // Refresh-icon spin while a fetch is in flight — counterclockwise, the way
-  // the glyph's arrow points.
+  // Refresh-icon spin while a fetch is in flight — clockwise, the way the
+  // glyph's arrow points.
   const spin = useSharedValue(0);
   useEffect(() => {
     if (!refreshing) return;
     spin.value = 0;
     spin.value = withRepeat(
-      withTiming(-360, { duration: SPIN_MS, easing: Easing.linear }),
+      withTiming(360, { duration: SPIN_MS, easing: Easing.linear }),
       -1
     );
     return () => {
