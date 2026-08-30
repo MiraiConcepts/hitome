@@ -100,10 +100,13 @@ export function useMonthEvents(visibleMonth: Date) {
       // Instant paint from the last-good snapshot while the network answers.
       if (!storeRef.current.has(monthKey)) seedFromSnapshot(monthKey);
       const ticket = primary ? ++seq.current : 0;
-      if (primary) {
-        setLoading(true);
-        setError(null);
-      }
+      // Deliberately NOT clearing the error here. The banner it drives sits in
+      // the grid's measured flow, so unmounting it for the duration of every
+      // request resized the grid pane, changed rowHeight (pane ÷ 6) and forced
+      // the whole week ribbon to re-lay-out — visible as a blank grid on each
+      // retry and each 60s poll while offline. The last error stands until a
+      // fetch actually succeeds, exactly as fetchedAt already does.
+      if (primary) setLoading(true);
       inflight.current.add(monthKey);
       try {
         const range = gridFetchRange(y, m0);
@@ -112,6 +115,7 @@ export function useMonthEvents(visibleMonth: Date) {
           applyFetch(prev, monthKey, range, result, Date.now())
         );
         setFetchedAt(new Date());
+        if (primary && seq.current === ticket) setError(null);
         writeSnapshot(cacheKey(monthKey), serializeEvents(result));
       } catch (err) {
         if (primary && seq.current === ticket) {
