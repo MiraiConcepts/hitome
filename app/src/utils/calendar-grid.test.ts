@@ -1,20 +1,28 @@
 import {
   addDays,
   buildMonthRange,
+  buildWeekRange,
   gridFetchRange,
   landingIndex,
   isBanner,
   layoutWeek,
   monthIndexIn,
   monthKey,
+  monthStartWeekIndex,
+  monthStartWeekIndices,
+  nearestSnapIndex,
+  weekIndexOfDay,
   weekStartOf,
-  weeksOfMonth,
+  weeksBetween,
   type GridEventLike,
 } from './calendar-grid';
-import { toDateString } from './date';
+import { parseDay, toDateString } from './date';
 
 // Mon 2026-07-06 .. Sun 2026-07-12 — the reference week for layout tests.
 const WEEK = new Date(2026, 6, 6);
+
+/** Week-start dateString -> local midnight, as the grid parses its rows. */
+const day = (s: string): Date => parseDay(s) as Date;
 
 const ev = (
   id: string,
@@ -92,72 +100,193 @@ describe('monthKey', () => {
   });
 });
 
-describe('weeksOfMonth', () => {
-  it('starts on the Monday of the week containing the 1st', () => {
-    // Jul 1 2026 is a Wednesday — its week starts Mon Jun 29.
-    expect(weeksOfMonth({ year: 2026, month0: 6 })[0]).toBe('2026-06-29');
-    // Jun 1 2026 is itself a Monday.
-    expect(weeksOfMonth({ year: 2026, month0: 5 })[0]).toBe('2026-06-01');
-    // Mar 1 2026 is a Sunday — the last column, so its week began Feb 23.
-    expect(weeksOfMonth({ year: 2026, month0: 2 })[0]).toBe('2026-02-23');
-  });
-
-  it('always lists six consecutive Mondays, so every page is one height', () => {
-    for (let month0 = 0; month0 < 12; month0++) {
-      const weeks = weeksOfMonth({ year: 2026, month0 });
-      expect(weeks.length).toBe(6);
-      for (let i = 1; i < 6; i++) {
-        const prev = new Date(weeks[i - 1]);
-        expect(weeks[i]).toBe(toDateString(addDays(prev, 7)));
-      }
+describe('weeksBetween', () => {
+  it('counts whole rows, unaffected by any clock shift in between', () => {
+    // Every row of a decade, walked from one end: a ±1h DST step in the raw
+    // ms difference must never round to a different row.
+    const start = weekStartOf(new Date(2021, 6, 12));
+    for (let i = 0; i < 522; i++) {
+      expect(weeksBetween(start, weekStartOf(addDays(start, i * 7)))).toBe(i);
     }
   });
 
-  it('covers the whole month, worst case included', () => {
-    // Mar 2026: 31 days starting Sunday — the six-row worst case now that
-    // Sunday is the last column, so the 1st sits alone in row one.
-    const weeks = weeksOfMonth({ year: 2026, month0: 2 });
-    const last = addDays(new Date(weeks[5]), 6);
-    expect(weeks[0] <= '2026-03-01').toBe(true);
-    expect(toDateString(last) >= '2026-03-31').toBe(true);
+  it('goes negative before the start', () => {
+    const start = weekStartOf(new Date(2026, 6, 12));
+    expect(weeksBetween(start, addDays(start, -14))).toBe(-2);
+  });
+});
+
+describe('buildWeekRange', () => {
+  const months = buildMonthRange(new Date(2026, 6, 12));
+  const { rangeStart, weeks } = buildWeekRange(months);
+
+  it('opens on the week containing the first month\u2019s 1st', () => {
+    // Jul 1 2021 is a Thursday \u2014 its week starts Mon Jun 28.
+    expect(toDateString(rangeStart)).toBe('2021-06-28');
+    expect(weeks[0]).toBe('2021-06-28');
+  });
+
+  it('steps one week per row throughout', () => {
+    for (let i = 1; i < weeks.length; i++) {
+      expect(weeks[i]).toBe(toDateString(addDays(day(weeks[i - 1]), 7)));
+    }
+  });
+
+  it('holds every month in the ribbon, with six rows for the last', () => {
+    const rows = monthStartWeekIndices(months, rangeStart);
+    expect(rows[0]).toBe(0);
+    for (const row of rows) {
+      expect(row).toBeGreaterThanOrEqual(0);
+      // Five more rows must exist beneath any month a swipe can land on.
+      expect(row + 5).toBeLessThan(weeks.length);
+    }
+  });
+});
+
+describe('monthStartWeekIndex', () => {
+  const months = buildMonthRange(new Date(2026, 6, 12));
+  const { rangeStart, weeks } = buildWeekRange(months);
+
+  it('points at the row holding the 1st', () => {
+    // Sep 1 2026 is a Tuesday \u2014 its week starts Mon Aug 31.
+    expect(weeks[monthStartWeekIndex(2026, 8, rangeStart)]).toBe('2026-08-31');
+    // Mar 1 2026 is a Sunday \u2014 the last column, so its week began Feb 23.
+    expect(weeks[monthStartWeekIndex(2026, 2, rangeStart)]).toBe('2026-02-23');
+    // Jun 1 2026 is itself a Monday.
+    expect(weeks[monthStartWeekIndex(2026, 5, rangeStart)]).toBe('2026-06-01');
+  });
+
+  it('agrees with weekIndexOfDay for the 1st', () => {
+    for (const m of months) {
+      expect(monthStartWeekIndex(m.year, m.month0, rangeStart)).toBe(
+        weekIndexOfDay(new Date(m.year, m.month0, 1), rangeStart)
+      );
+    }
+  });
+});
+
+describe('monthStartWeekIndices', () => {
+  const months = buildMonthRange(new Date(2026, 6, 12));
+  const { rangeStart, weeks } = buildWeekRange(months);
+  const rows = monthStartWeekIndices(months, rangeStart);
+
+  it('runs index-parallel to the month ribbon', () => {
+    expect(rows.length).toBe(months.length);
+    for (let i = 0; i < months.length; i++) {
+      expect(weeks[rows[i]]).toBe(
+        toDateString(weekStartOf(new Date(months[i].year, months[i].month0, 1)))
+      );
+    }
+  });
+
+  it('spaces months 4 or 5 rows apart \u2014 never 6', () => {
+    // The whole reason a ribbon beats month pages: a six-row page always
+    // overran its neighbour by 6 minus this gap, so it had to redraw a week
+    // the next page also drew. Nothing here can overlap.
+    const gaps = new Set<number>();
+    for (let i = 1; i < rows.length; i++) gaps.add(rows[i] - rows[i - 1]);
+    expect([...gaps].sort()).toEqual([4, 5]);
+  });
+});
+
+describe('monthStartWeekIndices vs. the calendar itself', () => {
+  it('marks exactly the rows that contain a 1st', () => {
+    // Independent cross-check: a month settles on a row iff some day of that
+    // row is a 1st. Catches an off-by-one in the index math that a
+    // self-consistent round-trip would not.
+    const months = buildMonthRange(new Date(2026, 6, 12));
+    const { rangeStart, weeks } = buildWeekRange(months);
+    const rows = new Set(monthStartWeekIndices(months, rangeStart));
+    const holdsA1st = (weekStart: string) =>
+      Array.from({ length: 7 }, (_, i) => addDays(day(weekStart), i)).some(
+        (d) => d.getDate() === 1
+      );
+    // The ribbon runs five rows past the last month, so only compare over the
+    // stretch the month ribbon actually covers.
+    const last = Math.max(...rows);
+    for (let i = 0; i <= last; i++) {
+      expect(holdsA1st(weeks[i])).toBe(rows.has(i));
+    }
+  });
+});
+
+describe('nearestSnapIndex', () => {
+  const SNAP = [0, 500, 900, 1400, 1800];
+
+  it('finds an exact offset', () => {
+    SNAP.forEach((offset, i) => {
+      expect(nearestSnapIndex(SNAP, offset)).toBe(i);
+    });
+  });
+
+  it('picks the closer neighbour between two months', () => {
+    expect(nearestSnapIndex(SNAP, 600)).toBe(1);
+    expect(nearestSnapIndex(SNAP, 800)).toBe(2);
+  });
+
+  it('resolves an exact midpoint to the later month', () => {
+    expect(nearestSnapIndex(SNAP, 700)).toBe(2);
+  });
+
+  it('clamps beyond either end of the ribbon', () => {
+    expect(nearestSnapIndex(SNAP, -9000)).toBe(0);
+    expect(nearestSnapIndex(SNAP, 9000)).toBe(SNAP.length - 1);
   });
 });
 
 describe('landingIndex', () => {
-  const H = 800; // page height
-  const from = 60;
-  const at = (fraction: number) => (from + fraction) * H;
+  const ROW = 100;
+  // Rows 0, 5, 9, 14, 18 — real month spacing, alternating 5 and 4 rows.
+  const SNAP = [0, 5, 9, 14, 18].map((row) => row * ROW);
+  const from = 2;
+  const FWD = SNAP[3] - SNAP[2]; // 500 — five rows to the next month
+  const BACK = SNAP[2] - SNAP[1]; // 400 — four rows to the previous one
+  const at = (moved: number) => SNAP[from] + moved;
 
   it('stays put below the distance threshold with no speed', () => {
-    expect(landingIndex(from, at(0.14), H, 0)).toBe(from);
-    expect(landingIndex(from, at(-0.14), H, 0)).toBe(from);
+    expect(landingIndex(from, at(FWD * 0.14), SNAP, 0)).toBe(from);
+    expect(landingIndex(from, at(-BACK * 0.14), SNAP, 0)).toBe(from);
   });
 
   it('flips once the drag passes the threshold, in either direction', () => {
-    expect(landingIndex(from, at(0.15), H, 0)).toBe(from + 1);
-    expect(landingIndex(from, at(-0.15), H, 0)).toBe(from - 1);
+    expect(landingIndex(from, at(FWD * 0.15), SNAP, 0)).toBe(from + 1);
+    expect(landingIndex(from, at(-BACK * 0.15), SNAP, 0)).toBe(from - 1);
+  });
+
+  it('measures the fraction against the real gap, not a fixed height', () => {
+    // Months are 4 or 5 rows apart, so the same distance can be enough one
+    // way and not the other: 60px clears 15% of the 400px gap back, but not
+    // of the 500px gap forward.
+    expect(landingIndex(from, at(60), SNAP, 0)).toBe(from);
+    expect(landingIndex(from, at(-60), SNAP, 0)).toBe(from - 1);
   });
 
   it('flips on speed alone, however short the drag', () => {
-    expect(landingIndex(from, at(0.01), H, 0.3)).toBe(from + 1);
-    expect(landingIndex(from, at(-0.01), H, -0.3)).toBe(from - 1);
+    expect(landingIndex(from, at(1), SNAP, 0.3)).toBe(from + 1);
+    expect(landingIndex(from, at(-1), SNAP, -0.3)).toBe(from - 1);
   });
 
   it('takes direction from the drag, not the velocity sign', () => {
     // Platforms disagree on the sign of scroll velocity; a fast drag forward
     // must page forward whichever sign arrives with it.
-    expect(landingIndex(from, at(0.02), H, -5)).toBe(from + 1);
-    expect(landingIndex(from, at(-0.02), H, 5)).toBe(from - 1);
+    expect(landingIndex(from, at(2), SNAP, -5)).toBe(from + 1);
+    expect(landingIndex(from, at(-2), SNAP, 5)).toBe(from - 1);
   });
 
   it('never moves more than one month, however far or fast', () => {
-    expect(landingIndex(from, at(4), H, 12)).toBe(from + 1);
-    expect(landingIndex(from, at(-4), H, -12)).toBe(from - 1);
+    expect(landingIndex(from, at(4000), SNAP, 12)).toBe(from + 1);
+    expect(landingIndex(from, at(-4000), SNAP, -12)).toBe(from - 1);
   });
 
-  it('holds the page when nothing moved', () => {
-    expect(landingIndex(from, at(0), H, 0)).toBe(from);
-    expect(landingIndex(from, at(0), H, 9)).toBe(from);
+  it('holds the month when nothing moved', () => {
+    expect(landingIndex(from, at(0), SNAP, 0)).toBe(from);
+    expect(landingIndex(from, at(0), SNAP, 9)).toBe(from);
+  });
+
+  it('has nothing to flip to at either end of the ribbon', () => {
+    expect(landingIndex(0, SNAP[0] - 900, SNAP, -12)).toBe(0);
+    const last = SNAP.length - 1;
+    expect(landingIndex(last, SNAP[last] + 900, SNAP, 12)).toBe(last);
   });
 });
 

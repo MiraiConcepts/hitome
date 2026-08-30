@@ -1,6 +1,5 @@
 import {
   forwardRef,
-  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -11,10 +10,10 @@ import {
   FlatList,
   Platform,
   StyleSheet,
-  View,
   type ListRenderItemInfo,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type ViewStyle,
   type ViewToken,
 } from 'react-native';
 
@@ -27,24 +26,25 @@ import {
 import {
   addDays,
   buildMonthRange,
+  buildWeekRange,
   landingIndex,
   monthIndexIn,
-  monthKey,
+  monthStartWeekIndices,
+  nearestSnapIndex,
   weekStartOf,
-  weeksOfMonth,
   type MonthAnchor,
 } from '@/utils/calendar-grid';
 import { parseDay, toDateString } from '@/utils/date';
 
 export type MonthGridHandle = {
-  /** Jump to (year, month0)'s page. Animated only for an adjacent month — a
+  /** Jump to (year, month0)'s row. Animated only for an adjacent month — a
    *  long glide outruns row mounting and shows empty rows on the way. */
   scrollToMonth: (year: number, month0: number, animated: boolean) => void;
 };
 
 type Props = {
   /** Measured grid pane size — the grid must only mount once these are known
-   *  (defines page height AND sidesteps Android's initialScrollIndex-at-zero-height bug). */
+   *  (defines row height AND sidesteps Android's initialScrollIndex-at-zero-height bug). */
   width: number;
   height: number;
   events: CalEvent[];
@@ -52,9 +52,17 @@ type Props = {
   today: string;
   /** Month to land on at mount (deep-linked day's month or today's). */
   initialMonth: MonthAnchor;
-  /** The page the grid has moved to — drives the header label and the fetch. */
+  /** The settled month — days outside it render dimmed. Held for the whole
+   *  drag so the grid never reshades under the finger; it flips once, on
+   *  landing, which is why this is the settled month and not the live one. */
+  focusedMonth: MonthAnchor;
+  /** The month the scroll position currently reads as — drives the header
+   *  label, live, with nothing to settle first. */
   onMonthChange: (anchor: MonthAnchor) => void;
-  /** Fired once, when the initial month's page first becomes viewable — i.e.
+  /** Fired once scrolling has stopped — drives the dimming and the fetch, so
+   *  a fling across several months costs one fetch rather than one per month. */
+  onMonthSettled: (anchor: MonthAnchor) => void;
+  /** Fired once, when the initial month's row first becomes viewable — i.e.
    *  the grid is verifiably rendering at its landing position. */
   onAnchored: () => void;
   onPressDay: (day: string) => void;
@@ -64,14 +72,38 @@ type Props = {
 
 const NO_EVENTS: CalEvent[] = [];
 
-/** Any sliver of the anchor page counts; fire without waiting for a gesture. */
+/** Any sliver of the anchor row counts; fire without waiting for a gesture. */
 const VIEWABILITY_CONFIG = {
   itemVisiblePercentThreshold: 1,
   waitForInteraction: false,
 };
 
+/** Quiet time before a scroll position counts as settled. Both platforms use
+ *  it: Android's own drag-end lands the month, but nothing reports the end of
+ *  the glide that follows, and web has no drag events at all. */
+const SETTLE_MS = 150;
+
+/**
+ * How web pages by month. RNW forwards unknown camelCase styles straight to
+ * CSS, and CSS creates a snap position only at an element that declares an
+ * alignment — so aligning month-start rows ALONE quantizes scrolling to
+ * months. (RNW's own `pagingEnabled` aligns every child, which on a ribbon of
+ * weeks would snap per week; it is deliberately not used.) Handing this to the
+ * browser also covers the scroll sources JS never saw — keyboard, scrollbar,
+ * find-in-page — which used to leave the grid parked between months.
+ */
+const WEB_SNAP_TYPE = 'y mandatory';
+const WEB_SNAP_CONTAINER =
+  Platform.OS === 'web'
+    ? ({ scrollSnapType: WEB_SNAP_TYPE } as unknown as ViewStyle)
+    : null;
+
+/** Long enough for a jump's destination rows to mount before snapping is
+ *  handed back to the browser (see `jumpTo`). */
+const SNAP_RESTORE_MS = 300;
+
 /** The scroller's DOM node on web (RNW), null on native. */
-function scrollerNode(list: FlatList<MonthAnchor> | null): HTMLElement | null {
+function scrollerNode(list: FlatList<string> | null): HTMLElement | null {
   if (Platform.OS !== 'web' || !list) return null;
   return (list.getScrollableNode() as HTMLElement | null) ?? null;
 }
@@ -98,67 +130,21 @@ function bucketByWeek(events: CalEvent[]): Map<string, CalEvent[]> {
   return map;
 }
 
-type PageProps = {
-  month: MonthAnchor;
-  height: number;
-  rowHeight: number;
-  cellWidth: number;
-  slotCount: number;
-  weekEvents: Map<string, CalEvent[]>;
-  today: string;
-  onPressDay: (day: string) => void;
-  onPressEvent: (event: CalEvent) => void;
-  onLongPressDay: (day: string) => void;
-};
-
-/** One month = one page = six week rows filling the pane exactly. Days outside
- *  the page's own month dim, so a page reads the same wherever it is scrolled. */
-const MonthPage = memo(function MonthPage({
-  month,
-  height,
-  rowHeight,
-  cellWidth,
-  slotCount,
-  weekEvents,
-  today,
-  onPressDay,
-  onPressEvent,
-  onLongPressDay,
-}: PageProps) {
-  const weeks = useMemo(() => weeksOfMonth(month), [month]);
-  return (
-    <View style={{ height }} testID={`month-page-${monthKey(month)}`}>
-      {weeks.map((week) => (
-        <WeekRow
-          key={week}
-          weekStart={week}
-          rowHeight={rowHeight}
-          cellWidth={cellWidth}
-          slotCount={slotCount}
-          events={weekEvents.get(week) ?? NO_EVENTS}
-          todayStr={today}
-          focusedYear={month.year}
-          focusedMonth0={month.month0}
-          onPressDay={onPressDay}
-          onPressEvent={onPressEvent}
-          onLongPressDay={onLongPressDay}
-        />
-      ))}
-    </View>
-  );
-});
+const keyExtractor = (week: string) => week;
 
 /**
- * The month grid: a paged FlatList of whole months spanning today ± 5 years.
- * One page fills the pane, so one swipe moves exactly one month — `pagingEnabled`
- * does it natively on Android and via CSS scroll-snap on web, and
- * `disableIntervalMomentum` stops a hard fling from carrying past the next page.
- * The page index is just the scroll offset over the page height, and the month
- * it names drives the header label and the fetch — nothing settles, eases, or
- * waits for idle. Each platform lands the gesture its own way: native measures
- * the drag against FLIP_FRACTION on release, web leaves it to the browser's
- * scroll-snap, hand-wired here because RNW cannot page a virtualized list on
- * its own and suspended across programmatic jumps (see setSnapping).
+ * The month grid: one continuous ribbon of week rows spanning today ± 5 years.
+ * Weeks — not months — are the list unit, because a month's own six rows always
+ * overrun into the next month's six by one or two, and two month-sized pages
+ * would each have to draw that shared week. One row per week means no week can
+ * be drawn twice, at any scroll position, including a drag held still.
+ *
+ * One swipe is still one month: the months a scroll can land on are rows
+ * `monthStartWeekIndices` names, four or five rows apart. Android measures the
+ * drag against those offsets on release (FLIP_FRACTION, in calendar-grid);
+ * web declares them to the browser as CSS scroll-snap positions and lets it
+ * page natively. The header follows the nearest of those offsets live, while
+ * the dimming waits for the scroll to stop — see `focusedMonth`.
  */
 export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   {
@@ -167,7 +153,9 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     events,
     today,
     initialMonth,
+    focusedMonth,
     onMonthChange,
+    onMonthSettled,
     onAnchored,
     onPressDay,
     onPressEvent,
@@ -175,14 +163,26 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   },
   ref
 ) {
-  const listRef = useRef<FlatList<MonthAnchor>>(null);
+  const listRef = useRef<FlatList<string>>(null);
 
   const months = useMemo(
     () => buildMonthRange(parseDay(today) ?? new Date()),
     [today]
   );
+  const { rangeStart, weeks } = useMemo(() => buildWeekRange(months), [months]);
+  /** Row index per month, index-parallel to `months`. */
+  const snapRows = useMemo(
+    () => monthStartWeekIndices(months, rangeStart),
+    [months, rangeStart]
+  );
+  /** The same rows as a lookup — what marks a row as web's snap target. */
+  const monthStartRows = useMemo(() => new Set(snapRows), [snapRows]);
 
   const rowHeight = height / 6;
+  const snapOffsets = useMemo(
+    () => snapRows.map((row) => row * rowHeight),
+    [snapRows, rowHeight]
+  );
   const slotCount = Math.max(
     0,
     Math.floor((rowHeight - DAY_NUMBER_HEIGHT - 2) / SLOT_HEIGHT)
@@ -204,93 +204,92 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
 
   const initialIndex = indexOfMonth(initialMonth);
   const currentIndex = useRef(initialIndex);
-  /** The page a gesture started from — what the flip is measured against. */
+  /** The month a gesture started from — what the flip is measured against. */
   const dragFrom = useRef(initialIndex);
-  /** True from the moment a user gesture starts until it has been landed. Our
-   *  own programmatic scrolls never set it, which is what keeps them from
-   *  being mistaken for a gesture and settled a second time. */
-  const gesturing = useRef(false);
+  // Settle latch. The month is reported once the scroll has been quiet for
+  // SETTLE_MS — after the drag, after the glide, and after a browser snap
+  // alike. Read through a ref so a pending timer never fires a stale month.
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settleContext = useRef({ months, onMonthSettled });
+  settleContext.current = { months, onMonthSettled };
+  const armSettle = useCallback(() => {
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => {
+      settleTimer.current = null;
+      const ctx = settleContext.current;
+      ctx.onMonthSettled(ctx.months[currentIndex.current]);
+    }, SETTLE_MS);
+  }, []);
+  useEffect(
+    () => () => {
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+    },
+    []
+  );
+
+  // Every programmatic scroll goes through here.
+  //
+  // On web the browser owns snapping, and it re-snaps a programmatic jump the
+  // moment it lands. Under virtualization the destination row is not mounted
+  // yet, so mandatory snap has nothing to snap to there and pulls the scroll
+  // back to the nearest row that IS mounted — a Today jump four months back
+  // stopped two months short, on a month nobody asked for. Snapping is
+  // therefore suspended for the jump and handed back once the destination has
+  // had time to mount. Inert on native, where the JS settle does the landing.
+  const snapRestore = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const jumpTo = useCallback((offset: number, animated: boolean) => {
+    const node = scrollerNode(listRef.current);
+    if (node) {
+      node.style.scrollSnapType = 'none';
+      if (snapRestore.current) clearTimeout(snapRestore.current);
+      snapRestore.current = setTimeout(() => {
+        snapRestore.current = null;
+        const restored = scrollerNode(listRef.current);
+        if (restored) restored.style.scrollSnapType = WEB_SNAP_TYPE;
+      }, SNAP_RESTORE_MS);
+    }
+    listRef.current?.scrollToOffset({ offset, animated });
+  }, []);
+  useEffect(
+    () => () => {
+      if (snapRestore.current) clearTimeout(snapRestore.current);
+    },
+    []
+  );
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    // The header follows the scroll live: the month is whichever page the
+    armSettle();
+    // The header follows the scroll live: the month is whichever one the
     // offset is nearest, with nothing to settle afterwards.
-    const index = clampIndex(
-      Math.round(e.nativeEvent.contentOffset.y / height)
-    );
+    const index = nearestSnapIndex(snapOffsets, e.nativeEvent.contentOffset.y);
     if (index === currentIndex.current) return;
     currentIndex.current = index;
     onMonthChange(months[index]);
   };
 
-  /** Note where a gesture began; its landing is measured from there. */
+  /** Note where a gesture began; its landing is measured from there. Only a
+   *  real drag reaches this — the platform raises it for nothing else. */
   const beginGesture = () => {
-    if (gesturing.current) return;
-    gesturing.current = true;
     dragFrom.current = currentIndex.current;
   };
 
-  /** Land the gesture on its page. Shared by the native drag-end event and the
-   *  web scroll-end signal, so both platforms settle by the same rule. */
-  const settleTo = (offset: number, velocity: number) => {
-    gesturing.current = false;
+  /** Land the drag on its month. Android only — web is snapped by the browser
+   *  from WEB_SNAP_CONTAINER, and RNW raises no drag events to run this from. */
+  const handleScrollEndDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const target = clampIndex(
-      landingIndex(dragFrom.current, offset, height, velocity)
+      landingIndex(
+        dragFrom.current,
+        e.nativeEvent.contentOffset.y,
+        snapOffsets,
+        e.nativeEvent.velocity?.y ?? 0
+      )
     );
     currentIndex.current = target;
-    listRef.current?.scrollToOffset({
-      offset: target * height,
-      animated: true,
-    });
+    jumpTo(snapOffsets[target], true);
     onMonthChange(months[target]);
   };
 
-  const handleScrollEndDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    settleTo(e.nativeEvent.contentOffset.y, e.nativeEvent.velocity?.y ?? 0);
-  };
-
-  // Web has no drag events a wheel can raise, so a gesture is recognised from
-  // the input itself — a wheel notch or a finger going down — and landed when
-  // the browser reports scrolling has stopped. Reading the input rather than
-  // the scrolling is what distinguishes a gesture from our own glide, which
-  // must never be settled again. `scrollend` is that stop signal where it
-  // exists; older engines get a short idle timer. No velocity is available
-  // either way, so on web the distance half of the rule carries it alone.
-  const settleRef = useRef(settleTo);
-  settleRef.current = settleTo;
-  const beginRef = useRef(beginGesture);
-  beginRef.current = beginGesture;
-  useEffect(() => {
-    const node = scrollerNode(listRef.current);
-    if (!node) return;
-    let idle: ReturnType<typeof setTimeout> | null = null;
-    const start = () => beginRef.current();
-    const finish = () => {
-      if (!gesturing.current) return;
-      settleRef.current(node.scrollTop, 0);
-    };
-    // Cast so this reads as the runtime feature check it is: lib.dom
-    // declares `onscrollend` unconditionally, so narrowing on `node`
-    // itself would type the fallback branch as unreachable.
-    const hasScrollEnd = 'onscrollend' in (node as object);
-    const onScroll = () => {
-      if (hasScrollEnd) return;
-      if (idle) clearTimeout(idle);
-      idle = setTimeout(finish, 120);
-    };
-    node.addEventListener('wheel', start, { passive: true });
-    node.addEventListener('touchstart', start, { passive: true });
-    if (hasScrollEnd) node.addEventListener('scrollend', finish);
-    else node.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      if (idle) clearTimeout(idle);
-      node.removeEventListener('wheel', start);
-      node.removeEventListener('touchstart', start);
-      node.removeEventListener('scrollend', finish);
-      node.removeEventListener('scroll', onScroll);
-    };
-  }, []);
-
-  // Anchored latch: report once, the first time the initial month's page is
+  // Anchored latch: report once, the first time the initial month's row is
   // viewable at the landing position — the parent keeps the grid area covered
   // until then. Viewability recomputes on cell layout and list updates, not
   // just user scrolls, so this fires shortly after mount. The callback must
@@ -301,7 +300,10 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     null
   );
   useEffect(() => {
-    anchorContext.current = { key: monthKey(months[initialIndex]), onAnchored };
+    anchorContext.current = {
+      key: weeks[snapRows[initialIndex]],
+      onAnchored,
+    };
   });
   const handleViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -322,23 +324,17 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   const handleContentSizeChange = () => {
     if (corrected.current) return;
     corrected.current = true;
-    listRef.current?.scrollToOffset({
-      offset: initialIndex * height,
-      animated: false,
-    });
+    jumpTo(snapOffsets[initialIndex], false);
   };
 
-  // Pane resize (rotation / window resize): the page height changed, so put
-  // the current page back under the viewport.
+  // Pane resize (rotation / window resize): the row height changed, so put the
+  // current month back under the viewport.
   const prevHeight = useRef(height);
   useEffect(() => {
     if (prevHeight.current === height) return;
     prevHeight.current = height;
-    listRef.current?.scrollToOffset({
-      offset: currentIndex.current * height,
-      animated: false,
-    });
-  }, [height]);
+    jumpTo(snapOffsets[currentIndex.current], false);
+  }, [height, snapOffsets, jumpTo]);
 
   useImperativeHandle(
     ref,
@@ -347,26 +343,42 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
         const index = indexOfMonth({ year, month0 });
         const adjacent = Math.abs(index - currentIndex.current) <= 1;
         currentIndex.current = index;
-        gesturing.current = false;
-        listRef.current?.scrollToOffset({
-          offset: index * height,
-          animated: animated && adjacent,
-        });
+        jumpTo(snapOffsets[index], animated && adjacent);
+        // An explicit jump knows its destination synchronously, so it reports
+        // it rather than waiting to be told by the scroll. Leaving this to the
+        // settle timer made Today a coin flip: the fetch and the dimming hang
+        // off the settle, and a programmatic scroll does not reliably emit the
+        // scroll events that arm it — Today landed on the right month with
+        // every day dimmed and not one event fetched for it.
         onMonthChange(months[index]);
+        onMonthSettled(months[index]);
       },
     }),
-    [indexOfMonth, height, months, onMonthChange]
+    [indexOfMonth, snapOffsets, months, onMonthChange, onMonthSettled, jumpTo]
   );
 
-  const renderItem = ({ item }: ListRenderItemInfo<MonthAnchor>) => (
-    <MonthPage
-      month={item}
-      height={height}
+  // FlatList treats its cells as pure: they re-render when `data` or
+  // `extraData` changes and not otherwise. Both of the things a mounted row
+  // draws from live outside `data` — which month is focused (dimming) and the
+  // fetched events — so without this a row mounted before a jump keeps the
+  // focus and the chips it first rendered with. Pressing Today four months
+  // back landed on the right month with every day dimmed and no events on it.
+  const extraData = useMemo(
+    () => ({ focusedMonth, weekEvents }),
+    [focusedMonth, weekEvents]
+  );
+
+  const renderItem = ({ item, index }: ListRenderItemInfo<string>) => (
+    <WeekRow
+      weekStart={item}
       rowHeight={rowHeight}
       cellWidth={width / 7}
       slotCount={slotCount}
-      weekEvents={weekEvents}
-      today={today}
+      events={weekEvents.get(item) ?? NO_EVENTS}
+      todayStr={today}
+      focusedYear={focusedMonth.year}
+      focusedMonth0={focusedMonth.month0}
+      isMonthStart={monthStartRows.has(index)}
       onPressDay={onPressDay}
       onPressEvent={onPressEvent}
       onLongPressDay={onLongPressDay}
@@ -377,27 +389,24 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     <FlatList
       ref={listRef}
       testID="month-grid"
-      style={styles.list}
-      data={months}
+      style={[styles.list, WEB_SNAP_CONTAINER]}
+      data={weeks}
       renderItem={renderItem}
-      keyExtractor={monthKey}
+      keyExtractor={keyExtractor}
+      extraData={extraData}
       getItemLayout={(_, index) => ({
-        length: height,
-        offset: height * index,
+        length: rowHeight,
+        offset: rowHeight * index,
         index,
       })}
-      initialScrollIndex={initialIndex}
-      initialNumToRender={1}
-      maxToRenderPerBatch={2}
-      windowSize={3}
+      initialScrollIndex={snapRows[initialIndex]}
+      initialNumToRender={8}
+      windowSize={7}
       // No pagingEnabled: its threshold is half a page and is not tunable, so
-      // the drag handlers below decide instead. Zero deceleration means the
+      // handleScrollEndDrag decides instead. Zero deceleration means the
       // content stops dead under the finger on release, leaving that decision
-      // — and the glide to the chosen month — entirely ours. Web keeps the
-      // browser's scroll-snap and neither prop applies there.
-      // Content stops dead under the finger on release, leaving the landing
-      // decision — and the glide to it — entirely ours. Web has no momentum to
-      // suppress and settles from the scroll-end effect above instead.
+      // — and the glide to the chosen month — entirely ours. Web has no
+      // momentum to suppress and is snapped by the browser instead.
       decelerationRate={Platform.OS === 'web' ? undefined : 0}
       onScrollBeginDrag={Platform.OS === 'web' ? undefined : beginGesture}
       onScrollEndDrag={Platform.OS === 'web' ? undefined : handleScrollEndDrag}
@@ -406,12 +415,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
       scrollEventThrottle={16}
       onScroll={handleScroll}
       onContentSizeChange={handleContentSizeChange}
-      onScrollToIndexFailed={({ index }) => {
-        listRef.current?.scrollToOffset({
-          offset: index * height,
-          animated: false,
-        });
-      }}
+      onScrollToIndexFailed={({ index }) => jumpTo(index * rowHeight, false)}
       showsVerticalScrollIndicator={false}
     />
   );

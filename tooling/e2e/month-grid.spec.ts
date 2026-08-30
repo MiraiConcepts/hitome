@@ -24,13 +24,14 @@ const weekStartOf = (d: Date) =>
   );
 
 /**
- * Grid queries must be scoped to one month's page. The grid pages by month and
- * every page draws six week rows starting at the week of the 1st, so the week
- * straddling two months is drawn by both — a boundary day cell, and any chip
- * or banner sitting in it, exists twice in the DOM.
+ * Scope grid queries to the grid, nothing finer. The grid is one continuous
+ * ribbon of week rows, so every day cell is unique in the DOM. It was not
+ * always: the grid used to page by month, and because a month's six rows
+ * overrun the next month's by one or two, each page redrew a week its
+ * neighbour also drew — a boundary day cell, and any chip in it, existed
+ * twice, and every query here had to name a page to disambiguate.
  */
-const gridPage = (page: Page, d: Date) =>
-  page.getByTestId(`month-page-${d.getFullYear()}-${pad(d.getMonth() + 1)}`);
+const grid = (page: Page) => page.getByTestId('month-grid');
 
 async function shot(page: Page, name: string) {
   await page.screenshot({ path: `artifacts/${name}.png`, fullPage: true });
@@ -61,7 +62,7 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
       monthTitle(now),
       { timeout: 30_000 }
     );
-    await expect(gridPage(page, now).getByText('🧪 E2E Today')).toBeVisible({
+    await expect(grid(page).getByText('🧪 E2E Today')).toBeVisible({
       timeout: 30_000,
     });
     await shot(page, '01-initial-today');
@@ -74,12 +75,12 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
       { timeout: 30_000 }
     );
     await expect(
-      gridPage(page, target(1)).getByText('🧪 E2E Morning')
+      grid(page).getByText('🧪 E2E Morning')
     ).toBeVisible({ timeout: 30_000 });
 
     // The week containing the 1st settles at the grid's top edge.
     const gridBox = await page.getByTestId('month-grid').boundingBox();
-    const firstWeekCell = gridPage(page, target(1)).getByTestId(
+    const firstWeekCell = grid(page).getByTestId(
       `day-cell-${dateString(weekStartOf(target(1)))}`
     );
     await expect
@@ -91,16 +92,63 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
     await shot(page, '02-target-month');
   });
 
+  await test.step('ribbon: the boundary week exists once, not once per month', async () => {
+    // The regression this grid was rebuilt for. Month pages each drew the week
+    // straddling their boundary, so holding a swipe mid-seam showed that week
+    // twice, stacked — August's copy dimmed above September's bright one. A
+    // ribbon cannot: the week is one row. Every day of the straddling week is
+    // asserted, including the ones belonging to the previous month, which are
+    // exactly the cells that used to double.
+    const weekStart = weekStartOf(target(1));
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(
+        weekStart.getFullYear(),
+        weekStart.getMonth(),
+        weekStart.getDate() + i
+      );
+      await expect(page.getByTestId(`day-cell-${dateString(d)}`)).toHaveCount(1);
+    }
+  });
+
+  await test.step('web: the browser snaps to months, not to weeks', async () => {
+    // Web has no snapToOffsets under RNW, so month paging is declared to the
+    // browser as CSS snap positions: mandatory on the scroller, aligned on the
+    // month-start rows ALONE. Aligning every row (what RNW's own
+    // `pagingEnabled` would do) would page by week instead — hence the
+    // sparseness assertion, which is the whole mechanism in one line. Doing it
+    // this way is also what fixed keyboard and scrollbar scrolling, which the
+    // old JS settle never saw and left parked between months.
+    // Snapping is deliberately suspended across a programmatic jump (see
+    // jumpTo in month-grid) — the deep link that got us here is one — so poll
+    // for it to be handed back rather than sampling inside that window.
+    await expect
+      .poll(async () =>
+        grid(page).evaluate(
+          (el: HTMLElement) => getComputedStyle(el).scrollSnapType
+        )
+      )
+      .toBe('y mandatory');
+    const aligned = await grid(page).evaluate(
+      (el: HTMLElement) =>
+        Array.from(el.querySelectorAll('*')).filter(
+          (n) => getComputedStyle(n as HTMLElement).scrollSnapAlign === 'start'
+        ).length
+    );
+    const rows = (await page.locator('[data-testid^="day-cell-"]').count()) / 7;
+    expect(aligned).toBeGreaterThan(0);
+    expect(aligned).toBeLessThan(rows);
+  });
+
   await test.step('banners: span days 8–10, stack above chips, break per week', async () => {
     // Some segment of the multi-day banner horizontally overlaps each covered
     // day cell (the span may break across a week edge on some run dates).
-    const segments = gridPage(page, target(1)).getByText('🧪 E2E Multi-day');
+    const segments = grid(page).getByText('🧪 E2E Multi-day');
     const segmentBoxes = [];
     for (let i = 0; i < (await segments.count()); i++) {
       segmentBoxes.push(await segments.nth(i).boundingBox());
     }
     for (const day of [8, 9, 10]) {
-      const cell = await gridPage(page, target(1))
+      const cell = await grid(page)
         .getByTestId(`day-cell-${dateString(target(day))}`)
         .boundingBox();
       expect(
@@ -111,17 +159,17 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
     }
 
     // All-day banner renders above the timed chip on day 6.
-    const allDayBox = await gridPage(page, target(1))
+    const allDayBox = await grid(page)
       .getByText('🧪 E2E All-day')
       .boundingBox();
-    const morningBox = await gridPage(page, target(1))
+    const morningBox = await grid(page)
       .getByText('🧪 E2E Morning')
       .boundingBox();
     expect(allDayBox!.y).toBeLessThan(morningBox!.y);
 
     // A 9-day banner always crosses a week boundary → ≥2 segments.
     expect(
-      await gridPage(page, target(1)).getByText('🧪 E2E Longspan').count()
+      await grid(page).getByText('🧪 E2E Longspan').count()
     ).toBeGreaterThanOrEqual(2);
     await shot(page, '03-banners');
   });
@@ -129,7 +177,7 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
   await test.step('long-press a day → popover → edit editor', async () => {
     // The overflow counter is a label, not a button — the cell underneath owns
     // both gestures: tap creates an event, long press opens the day.
-    const day = gridPage(page, target(1));
+    const day = grid(page);
     await expect(day.getByTestId(`more-${dateString(target(27))}`)).toHaveText(
       /\+\d+/
     );
@@ -152,7 +200,7 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
   });
 
   await test.step('empty day tap → create editor dated that day', async () => {
-    await gridPage(page, target(1))
+    await grid(page)
       .getByTestId(`day-cell-${dateString(target(15))}`)
       .click();
     await expect(page.getByTestId('event-editor')).toBeVisible();
@@ -168,7 +216,7 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
   });
 
   await test.step('chip tap → edit editor', async () => {
-    await gridPage(page, target(1)).getByText('🧪 E2E Morning').click();
+    await grid(page).getByText('🧪 E2E Morning').click();
     await expect(page.getByTestId('event-editor')).toBeVisible();
     await expect(page.getByTestId('editor-summary')).toHaveValue(
       '🧪 E2E Morning'
@@ -178,7 +226,7 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
   });
 
   await test.step('recurring create → daily ×3 → chips on three days → delete series', async () => {
-    await gridPage(page, target(1))
+    await grid(page)
       .getByTestId(`day-cell-${dateString(target(15))}`)
       .click();
     await expect(page.getByTestId('event-editor')).toBeVisible();
@@ -190,16 +238,16 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
     await expect(page.getByTestId('event-editor')).toHaveCount(0);
     // One occurrence chip on each of the three days.
     await expect(
-      gridPage(page, target(1)).getByText('🧪 E2E Recurring')
+      grid(page).getByText('🧪 E2E Recurring')
     ).toHaveCount(3, { timeout: 30_000 });
     await shot(page, '06b-recurring-chips');
 
     // Whole-series delete from any occurrence.
-    await gridPage(page, target(1)).getByText('🧪 E2E Recurring').nth(1).click();
+    await grid(page).getByText('🧪 E2E Recurring').nth(1).click();
     await expect(page.getByTestId('editor-delete')).toHaveText('Delete series');
     await page.getByTestId('editor-delete').click();
     await expect(
-      gridPage(page, target(1)).getByText('🧪 E2E Recurring')
+      grid(page).getByText('🧪 E2E Recurring')
     ).toHaveCount(0, { timeout: 30_000 });
   });
 
@@ -246,7 +294,7 @@ test('month grid: chips, banners, navigation, editors', async ({ page }) => {
     await expect(page.getByTestId('calendar-header-label')).toHaveText(
       monthTitle(now)
     );
-    await expect(gridPage(page, now).getByText('🧪 E2E Today')).toBeVisible({
+    await expect(grid(page).getByText('🧪 E2E Today')).toBeVisible({
       timeout: 30_000,
     });
     await shot(page, '08-today');

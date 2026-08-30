@@ -1,10 +1,11 @@
-// Pure math for the paged month grid: the bounded month ribbon (the list
-// data, one entry per page), the six week rows a page draws, and per-week
+// Pure math for the month grid: the bounded week ribbon (the list data, one
+// entry per week row), the month-start rows a swipe lands on, and per-week
 // banner/chip lane layout. No React or react-native imports — runs under bun
 // test and CI jest.
 import { eventLastMs, toDateString } from '@/utils/date';
 
 const DAY_MS = 86_400_000;
+const WEEK_MS = 7 * DAY_MS;
 
 /** Grid range: today ± this many years of week rows. */
 const RANGE_YEARS = 5;
@@ -28,7 +29,8 @@ const ordinalOf = ({ year, month0 }: MonthAnchor) => year * 12 + month0;
 
 /**
  * The bounded month ribbon: every month from RANGE_YEARS before `today`
- * through RANGE_YEARS after. One entry per page of the grid — the list data.
+ * through RANGE_YEARS after. Not the list data — it names the months a swipe
+ * can land on, and is what `monthStartWeekIndices` runs index-parallel to.
  */
 export function buildMonthRange(today: Date): MonthAnchor[] {
   const first = ordinalOf({
@@ -42,68 +44,143 @@ export function buildMonthRange(today: Date): MonthAnchor[] {
   }));
 }
 
-/** Page index of `anchor` in a ribbon starting at `first`; out of range when
+/** Month index of `anchor` in a ribbon starting at `first`; out of range when
  *  negative or past the ribbon's end, so callers clamp. */
 export function monthIndexIn(first: MonthAnchor, anchor: MonthAnchor): number {
   return ordinalOf(anchor) - ordinalOf(first);
 }
 
-/** Stable page key, e.g. '2026-08'. */
+/** Stable month key, e.g. '2026-08'. */
 export function monthKey({ year, month0 }: MonthAnchor): string {
   return `${year}-${String(month0 + 1).padStart(2, '0')}`;
 }
 
 /**
- * The six week-starts a month page renders: the week containing the 1st, plus
- * five. Six always covers a month (a 31-day month starting Sunday is the worst
- * case, at exactly six), and always rendering six — rather than the four or
- * five a month may strictly need — is what keeps every page the same height,
- * which is what makes one swipe equal one month.
+ * Whole weeks between two local-midnight week starts. Math.round absorbs the
+ * ±1h drift a DST transition puts into the raw ms difference.
  */
-export function weeksOfMonth({ year, month0 }: MonthAnchor): string[] {
-  const first = weekStartOf(new Date(year, month0, 1));
-  return Array.from({ length: 6 }, (_, i) =>
-    toDateString(addDays(first, i * 7))
+export function weeksBetween(fromWeekStart: Date, toWeekStart: Date): number {
+  return Math.round(
+    (toWeekStart.getTime() - fromWeekStart.getTime()) / WEEK_MS
   );
 }
 
+/**
+ * The bounded week ribbon — the list data, one entry per row, each entry its
+ * own key. Derived from the month ribbon rather than from today, so the two
+ * are consistent by construction: it opens on the week containing the first
+ * month's 1st (no month can index before row 0) and runs five weeks past the
+ * last month's start (so the final month still fills a six-row viewport).
+ */
+export function buildWeekRange(months: readonly MonthAnchor[]): {
+  rangeStart: Date;
+  weeks: string[];
+} {
+  const first = months[0];
+  const last = months[months.length - 1];
+  const rangeStart = weekStartOf(new Date(first.year, first.month0, 1));
+  const lastStart = weekStartOf(new Date(last.year, last.month0, 1));
+  const count = weeksBetween(rangeStart, lastStart) + 6;
+  const weeks: string[] = [];
+  for (let i = 0; i < count; i++) {
+    weeks.push(toDateString(addDays(rangeStart, i * 7)));
+  }
+  return { rangeStart, weeks };
+}
+
+/** Row index of the week containing `day` (negative when before the ribbon). */
+export function weekIndexOfDay(day: Date, rangeStart: Date): number {
+  return weeksBetween(rangeStart, weekStartOf(day));
+}
+
+/** Row index of the week containing the 1st — where a month settles. */
+export function monthStartWeekIndex(
+  year: number,
+  month0: number,
+  rangeStart: Date
+): number {
+  return weekIndexOfDay(new Date(year, month0, 1), rangeStart);
+}
+
+/**
+ * The rows a swipe can land on, one per entry of `months` and index-parallel
+ * to it — so a landing index names its month with no lookup. Consecutive
+ * entries are 4 or 5 rows apart, never 6, which is exactly why month pages had
+ * to redraw their neighbour's week and a ribbon does not.
+ */
+export function monthStartWeekIndices(
+  months: readonly MonthAnchor[],
+  rangeStart: Date
+): number[] {
+  return months.map((m) => monthStartWeekIndex(m.year, m.month0, rangeStart));
+}
+
+/**
+ * Index of the snap offset nearest `offset` — the month a scroll position
+ * reads as. Offsets ascend, so this bisects rather than scanning all ~121 of
+ * them on every scroll frame. An exact midpoint resolves to the later month.
+ */
+export function nearestSnapIndex(
+  snapOffsets: readonly number[],
+  offset: number
+): number {
+  let lo = 0;
+  let hi = snapOffsets.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (snapOffsets[mid] < offset) lo = mid + 1;
+    else hi = mid;
+  }
+  // `lo` is the first offset at or past `offset`; its predecessor may be nearer.
+  if (lo > 0 && offset - snapOffsets[lo - 1] < snapOffsets[lo] - offset) {
+    return lo - 1;
+  }
+  return lo;
+}
+
 // What it takes to flip a month. The platform's own rule is "drag past half
-// the page, or fling hard enough that its predicted landing crosses the
-// halfway mark" — on a full-screen page that is a very long drag, which is
-// what made paging feel like work. These replace it: a drag flips once it has
-// covered this fraction of a page, or is let go with this much speed behind
-// it (dp/ms, the unit Android and iOS both report). Neither can move more
-// than one month, because the decision is always "the page the drag started
-// on, plus or minus one".
+// the way, or fling hard enough that its predicted landing crosses the
+// halfway mark" — across a near-full-screen month that is a very long drag,
+// which is what made paging feel like work. These replace it: a drag flips
+// once it has covered this fraction of the way to the next month, or is let
+// go with this much speed behind it (dp/ms, the unit Android and iOS both
+// report). Neither can move more than one month, because the decision is
+// always "the month the drag started on, plus or minus one".
 const FLIP_FRACTION = 0.15;
 const FLIP_VELOCITY = 0.3;
 
 /**
- * Where a gesture lands: the page it began on, plus or minus one. Both
- * platforms run this same rule, so a drag that flips the month on the phone
- * flips it in the browser too. Direction comes from the distance moved rather
- * than the velocity's sign, which differs between platforms.
+ * Where a gesture lands: the month it began on, plus or minus one. Direction
+ * comes from the distance moved rather than the velocity's sign, which differs
+ * between platforms. `snapOffsets` are scroll offsets in the same unit as
+ * `offset` (rows × rowHeight) — months sit 4 or 5 rows apart, so the fraction
+ * is measured against the real gap to the neighbour rather than a fixed page
+ * height. Out of range in the direction of travel means there is nothing to
+ * flip to, so the gesture stays put.
  */
 export function landingIndex(
   from: number,
   offset: number,
-  height: number,
+  snapOffsets: readonly number[],
   velocity: number
 ): number {
-  const moved = offset - from * height;
+  const moved = offset - snapOffsets[from];
   const direction = Math.sign(moved);
   if (direction === 0) return from;
+  const next = from + direction;
+  if (next < 0 || next >= snapOffsets.length) return from;
+  const span = Math.abs(snapOffsets[next] - snapOffsets[from]);
   const flips =
-    Math.abs(moved) >= height * FLIP_FRACTION ||
+    Math.abs(moved) >= span * FLIP_FRACTION ||
     Math.abs(velocity) >= FLIP_VELOCITY;
-  return flips ? from + direction : from;
+  return flips ? next : from;
 }
 
 /**
  * Fetch window covering a settled month's full 6-row viewport:
  * [weekStart(1st) − 7d, weekStart(1st) + 49d). Unlike the old
  * [1st−7d, last+7d) window, this covers the 6th grid row even for short
- * short months (e.g. a February whose grid runs two weeks into March, where
+ * months (e.g. a February whose grid runs two weeks into March, where
  * last+7d would stop a week early).
  */
 export function gridFetchRange(

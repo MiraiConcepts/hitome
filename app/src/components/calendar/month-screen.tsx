@@ -28,12 +28,7 @@ import { HEADER_GROUND, MonthHeader } from '@/components/calendar/month-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { davConfigured } from '@/config';
-import {
-  AccentColor,
-  Colors,
-  MaxContentWidth,
-  Spacing,
-} from '@/constants/theme';
+import { AccentColor, Colors, Spacing } from '@/constants/theme';
 import { useMonthEvents } from '@/hooks/use-month-events';
 import type { MonthAnchor } from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
@@ -75,7 +70,12 @@ export function MonthScreen() {
   const [initialMonth] = useState<MonthAnchor>(() =>
     monthOfDay(dayParam, new Date())
   );
+  // Two months, deliberately. `month` tracks the scroll live and drives the
+  // header label; `settledMonth` only moves once scrolling has stopped, and
+  // drives the day dimming and the fetch — so the grid does not reshade under
+  // a finger mid-drag, and a fling across several months costs one fetch.
   const [month, setMonth] = useState<MonthAnchor>(initialMonth);
+  const [settledMonth, setSettledMonth] = useState<MonthAnchor>(initialMonth);
   const [editor, setEditor] = useState<EditorState>(
     newParam ? { mode: 'create', day: today } : { mode: 'closed' }
   );
@@ -136,8 +136,12 @@ export function MonthScreen() {
     () => new Date(month.year, month.month0, 1),
     [month]
   );
+  const settledDate = useMemo(
+    () => new Date(settledMonth.year, settledMonth.month0, 1),
+    [settledMonth]
+  );
   const { events, loading, error, refresh, fetchedAt } =
-    useMonthEvents(monthDate);
+    useMonthEvents(settledDate);
 
   // Auto-dismiss the snackbar.
   useEffect(() => {
@@ -148,6 +152,10 @@ export function MonthScreen() {
 
   const onMonthChange = useCallback((anchor: MonthAnchor) => {
     setMonth((prev) => (sameMonth(prev, anchor) ? prev : anchor));
+  }, []);
+
+  const onMonthSettled = useCallback((anchor: MonthAnchor) => {
+    setSettledMonth((prev) => (sameMonth(prev, anchor) ? prev : anchor));
   }, []);
 
   const onPressDay = useCallback(
@@ -308,7 +316,9 @@ export function MonthScreen() {
                 events={events}
                 today={today}
                 initialMonth={initialMonth}
+                focusedMonth={settledMonth}
                 onMonthChange={onMonthChange}
+                onMonthSettled={onMonthSettled}
                 onAnchored={onGridAnchored}
                 onPressDay={onPressDay}
                 onPressEvent={onPressEvent}
@@ -369,14 +379,14 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    alignItems: 'center',
   },
+  // Full-bleed on every platform: a month grid is a seven-column table, so the
+  // window's width is the columns' width. Capping it (the 800px
+  // MaxContentWidth inherited from the notes app) left a desktop browser
+  // showing a narrow strip of calendar in a field of empty ground.
   content: {
     flex: 1,
     width: '100%',
-    maxWidth: MaxContentWidth,
-    // paddingTop: Platform.select({ web: Spacing.four, default: Spacing.two }),
-    // paddingBottom: Platform.select({ web: Spacing.two, default: 0 }),
   },
   setupWrapper: {
     flex: 1,

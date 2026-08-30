@@ -1,5 +1,17 @@
-import { memo, useMemo } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { memo, useEffect, useMemo } from 'react';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from 'react-native';
+
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import type { CalEvent } from '@/caldav/types';
 import {
@@ -35,9 +47,13 @@ type WeekRowProps = {
   /** Events touching this week (pre-bucketed by the grid). */
   events: CalEvent[];
   todayStr: string;
-  /** The settled/visible month — days outside it render dimmed. */
+  /** The settled month — days outside it render dimmed. Settled, not live, so
+   *  the grid does not reshade under a finger mid-drag. */
   focusedYear: number;
   focusedMonth0: number;
+  /** Web only: a month begins in this row, making it one of the CSS
+   *  scroll-snap positions the browser pages between (see month-grid). */
+  isMonthStart?: boolean;
   onPressDay: (day: string) => void;
   onPressEvent: (event: CalEvent) => void;
   /** Long-press a cell to see everything on that day. Empty days have
@@ -83,6 +99,12 @@ function bannerTitleLines(summary: string, widthPx: number): number {
 const TODAY_FILL = '#0060E0';
 const OTHER_MONTH_FILL = '#2E3135';
 
+/** How long a neighbouring month's shading takes to settle in or out. */
+const DIM_MS = 200;
+
+/** Month ordinal — the unit a row's two shares are compared by. */
+const monthOrdOf = (d: Date) => d.getFullYear() * 12 + d.getMonth();
+
 /** The working week ends after this many columns — weeks start Monday, so
  *  five is the end of Friday. */
 const WEEK_SPLIT_AFTER_COL = 5;
@@ -106,6 +128,14 @@ export const GRID_RULE = '#60646C';
  *  — every modern phone — with room to spare rather than by a hair. */
 export const RULE_WIDTH = 1;
 
+/** Declared per row rather than on the list, because only the rows a month
+ *  starts in are snap positions — that is what makes the browser page by
+ *  month instead of by week. Inert off web. */
+const WEB_SNAP_ROW =
+  Platform.OS === 'web'
+    ? ({ scrollSnapAlign: 'start' } as unknown as ViewStyle)
+    : null;
+
 export const WeekRow = memo(function WeekRow({
   weekStart,
   rowHeight,
@@ -115,6 +145,7 @@ export const WeekRow = memo(function WeekRow({
   todayStr,
   focusedYear,
   focusedMonth0,
+  isMonthStart,
   onPressDay,
   onPressEvent,
   onLongPressDay,
@@ -138,6 +169,36 @@ export const WeekRow = memo(function WeekRow({
     return set;
   }, [events]);
 
+  // A week touches at most two months, so its shading is two blocks, not seven
+  // cells — which is what lets this fade on a couple of animated values per row
+  // instead of one per day. `split` is the column the second month starts at,
+  // or 7 when the week sits inside a single month.
+  const { firstOrd, lastOrd, split } = useMemo(() => {
+    const first = monthOrdOf(days[0]);
+    const last = monthOrdOf(days[6]);
+    return {
+      firstOrd: first,
+      lastOrd: last,
+      split: first === last ? 7 : days.findIndex((d) => monthOrdOf(d) === last),
+    };
+  }, [days]);
+
+  const focusedOrd = focusedYear * 12 + focusedMonth0;
+  // Seeded at the settled value so a row scrolling into view arrives already
+  // shaded — only a change of focused month animates.
+  const firstDim = useSharedValue(firstOrd === focusedOrd ? 0 : 1);
+  const lastDim = useSharedValue(lastOrd === focusedOrd ? 0 : 1);
+  useEffect(() => {
+    firstDim.value = withTiming(firstOrd === focusedOrd ? 0 : 1, {
+      duration: DIM_MS,
+    });
+    lastDim.value = withTiming(lastOrd === focusedOrd ? 0 : 1, {
+      duration: DIM_MS,
+    });
+  }, [firstOrd, lastOrd, focusedOrd, firstDim, lastDim]);
+  const firstFill = useAnimatedStyle(() => ({ opacity: firstDim.value }));
+  const lastFill = useAnimatedStyle(() => ({ opacity: lastDim.value }));
+
   const layout = useMemo(() => {
     const chipSpan = (event: CalEvent) =>
       chipTitleLines(event.summary, cellWidth);
@@ -147,19 +208,36 @@ export const WeekRow = memo(function WeekRow({
   }, [days, events, slotCount, cellWidth]);
 
   return (
-    <View style={[styles.row, { height: rowHeight }]}>
+    <View
+      style={[
+        styles.row,
+        { height: rowHeight },
+        isMonthStart ? WEB_SNAP_ROW : null,
+      ]}
+    >
       <View style={styles.cells}>
+        {/* Behind the cells, so today's fill still paints over the shading on
+            a today that belongs to a neighbouring month. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.monthFill, { left: 0, width: pct(split) }, firstFill]}
+        />
+        {split < 7 && (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.monthFill, { left: pct(split), right: 0 }, lastFill]}
+          />
+        )}
         {days.map((day, col) => {
           const dateString = toDateString(day);
           const isToday = dateString === todayStr;
           const inMonth =
             day.getFullYear() === focusedYear &&
             day.getMonth() === focusedMonth0;
-          const tint = isToday
-            ? TODAY_FILL
-            : !inMonth
-              ? OTHER_MONTH_FILL
-              : undefined;
+          // Today keeps a month's weight and ink wherever it sits, so it
+          // reads as today even from a neighbouring month's grid.
+          const muted = !isToday && !inMonth;
+          const tint = isToday ? TODAY_FILL : undefined;
           const label =
             day.getDate() === 1
               ? `1 ${day.toLocaleDateString(undefined, { month: 'short' })}`
@@ -187,8 +265,11 @@ export const WeekRow = memo(function WeekRow({
                   style={[
                     styles.dayNumber,
                     {
-                      color:
-                        isToday || inMonth ? theme.text : theme.textSecondary,
+                      color: muted ? theme.textSecondary : theme.text,
+                      // Muted days fall back to the `small` type's own 500 —
+                      // a neighbouring month should not shout as loudly as
+                      // the one being looked at.
+                      fontWeight: muted ? '500' : '700',
                     },
                   ]}
                 >
@@ -286,6 +367,12 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
   },
+  monthFill: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    backgroundColor: OTHER_MONTH_FILL,
+  },
   cell: {
     flex: 1,
     paddingTop: 2,
@@ -304,7 +391,6 @@ const styles = StyleSheet.create({
   },
   dayNumber: {
     fontSize: 14,
-    fontWeight: 'bold',
   },
   weekSplit: {
     position: 'absolute',
