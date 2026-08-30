@@ -4,12 +4,13 @@ import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Slot, ThemeProvider } from 'expo-router';
 import { useEffect } from 'react';
-import { StyleSheet, useColorScheme } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { BootScreen } from '@/components/boot-screen';
 import { VersionBadge } from '@/components/version-badge';
 import { useAlarmReconcile } from '@/hooks/use-alarm-reconcile';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHydrated } from '@/hooks/use-hydrated';
 import { useSilentReload } from '@/hooks/use-silent-reload';
 import { refreshAgendaWidget } from '@/widget/app-refresh';

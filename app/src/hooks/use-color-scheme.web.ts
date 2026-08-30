@@ -1,19 +1,15 @@
-import { useSyncExternalStore } from 'react';
-import { useColorScheme as useRNColorScheme } from 'react-native';
-
-const emptySubscribe = () => () => {};
+import type { ColorSchemeName } from 'react-native';
 
 /**
- * To support static rendering, this value needs to be re-calculated on the client side for web
+ * Web is pinned to the dark palette, whatever the OS says.
+ *
+ * The calendar is drawn dark-first — black header block, accent-orange ink,
+ * dark out-of-month fills lifted from the home-screen widget — and those are
+ * fixed colors, not theme lookups. Following a light OS setting therefore only
+ * produced a half-light screen: white day cells under a black header, with
+ * near-black neighbouring-month cells punched through them. One scheme, one
+ * design. (Native still follows the system.)
  */
-export function useColorScheme() {
-  const hasHydrated = useSyncExternalStore(
-    emptySubscribe,
-    () => true,
-    () => false
-  );
-
-  const colorScheme = useRNColorScheme();
-
-  return hasHydrated ? colorScheme : 'light';
+export function useColorScheme(): ColorSchemeName {
+  return 'dark';
 }

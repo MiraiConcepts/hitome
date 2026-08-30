@@ -1,7 +1,7 @@
 import { ScrollViewStyleReset } from 'expo-router/html';
 import { type PropsWithChildren } from 'react';
 
-import { AccentColor } from '@/constants/theme';
+import { AccentColor, Colors } from '@/constants/theme';
 
 /**
  * Root HTML wrapper for every web route (static export). Runs in Node only —
@@ -29,8 +29,19 @@ export default function Root({ children }: PropsWithChildren) {
           expected. Remove if you want native web scroll behaviour.
         */}
         <ScrollViewStyleReset />
+
+        {/* Web runs the dark palette only (see hooks/use-color-scheme.web.ts).
+            Declaring it here paints the page — and the browser's own form
+            controls and scrollbars — dark from the first frame, instead of a
+            white flash before React mounts. */}
+        <style dangerouslySetInnerHTML={{ __html: darkGround }} />
       </head>
       <body>{children}</body>
     </html>
   );
 }
+
+const darkGround = `
+:root { color-scheme: dark; }
+html, body, #root { background-color: ${Colors.dark.background}; }
+`;
