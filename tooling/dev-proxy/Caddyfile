@@ -12,8 +12,8 @@
 #   docker compose -f tooling/dev-proxy/compose.yml up -d      # start
 #   docker compose -f tooling/dev-proxy/compose.yml down       # stop (removes container)
 #
-# Ports on this Mac: :8080 is an unrelated dev server, :8880 is mitsume's proxy,
-# :8881 is the e2e proxy — hitome takes :8882 so all four can run at once.
+# Ports on this Mac: :8080 and :8880 belong to unrelated dev servers, :8881 is
+# the e2e proxy — hitome takes :8882 so all four can run at once.
 #
 # (Native Android dev is never subject to CORS — point it straight at the
 # Tailscale URL and skip this proxy.)

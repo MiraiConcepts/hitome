@@ -168,7 +168,7 @@ import ICAL from 'ical.js';
 import * as Crypto from 'expo-crypto';
 
 const vcalendar = new ICAL.Component(['vcalendar', [], []]);
-vcalendar.updatePropertyWithValue('prodid', '-//mitsume//caldav//EN');
+vcalendar.updatePropertyWithValue('prodid', '-//<app>//caldav//EN');
 vcalendar.updatePropertyWithValue('version', '2.0');
 
 const vevent = new ICAL.Component('vevent');
@@ -341,7 +341,7 @@ build time). Simpler than `app.config.ts` `extra` + `expo-constants`, and adequa
 
 `.env` (**gitignore this**):
 ```dotenv
-EXPO_PUBLIC_DAV_URL=https://mitsume.<tailnet>.ts.net/dav/
+EXPO_PUBLIC_DAV_URL=https://<app>.<tailnet>.ts.net/dav/
 EXPO_PUBLIC_DAV_USER=carrein
 EXPO_PUBLIC_DAV_PASS=your-radicale-app-password
 ```
@@ -422,7 +422,7 @@ EXPOSE 80
 ### Caddyfile — app at `/`, Radicale at `/dav/*`, ONE origin
 
 ```caddyfile
-mitsume.<tailnet>.ts.net {
+<app>.<tailnet>.ts.net {
     encode gzip
 
     # CalDAV — strip /dav before proxying; X-Script-Name makes Radicale emit hrefs under /dav
@@ -476,7 +476,7 @@ Requires a **free Expo account** (`eas login`). Use `bunx eas-cli@latest` (or `b
 eas-cli`). **`eas-cli` targets whatever SDK the project declares — no SDK‑56‑specific flag.**
 
 > ⚠️ **`app.json` is missing `android.package`** — EAS build will fail without it. Add a
-> reverse‑DNS id, e.g. `"android": { "package": "com.carrein.mitsume", ... }`.
+> reverse‑DNS id, e.g. `"android": { "package": "<app package id>", ... }`.
 
 `eas.json` — `preview` profile emits an installable **`.apk`** (vs the default `app-bundle`/AAB):
 ```json

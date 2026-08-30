@@ -6,7 +6,7 @@ Status: COMPLETE (executed 2026-06-11)
 All six steps done. Expo SDK 56 scaffold in `app/` (TS strict, Expo Router,
 RN Web included by default); ESLint (expo flat config + prettier) / Prettier /
 jest-expo wired with typecheck/lint/test/format scripts; bun-based CI at
-`.github/workflows/ci.yml`; repo pushed to https://github.com/carrein/mitsume
+`.github/workflows/ci.yml`; repo pushed to the parent repo
 (public, MIT). Smoke: web `expo export` builds all routes; app rendered in
 Android emulator via Expo Go (bundled 4.4s).
 
@@ -22,7 +22,7 @@ Deviations:
 ## Context
 Kick-start the note-taking app from Requirements.md: minimal repo + toolchain
 setup only. User decisions: **bun** as package manager, **public** GitHub repo
-named **mitsume**, and no feature libraries yet — bare scaffold first. Stack
+named for the parent app, and no feature libraries yet — bare scaffold first. Stack
 for later phases remains as decided in Requirements.md §9.
 
 ## Approach — minimal initialization steps
@@ -30,12 +30,12 @@ for later phases remains as decided in Requirements.md §9.
 | # | Step | What |
 |---|------|------|
 | 0 | Verify versions | Confirm current Expo SDK + bun compatibility (bun is a supported Expo package manager) — nothing pinned from memory |
-| 1 | Init repo + GitHub | `git init`, `.gitignore`, README, license; `gh repo create mitsume --public` |
+| 1 | Init repo + GitHub | `git init`, `.gitignore`, README, license; `gh repo create <repo> --public` |
 | 2 | Layout | `app/` (Expo client) · `docs/` (Requirements.md moves here) · `.claude/` (plans) · `server/` left as a stub README |
 | 3 | Scaffold client | `bun create expo` TypeScript template, Expo Router, RN Web enabled; no extra dependencies |
 | 4 | Dev tooling | TS strict, ESLint + Prettier, jest-expo, bun scripts (typecheck / lint / test) |
 | 5 | CI | GitHub Actions (bun-based): typecheck + lint + test on push/PR |
-| 6 | Smoke + first push | App boots on web and Android emulator; initial commit pushed to mitsume |
+| 6 | Smoke + first push | App boots on web and Android emulator; initial commit pushed to the parent repo |
 
 ## Deferred (next phases, in rough order)
 - Feature libraries: yjs, Tiptap + y-prosemirror, y-indexeddb, op-sqlite +

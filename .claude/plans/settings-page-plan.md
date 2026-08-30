@@ -20,7 +20,7 @@ page need to exist at all?* → **No ("option A")**:
 ## Where the record lives
 
 - Architecture + rationale + accepted residual risk: `docs/Deploy.md` (Shape + §3),
-  `docs/Requirements.md` decisions log #9, memory `mitsume-caldav-auth-architecture`.
+  `docs/Requirements.md` decisions log #9, memory `caldav-auth-architecture`.
 - Implementation: credential-injection work executed on `feat/caldav-calendar`
   (config/client rewrite, dev-proxy + prod-sim injection, credential-free image,
   workflow/docs strip) — see the build-log commits.

@@ -4,12 +4,11 @@ Personal, single-user, local-first calendar app. Expo SDK 56 / RN 0.85 (+ RN
 Web) client against self-hosted Radicale over CalDAV, with an Android home-screen
 agenda widget and exact alarms. Targets web + Android (Obtainium) — no iOS.
 
-Split out of [mitsume](https://github.com/MiraiConcepts/mitsume) (notes), which
-keeps the notes canvas and its Hocuspocus/blob backend. The two apps share a
-design language via `MiraiConcepts/tokens`; the shared primitives in
-`src/constants/theme.ts` and `src/components/` are currently a **verbatim copy**
-of mitsume's — keep them byte-identical until both apps move onto
-`MiraiConcepts/components`.
+Split out of a sibling notes app, which keeps the notes canvas and its
+Hocuspocus/blob backend. The two share a design language via
+`MiraiConcepts/tokens`; the primitives in `src/constants/theme.ts` and
+`src/components/` are currently a **verbatim copy** of that app's — keep them
+byte-identical until both move onto `MiraiConcepts/components`.
 
 ## Layout
 
@@ -69,5 +68,5 @@ helper scripts.
   credential baking or client-side credential storage as defaults.
 - Rounded UI is 4px (`Spacing.one`; literal `4` in the widget). Exception:
   month-grid banners and chip bars are square and flush.
-- Ports on this Mac: 8080 is an unrelated dev server, 8880 is mitsume's dev
-  proxy, 8881 is this repo's e2e proxy, 8882 is this repo's dev proxy.
+- Ports on this Mac: 8080 and 8880 belong to unrelated dev servers, 8881 is
+  this repo's e2e proxy, 8882 is this repo's dev proxy.

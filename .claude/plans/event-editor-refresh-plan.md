@@ -1,7 +1,7 @@
 # Event Editor Refresh — Implementation Plan
 
 Created: 2026-07-19 · Status: COMPLETE
-Repo: `/Users/addison/Desktop/mitsume` (work happens under `app/` unless noted)
+Repo: `/Users/addison/Desktop/<repo>` (work happens under `app/` unless noted)
 
 ## Context
 
@@ -99,7 +99,7 @@ One shared form, two shells. `EventEditor` keeps its public contract (`event`, `
 - Files: new `alarm-field.tsx`, `event-editor-form.tsx`
 
 ### Phase G — Alarm firing + deep-link (needs dev-client rebuild)
-- [ ] `bunx expo install expo-notifications`; app.json: plugin entry (new `assets/images/notification-icon.png`, white 96×96, from the mitsume mark; color = AccentColor) + `android.permissions` USE_EXACT_ALARM + SCHEDULE_EXACT_ALARM; rebuild dev client (`bun run android:dev`)
+- [ ] `bunx expo install expo-notifications`; app.json: plugin entry (new `assets/images/notification-icon.png`, white 96×96, from the app mark; color = AccentColor) + `android.permissions` USE_EXACT_ALARM + SCHEDULE_EXACT_ALARM; rebuild dev client (`bun run android:dev`)
 - [ ] New `src/alarms/`: `occurrences.ts` (pure: CalEvents + horizon(14d) → `{ id: alarm:{uid}:{occStartEpoch}, fireDate, title, body, day }`, skips past/absolute), `reconcile.ts` (pure diff desired vs scheduled → toCancel/toSchedule; idempotent), `scheduler.ts` (expo-notifications: channel, handler, permission ensure, DATE triggers with `data.day`, list/cancel), `scheduler.web.ts` (interval + `new Notification()`, onclick focus+day param), `runner.ts` (coalesced `runAlarmReconcile()`: `fetchMonth(now, now+14d)`, fallback to snapshot buckets intersecting horizon, diff, apply)
 - [ ] Export snapshot cacheKey helper from use-month-events (or move to month-events-store) for the cold-start fallback
 - [ ] New `hooks/use-alarm-reconcile.ts` mounted in `_layout.tsx` (mount + AppState→active, ~5s debounce); `month-screen.tsx` calls `runAlarmReconcile()` in `onEditorDone` + delete-undo (next to `refreshAgendaWidget()`)
@@ -144,7 +144,7 @@ One shared form, two shells. `EventEditor` keeps its public contract (`event`, `
 
 ## Verification (end-to-end definition of done)
 
-Web (localhost:8880): create a timed multi-day weekly event with a 10m alarm and a Photon-picked location entirely via pickers; header shows the date in BrandColor; chips/banners land correctly; edit title-only → Radicale object diff shows only SUMMARY/SEQUENCE/LAST-MODIFIED changed. Android: same flow in the bottom sheet; alarm fires exactly with screen off; tapping the notification opens mitsume centered on the day. All checks + suites + e2e green.
+Web (localhost:8880): create a timed multi-day weekly event with a 10m alarm and a Photon-picked location entirely via pickers; header shows the date in BrandColor; chips/banners land correctly; edit title-only → Radicale object diff shows only SUMMARY/SEQUENCE/LAST-MODIFIED changed. Android: same flow in the bottom sheet; alarm fires exactly with screen off; tapping the notification opens the app centered on the day. All checks + suites + e2e green.
 
 ## Risks & open items
 

@@ -33,7 +33,7 @@ Supersedes the earlier interview note.
 
 ## Context
 
-**What:** a standalone **CalDAV calendar** inside mitsume (Expo SDK 56, RN 0.85, RN Web)
+**What:** a standalone **CalDAV calendar** inside the parent app (Expo SDK 56, RN 0.85, RN Web)
 that reads/writes events on the user's self-hosted **Radicale** (already used daily via
 **Etar** on Android and **Apple Calendar** on macOS). The **first testable cut** is
 **online-first CRUD + a month view on Android *and* Web** — small but genuinely usable.
@@ -84,7 +84,7 @@ Build the **data layer first and smoke-test the tsdav round-trip on both platfor
 UI** — that embeds the de-risk spike as a hard gate. Online-first: writes go straight to Radicale
 with `etag`/`If-Match` (lost-update protection); no offline queue yet. Web reaches Radicale
 **same-origin** through Caddy (`/dav/*`); Android points straight at the Tailscale URL (native = no
-CORS). Deployment mirrors the user's stack: `ghcr.io/carrein/mitsume` image + Watchtower + a new
+CORS). Deployment mirrors the user's stack: `ghcr.io/<owner>/<app>` image + Watchtower + a new
 hardened compose service and Caddy block.
 
 ### Design priorities (in order)
@@ -95,7 +95,7 @@ hardened compose service and Caddy block.
 ### Phase A — Branch, prep, bug fixes
 - [ ] Cut `feat/caldav-calendar` off `main`
 - [ ] Fix `app/.gitignore` (add `.env`); add committed `app/.env.example` (placeholders)
-- [ ] Add `android.package: "com.carrein.mitsume"` to `app.json`
+- [ ] Add `android.package: "<app package id>"` to `app.json`
 - [ ] Install (via `bunx expo install` / `bun add`): `tsdav ical.js ical-expander react-native-calendars expo-crypto base-64 text-encoding`
 - [ ] `src/polyfills.ts` (btoa/atob/TextEncoder guards); import it FIRST in `src/app/_layout.tsx`
 - Files: `app/.gitignore`, `app/.env.example`, `app/app.json`, `app/src/polyfills.ts`, `app/src/app/_layout.tsx`, `app/package.json`
@@ -126,8 +126,8 @@ hardened compose service and Caddy block.
 ### Phase E — Web Docker image + prod Caddy + compose service
 - [ ] `app/Dockerfile` — multi-stage `oven/bun` build → `caddy:2-alpine` serving `dist/`
 - [ ] `app/Caddyfile` — app at `/`, `/dav/*` → `radicale:5232` (`header_up X-Script-Name /dav`)
-- [ ] `.github/workflows/web-image.yml` — build → push `ghcr.io/carrein/mitsume:latest` (Watchtower deploys)
-- [ ] Compose snippet (docs): hardened `mitsume` service + `MITSUME_REVERSE_PROXY_PORT` + watchtower label + Caddy block — for the user to drop into their compose
+- [ ] `.github/workflows/web-image.yml` — build → push `ghcr.io/<owner>/<app>:latest` (Watchtower deploys)
+- [ ] Compose snippet (docs): hardened app service + `<APP>_REVERSE_PROXY_PORT` + watchtower label + Caddy block — for the user to drop into their compose
 - Files: `app/Dockerfile`, `app/Caddyfile`, `.github/workflows/web-image.yml`, docs
 
 ### Phase F — EAS Android APK config
@@ -143,7 +143,7 @@ hardened compose service and Caddy block.
 - Deployment: `Dockerfile` + `Caddyfile` + GitHub Actions (→ GHCR image → Watchtower) + a compose
   service snippet + a dev-proxy Caddyfile.
 - Docs: this plan, the research doc, and the smoke-test checklist below.
-- On demand: `ghcr.io/carrein/mitsume:latest` (CI) and a `preview` **.apk** (`eas build`).
+- On demand: `ghcr.io/<owner>/<app>:latest` (CI) and a `preview` **.apk** (`eas build`).
 
 ## Smoke tests (exact — mobile + web)
 
@@ -211,5 +211,5 @@ strict lint, prettier, and 18 unit tests green (bun runner).
 - **tsdav on RN/Hermes** (unofficial) — gated by the Phase B smoke test; polyfills in place; fallback = hand-rolled `davRequest`.
 - **ical.js VTIMEZONE-on-write** — UTC now; revisit for TZID round-trip.
 - **Same-origin / `X-Script-Name`** — validate CalDAV hrefs resolve under `/dav/` in the web smoke test.
-- **Need from you (later, non-blocking):** the mitsume tailnet host + `MITSUME_REVERSE_PROXY_PORT` for Caddy/compose; the real Radicale app password in `.env`.
+- **Need from you (later, non-blocking):** the tailnet host + `<APP>_REVERSE_PROXY_PORT` for Caddy/compose; the real Radicale app password in `.env`.
 - **Deferred to later cuts:** offline cache/SQLite (web OPFS needs COOP/COEP) · reminders (`expo-notifications` + exact-alarm) · widget (`react-native-android-widget` SDK-56 unverified) · recurrence editing · multi-calendar · in-app settings + secure-store · offline queue/conflict copies.

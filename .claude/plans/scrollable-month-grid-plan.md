@@ -182,7 +182,7 @@ no-op in embedded/headless Chromium); pointerEvents via style; lib0 shim.
 
 Stale-while-revalidate for calendar events + a reusable cross-platform cache:
 - `src/utils/snapshot-cache.ts` (expo-file-system file per key) /
-  `.web.ts` (IndexedDB via idb, DB `mitsume-snapshots`) — generic key→JSON,
+  `.web.ts` (IndexedDB via idb, DB `<app>-snapshots`) — generic key→JSON,
   best-effort, values must be JSON-safe.
 - `src/utils/event-snapshot.ts` — CalEvent (de)serialization with shape
   validation (5 bun tests).

@@ -163,7 +163,7 @@ Three distinct bugs, each confirmed by logcat evidence before fixing:
    OPEN_APP in v0.2.2, `2c1974a`). RNAW routes every click (incl. OPEN_APP) as a
    broadcast → app receiver → `startActivity()`. Tap with dead app = background
    process spawn, which ColorOS's cleaner kills ~2 s in (logcat: "Process
-   com.carrein.mitsume has died: prcl TRNB" — OplusHansManager). PendingIntents
+   <app package id> has died: prcl TRNB" — OplusHansManager). PendingIntents
    showed `sent=true`: taps fired, receiver died. Battery toggles/deviceidle
    whitelist did NOT help. Fix: `app/patches/react-native-android-widget@0.20.3.patch`
    (bun patchedDependencies, compiled by CI prebuild) — OPEN_APP clickables get a
@@ -206,4 +206,4 @@ WorkManager job to expedited.
 - `expo-file-system` in the headless context is expected to work (native module in the same
   bundle) but is only proven on device.
 - Widget must never touch credentials — it inherits the credential-less origin; nothing to
-  do, just don't add auth (memory: mitsume-caldav-auth-architecture).
+  do, just don't add auth (memory: caldav-auth-architecture).

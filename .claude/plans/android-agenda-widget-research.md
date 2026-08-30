@@ -98,7 +98,7 @@ registerWidgetTaskHandler(widgetTaskHandler);
 - **Cold fetch ≈ 6 HTTP round-trips** (tsdav discovery → principal → home-set → calendars →
   calendar-query → multiget); `client.ts` caches per-JS-context, so every widget cycle is cold.
 - `EXPO_PUBLIC_DAV_URL` is Metro-inlined at bundle time — headless code in the same bundle sees
-  the same baked URL (CI sets it from Actions var `MITSUME_DAV_URL` on the gradle step, which
+  the same baked URL (CI sets it from Actions var `<APP>_DAV_URL` on the gradle step, which
   bundles). `davConfigured` exported for the unconfigured case.
 - **No storage lib installed** (no AsyncStorage/MMKV/expo-file-system). Last-good cache is a
   net-new dependency → **`expo-file-system`** (Expo-SDK family, JSON blob, installed via
