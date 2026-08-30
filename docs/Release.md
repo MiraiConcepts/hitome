@@ -3,13 +3,20 @@
 > Releases are **symmetric** (decided 2026-07-07): pushes to `main` only run CI
 > checks; a `v*` tag fires BOTH the web image and the Android APK from the same
 > commit, so both platforms always carry the same version (visible in the
-> in-app version badge, bottom-right). Android lands as a signed universal APK
+> in-app version badge, bottom-right). Android lands as a signed arm64-v8a APK
 > on a GitHub Release, tracked by
 > [Obtainium](https://github.com/ImranR98/Obtainium); web lands as
 > `ghcr.io/miraiconcepts/hitome:latest`, deployed by Watchtower.
 
 ## Architecture (locked 2026-07-06)
 
+- **arm64-v8a only**: the New Architecture compiles C++ from source once per ABI, so
+  a four-ABI universal APK pays that three extra times for architectures nothing here
+  runs (both the phone and the Apple Silicon emulator are arm64). Set with
+  `-PreactNativeArchitectures=arm64-v8a` on the CI gradle step — a flag, not an edit to
+  the prebuild-regenerated `gradle.properties`, so local `android:dev` is unaffected.
+  Reverting to universal means dropping the flag. A release APK will not install on an
+  x86_64 emulator.
 - **CI builds, local signs** (hybrid): GitHub Actions (`.github/workflows/android-apk.yml`)
   builds the APK **unsigned** on real x86_64 Linux — the canonical platform — and
   uploads it as an artifact together with `apksigner.jar`. Signing + publishing happen

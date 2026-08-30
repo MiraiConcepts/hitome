@@ -44,11 +44,17 @@ jobs:
       - name: Strip signing (signed locally after download)
         run: node tooling/android-builder/patch-signing.mjs app/android/app/build.gradle --unsigned
 
-      - name: Build release APK (unsigned, universal)
+      # arm64-v8a only. New Architecture builds C++ from source once per ABI,
+      # so the default four-ABI universal APK pays that cost three extra times
+      # for architectures nothing here runs: the phone is arm64, and so is the
+      # emulator (Apple Silicon host). Passed as a flag rather than edited into
+      # gradle.properties, which expo prebuild regenerates — and which local
+      # `android:dev` builds should keep reading unchanged.
+      - name: Build release APK (unsigned, arm64-v8a)
         working-directory: app/android
         env:
           EXPO_PUBLIC_DAV_URL: ${{ vars.HITOME_DAV_URL }}
-        run: ./gradlew :app:assembleRelease
+        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a
 
       - name: Zipalign + stage signing tool
         run: |
