@@ -2,14 +2,14 @@
   "expo": {
     "name": "hitome",
     "slug": "hitome",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "app",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.miraiconcepts.hitome",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#FFBD4F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
