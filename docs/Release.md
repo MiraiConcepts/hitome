@@ -17,13 +17,22 @@
   the prebuild-regenerated `gradle.properties`, so local `android:dev` is unaffected.
   Reverting to universal means dropping the flag. A release APK will not install on an
   x86_64 emulator.
-- **CI builds, local signs** (hybrid): GitHub Actions (`.github/workflows/android-apk.yml`)
-  builds the APK **unsigned** on real x86_64 Linux — the canonical platform — and
-  uploads it as an artifact together with `apksigner.jar`. Signing + publishing happen
-  locally via `tooling/android-builder/sign-release.sh`. **GitHub holds no secrets;
-  the signing keystore never leaves the maintainer's machine.**
-  (Memoka precedent signed in CI via `KEYSTORE_BASE64` secret; hitome deliberately
-  keeps key custody local.)
+- **CI builds AND signs** (reversed 2026-09-03): GitHub Actions
+  (`.github/workflows/android-apk.yml`) builds the APK on real x86_64 Linux — the
+  canonical platform — signs it, and publishes the GitHub Release. A tag is the
+  whole release; nothing is done by hand. This adopts the Memoka model
+  (`KEYSTORE_BASE64` secret) and **reverses the 2026-07-06 decision** to keep key
+  custody local, which cost one manual command per release.
+  - Repo secrets required: `KEYSTORE_BASE64` (base64 of `release.keystore`),
+    `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
+  - The unsigned APK is still uploaded as an artifact, so
+    `tooling/android-builder/sign-release.sh` stays a working fallback for a run
+    whose signing step failed, or a release that needs re-cutting by hand.
+  - What this costs: GitHub now holds a copy of the signing key. It is the one
+    credential that cannot be rotated — Android only installs updates signed by
+    the same key — so the local backup in `~/.hitome-keys/` matters more, not
+    less. The CalDAV invariant is untouched: **no server credentials in CI, the
+    repo, images, bundles or devices**, ever.
 - **Baked server URL** ("option 1"): the APK ships `EXPO_PUBLIC_DAV_URL` baked from
   the repo Actions **variable** `HITOME_DAV_URL` — a variable, not a secret: the
   ts.net hostname is already public via Certificate Transparency, and the origin is
@@ -45,14 +54,15 @@
    ```
    The tag fires **both** workflows (`Android APK` + `Web image`) from the same
    commit. Wait for green (`gh run watch`).
-4. Sign + publish the Android side locally:
-   ```sh
-   ./tooling/android-builder/sign-release.sh
-   ```
-   (Downloads the artifact, signs with `~/.hitome-keys` in a small JRE container,
-   verifies the signature + baked URL, creates the GitHub Release with the APK.)
+4. Nothing. The tag's workflow signs the APK and creates the GitHub Release
+   itself, verifying the signature and the baked URL before it publishes.
 5. Obtainium picks up the APK on its next poll; Watchtower deploys the web image
    on its next cycle. Verify parity via the version badge on both.
+
+If the signing step ever fails, the unsigned artifact is still uploaded and
+`./tooling/android-builder/sign-release.sh` finishes the job from this machine —
+it downloads the artifact, signs with `~/.hitome-keys` in a JRE container,
+verifies signature + baked URL, and creates the Release.
 
 `gh workflow run 'Android APK'` / `'Web image'` (workflow_dispatch) still exist
 for untagged smoke builds — they publish nothing user-facing on their own

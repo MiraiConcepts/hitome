@@ -53,12 +53,13 @@ helper scripts.
 ## Deploy & release
 
 - Releases are SYMMETRIC: pushes to `main` only run CI checks; a `v*` tag
-  builds BOTH the web image (→ Watchtower) and the unsigned APK from the same
+  builds BOTH the web image (→ Watchtower) and the signed APK from the same
   commit — web and Android versions always match (see the in-app badge).
 - Cut: bump `expo.version` + `android.versionCode` in `app/app.json` → push →
-  `git tag vX.Y.Z && git push origin main vX.Y.Z` → green → sign + publish with
-  `tooling/android-builder/sign-release.sh` → Obtainium + Watchtower deliver.
-  See `docs/Release.md`, `docs/Deploy.md`.
+  `git tag vX.Y.Z && git push origin main vX.Y.Z`. The tag signs and publishes
+  the Release itself (keystore in the `KEYSTORE_BASE64` repo secret, reversed
+  2026-09-03); Obtainium + Watchtower deliver. `sign-release.sh` remains the
+  fallback when the signing step fails. See `docs/Release.md`, `docs/Deploy.md`.
 
 ## Invariants
 
