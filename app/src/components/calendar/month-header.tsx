@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
-  cancelAnimation,
   runOnJS,
+  runOnUI,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -13,7 +13,7 @@ import Animated, {
 import { AddIcon, RefreshIcon } from '@/components/icons';
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, FontFamilyBold, Spacing } from '@/constants/theme';
-import { toTimeString } from '@/utils/date';
+import { agoLabel, longDayLabel } from '@/utils/date';
 
 type Props = {
   /** e.g. "July 2026" — tracks the visible month while scrolling. */
@@ -25,6 +25,11 @@ type Props = {
   loading: boolean;
   /** Spin the refresh icon (a button-pressed refresh is in flight). */
   refreshing: boolean;
+  /** Today's dateString — the header's second line when all is well. Passed
+   *  in rather than read here so it cannot disagree with the grid's today. */
+  today: string;
+  /** The last fetch failed and the calendar is running on cached data. */
+  offline: boolean;
   /** When the server last answered; null until the first landed fetch. */
   fetchedAt: Date | null;
   onToday: () => void;
@@ -70,12 +75,19 @@ const LABEL_SHIFT_PX = 10;
 /** One full refresh-icon revolution. */
 const SPIN_MS = 800;
 
+/** The freshness line when the server cannot be reached. Fixed rather than a
+ *  palette token because the palette has no danger colour and this is the only
+ *  place that wants one; light enough to carry on the header's black ground. */
+const OFFLINE_COLOR = '#F09595';
+
 /** Header bar above the month grid: the label (tap → today) and refresh. */
 export function MonthHeader({
   label,
   monthIndex,
   loading,
   refreshing,
+  today,
+  offline,
   fetchedAt,
   onToday,
   onRefresh,
@@ -131,16 +143,37 @@ export function MonthHeader({
   // glyph's arrow points.
   const spin = useSharedValue(0);
   useEffect(() => {
-    if (!refreshing) return;
-    spin.value = 0;
-    spin.value = withRepeat(
-      withTiming(360, { duration: SPIN_MS, easing: Easing.linear }),
-      -1
-    );
-    return () => {
-      cancelAnimation(spin);
+    if (refreshing) {
       spin.value = 0;
-    };
+      spin.value = withRepeat(
+        withTiming(360, { duration: SPIN_MS, easing: Easing.linear }),
+        -1
+      );
+      return;
+    }
+    // Landing, not cancelling: a fetch that answers mid-turn carries the glyph
+    // on to the top of the turn it is in, at the same speed, so the icon never
+    // stops askew. Run on the UI thread, where the live angle actually lives.
+    runOnUI(() => {
+      'worklet';
+      const from = spin.value % 360;
+      if (from === 0) return;
+      // Assigning a plain value stops the repeat; the timing below then covers
+      // only what is left of this revolution.
+      spin.value = from;
+      spin.value = withTiming(
+        360,
+        {
+          duration: SPIN_MS * ((360 - from) / 360),
+          easing: Easing.linear,
+        },
+        (finished) => {
+          // 0 and 360 are the same picture, so this is invisible — it just
+          // leaves the next spin starting from a known angle.
+          if (finished) spin.value = 0;
+        }
+      );
+    })();
   }, [refreshing, spin]);
 
   const spinStyle = useAnimatedStyle(() => ({
@@ -169,11 +202,23 @@ export function MonthHeader({
           </Pressable>
           {loading && <ActivityIndicator size="small" color={AccentColor} />}
         </View>
-        {fetchedAt ? (
-          <ThemedText testID="calendar-updated" style={styles.updated}>
-            Last Updated: {toTimeString(fetchedAt)}
-          </ThemedText>
-        ) : null}
+        {/* Today's date, which is worth reading from any month — it is what
+            the blue cell means once you have scrolled away from it. A
+            timestamp is not: it only matters when the server is unreachable,
+            so that is the only time it appears, and it appears in red with the
+            reason attached. Fixed height in both states, so nothing here can
+            push the grid down when it changes. */}
+        <ThemedText
+          testID="calendar-updated"
+          style={[styles.updated, offline && styles.updatedOffline]}
+        >
+          {!offline
+            ? longDayLabel(today)
+            : fetchedAt
+              ? `Offline · Updated ${agoLabel(fetchedAt, new Date())}`
+              : // Nothing has ever landed, so there is no age to report.
+                'Offline'}
+        </ThemedText>
       </View>
       <View style={styles.controls}>
         <Pressable
@@ -235,6 +280,12 @@ const styles = StyleSheet.create({
     color: AccentColor,
     fontSize: Bar.subtitleSize,
     lineHeight: Bar.subtitleSize + 4,
+    // Held open whatever the text says, so swapping the date for the offline
+    // warning cannot move the grid beneath it.
+    height: Bar.subtitleSize + 4,
+  },
+  updatedOffline: {
+    color: OFFLINE_COLOR,
   },
   controls: {
     flexDirection: 'row',

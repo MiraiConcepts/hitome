@@ -19,7 +19,9 @@ import {
 
 import type { CalEvent } from '@/caldav/types';
 import {
+  COUNTER_FOOTPRINT,
   DAY_NUMBER_HEIGHT,
+  EVENT_GAP,
   SLOT_HEIGHT,
   WeekRow,
 } from '@/components/calendar/week-row';
@@ -31,6 +33,7 @@ import {
   monthIndexIn,
   monthStartWeekIndices,
   nearestSnapIndex,
+  weekIndexOfDay,
   weekStartOf,
   type MonthAnchor,
 } from '@/utils/calendar-grid';
@@ -65,10 +68,27 @@ type Props = {
   /** Fired once, when the initial month's row first becomes viewable — i.e.
    *  the grid is verifiably rendering at its landing position. */
   onAnchored: () => void;
-  onPressDay: (day: string) => void;
+  onOpenDay: (day: string) => void;
   onPressEvent: (event: CalEvent) => void;
-  onLongPressDay: (day: string) => void;
+  onCreateOnDay: (day: string) => void;
 };
+
+/**
+ * Which of the six visible rows today's week lands on when the app opens.
+ * Zero puts it flush against the header, where the month it belongs to is
+ * invisible; a calendar is read forwards, so one row of history is worth more
+ * than three are.
+ *
+ * A launch pose, not a resting place: the grid rests on months, so the first
+ * swipe snaps to a month page and there is no way back to this offset. Today
+ * goes to a clean month page by design. Native only — on web a mandatory CSS
+ * snap pulls an off-month offset straight back to the month line, so the pose
+ * would show for a frame and then vanish.
+ */
+const TODAY_LANDING_ROW = 1;
+
+/** Rows the pane shows at once — the grid is six weeks tall by construction. */
+const VISIBLE_ROWS = 6;
 
 const NO_EVENTS: CalEvent[] = [];
 
@@ -157,9 +177,9 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     onMonthChange,
     onMonthSettled,
     onAnchored,
-    onPressDay,
+    onOpenDay,
     onPressEvent,
-    onLongPressDay,
+    onCreateOnDay,
   },
   ref
 ) {
@@ -183,10 +203,17 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     () => snapRows.map((row) => row * rowHeight),
     [snapRows, rowHeight]
   );
-  const slotCount = Math.max(
-    0,
-    Math.floor((rowHeight - DAY_NUMBER_HEIGHT - 2) / SLOT_HEIGHT)
-  );
+  // Slots divide what is left of a cell under its day number. The division
+  // rarely comes out whole, and the remainder is real space: the last strip
+  // also stops EVENT_GAP short of its slot's floor, so the room beneath it is
+  // the remainder plus that gap. The "+N more" counter is drawn against the
+  // cell's bottom edge rather than laid into a slot, so when that room holds
+  // it there is no need to surrender a slot — which is the difference between
+  // a cell showing two two-line events and only showing one.
+  const eventsHeight = rowHeight - DAY_NUMBER_HEIGHT;
+  const slotCount = Math.max(0, Math.floor(eventsHeight / SLOT_HEIGHT));
+  const roomUnderLastStrip = eventsHeight - slotCount * SLOT_HEIGHT + EVENT_GAP;
+  const counterNeedsSlot = roomUnderLastStrip < COUNTER_FOOTPRINT;
 
   const clampIndex = useCallback(
     (index: number) => Math.min(Math.max(index, 0), months.length - 1),
@@ -203,7 +230,24 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   const weekEvents = useMemo(() => bucketByWeek(events), [events]);
 
   const initialIndex = indexOfMonth(initialMonth);
+  /** The row the grid opens on. Today's own month opens a row above today's
+   *  week so it is not flush against the header; anything else — a deep link,
+   *  or web — opens at the month's first row. */
+  const launchRow = useMemo(() => {
+    const month = months[initialIndex];
+    const today0 = parseDay(today) ?? new Date();
+    const isTodaysMonth =
+      month.year === today0.getFullYear() && month.month0 === today0.getMonth();
+    if (!isTodaysMonth || Platform.OS === 'web') return snapRows[initialIndex];
+    const row = weekIndexOfDay(today0, rangeStart) - TODAY_LANDING_ROW;
+    return Math.min(Math.max(row, 0), weeks.length - VISIBLE_ROWS);
+  }, [months, snapRows, initialIndex, today, rangeStart, weeks.length]);
   const currentIndex = useRef(initialIndex);
+  /** The row the grid is actually on — the launch pose to begin with, then the
+   *  month it settles on. Restored on a pane resize, where using the month's
+   *  own row instead threw the pose away on every launch: the height settles a
+   *  frame or two after mount, so that effect runs during startup. */
+  const currentRow = useRef(launchRow);
   /** The month a gesture started from — what the flip is measured against. */
   const dragFrom = useRef(initialIndex);
   // Settle latch. The month is reported once the scroll has been quiet for
@@ -264,6 +308,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     const index = nearestSnapIndex(snapOffsets, e.nativeEvent.contentOffset.y);
     if (index === currentIndex.current) return;
     currentIndex.current = index;
+    currentRow.current = snapRows[index];
     onMonthChange(months[index]);
   };
 
@@ -286,6 +331,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     );
     currentIndex.current = target;
     jumpTo(snapOffsets[target], true);
+    currentRow.current = snapRows[target];
     onMonthChange(months[target]);
   };
 
@@ -301,7 +347,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   );
   useEffect(() => {
     anchorContext.current = {
-      key: weeks[snapRows[initialIndex]],
+      key: weeks[launchRow],
       onAnchored,
     };
   });
@@ -324,7 +370,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   const handleContentSizeChange = () => {
     if (corrected.current) return;
     corrected.current = true;
-    jumpTo(snapOffsets[initialIndex], false);
+    jumpTo(launchRow * rowHeight, false);
   };
 
   // Pane resize (rotation / window resize): the row height changed, so put the
@@ -333,8 +379,8 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   useEffect(() => {
     if (prevHeight.current === height) return;
     prevHeight.current = height;
-    jumpTo(snapOffsets[currentIndex.current], false);
-  }, [height, snapOffsets, jumpTo]);
+    jumpTo(currentRow.current * rowHeight, false);
+  }, [height, rowHeight, jumpTo]);
 
   useImperativeHandle(
     ref,
@@ -343,6 +389,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
         const index = indexOfMonth({ year, month0 });
         const adjacent = Math.abs(index - currentIndex.current) <= 1;
         currentIndex.current = index;
+        currentRow.current = snapRows[index];
         jumpTo(snapOffsets[index], animated && adjacent);
         // An explicit jump knows its destination synchronously, so it reports
         // it rather than waiting to be told by the scroll. Leaving this to the
@@ -354,7 +401,15 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
         onMonthSettled(months[index]);
       },
     }),
-    [indexOfMonth, snapOffsets, months, onMonthChange, onMonthSettled, jumpTo]
+    [
+      indexOfMonth,
+      snapOffsets,
+      snapRows,
+      months,
+      onMonthChange,
+      onMonthSettled,
+      jumpTo,
+    ]
   );
 
   // FlatList treats its cells as pure: they re-render when `data` or
@@ -374,14 +429,15 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
       rowHeight={rowHeight}
       cellWidth={width / 7}
       slotCount={slotCount}
+      counterNeedsSlot={counterNeedsSlot}
       events={weekEvents.get(item) ?? NO_EVENTS}
       todayStr={today}
       focusedYear={focusedMonth.year}
       focusedMonth0={focusedMonth.month0}
       isMonthStart={monthStartRows.has(index)}
-      onPressDay={onPressDay}
+      onOpenDay={onOpenDay}
       onPressEvent={onPressEvent}
-      onLongPressDay={onLongPressDay}
+      onCreateOnDay={onCreateOnDay}
     />
   );
 
@@ -399,7 +455,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
         offset: rowHeight * index,
         index,
       })}
-      initialScrollIndex={snapRows[initialIndex]}
+      initialScrollIndex={launchRow}
       initialNumToRender={8}
       windowSize={7}
       // No pagingEnabled: its threshold is half a page and is not tunable, so

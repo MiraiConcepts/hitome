@@ -2,6 +2,7 @@ import {
   Pressable,
   StyleSheet,
   View,
+  type GestureResponderEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -12,14 +13,34 @@ import { AccentColor, Spacing } from '@/constants/theme';
 import type { BannerPlacement } from '@/utils/calendar-grid';
 import { readableTextColor } from '@/utils/color';
 
-type ChipProps = {
+/**
+ * An event carries the same two gestures as the day cell beneath it, so
+ * nothing the cell offers is lost by covering a strip of it: tap opens (the
+ * event, or the day's list when the cell overflows), hold creates on the day
+ * under the finger. The week row decides all of that — it knows the column and
+ * the overflow count — so the handlers here are opaque pass-throughs, and the
+ * press-in/out pair only exists to drive the cell's ink.
+ */
+type PressProps = {
+  onPress: (e: GestureResponderEvent) => void;
+  onLongPress: (e: GestureResponderEvent) => void;
+  onPressIn: (e: GestureResponderEvent) => void;
+  onPressOut: () => void;
+  /** Hold duration, passed down so the ink fill and the gesture stay timed
+   *  to each other — see LONG_PRESS_MS in week-row. */
+  delayLongPress: number;
+  /** Beat a touch must stay put before it counts as a press, so a scroll that
+   *  starts on an event does not light it — see PRESS_DELAY_MS in week-row. */
+  unstable_pressDelay: number;
+};
+
+type ChipProps = PressProps & {
   event: CalEvent;
   /** Show the start time — only when cells are wide enough to afford it. */
   /** Title lines the layout granted this chip; >1 renders the stacked form. */
   titleLines: number;
   /** Absolute slot position, supplied by the week row. */
   style?: StyleProp<ViewStyle>;
-  onPress: () => void;
 };
 
 /**
@@ -28,10 +49,10 @@ type ChipProps = {
  * to the granted lines. Without a time it's the title alone, wrapping only
  * when granted extra lines.
  */
-export function EventChip({ event, titleLines, style, onPress }: ChipProps) {
+export function EventChip({ event, titleLines, style, ...press }: ChipProps) {
   return (
     <Pressable
-      onPress={onPress}
+      {...press}
       style={[styles.chip, style]}
       testID={`chip-${event.id}`}
     >
@@ -67,13 +88,12 @@ export function EventChip({ event, titleLines, style, onPress }: ChipProps) {
   );
 }
 
-type BannerProps = {
+type BannerProps = PressProps & {
   placement: BannerPlacement<CalEvent>;
   /** Title lines the layout granted this banner (>1 when it wraps). */
   titleLines: number;
   /** Absolute slot position + horizontal extent, supplied by the week row. */
   style?: StyleProp<ViewStyle>;
-  onPress: () => void;
 };
 
 /**
@@ -86,14 +106,14 @@ export function EventBanner({
   placement,
   titleLines,
   style,
-  onPress,
+  ...press
 }: BannerProps) {
   const { event, continuesRight } = placement;
   // Fill by source calendar; title contrasts against whatever that fill is.
   const fill = event.color ?? AccentColor;
   return (
     <Pressable
-      onPress={onPress}
+      {...press}
       style={[
         styles.banner,
         { backgroundColor: fill },
@@ -115,21 +135,37 @@ export function EventBanner({
 
 /** Every event's text — chip title, wrapped title, start time, banner title.
  *  week-row's width estimate is derived from this, so the two move together. */
-export const EVENT_FONT_SIZE = 12;
-const EVENT_LINE_HEIGHT = 15;
+export const EVENT_FONT_SIZE = 11;
+const EVENT_LINE_HEIGHT = 14;
+/**
+ * Optical centring, not layout. Satoshi's ascent (1.026em) leaves far more
+ * room above the caps than its descent (0.224em) leaves below the baseline, so
+ * ink centred in its line box reads as sitting low — beside a strip's hard
+ * horizontal edges, unmistakably so. Half the difference, shifted down for the
+ * bar (which moves) and up for the banner's text (which is what moves there).
+ * The widget's marker glyphs carry the same correction for the same reason.
+ */
+const EVENT_INK_NUDGE = 0.5;
 
 const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
+    // The bar is not flush with the cell edge: it stands off it by 4, so a
+    // column of chips reads as a column rather than as a second grid rule.
+    paddingLeft: 4,
     paddingRight: 3,
   },
   chipBar: {
     width: 3,
-    // No vertical inset: the bar fills the chip's slot exactly, so a timed
-    // event's marker stands the same height as an all-day banner beside it.
     alignSelf: 'stretch',
+    // Fills the chip's slot exactly, which already stands a dp proud of the
+    // title at each end (see SLOT_HEIGHT in week-row) — so a timed event's
+    // marker is the same height as an all-day banner beside it. The margins
+    // cancel: they move the bar's centre without changing its height.
+    marginTop: EVENT_INK_NUDGE,
+    marginBottom: -EVENT_INK_NUDGE,
   },
   chipStack: {
     flex: 1,
@@ -148,6 +184,9 @@ const styles = StyleSheet.create({
   banner: {
     justifyContent: 'center',
     paddingHorizontal: Spacing.one,
+    // The optical nudge, mirrored: a banner centres its title, so shrinking
+    // the box from the bottom is what lifts the ink.
+    paddingBottom: EVENT_INK_NUDGE * 2,
     marginRight: StyleSheet.hairlineWidth,
   },
   bannerContinuesRight: {

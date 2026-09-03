@@ -267,7 +267,12 @@ export function layoutWeek<T extends GridEventLike>(
   events: T[],
   slotCount: number,
   chipSpan?: (event: T) => number,
-  bannerRows?: (event: T, spanCols: number) => number
+  bannerRows?: (event: T, spanCols: number) => number,
+  /** Whether the "+N more" counter has to be given the last slot. It is drawn
+   *  anchored to the cell's bottom edge, not laid into a slot, so when the
+   *  space left under the last strip is deep enough to hold it the slot stays
+   *  available for an event — see counterNeedsSlot in month-grid. */
+  reserveCounterSlot = true
 ): WeekLayout<T> {
   const weekStartMs = weekStart.getTime();
   const weekEndMs = addDays(weekStart, 7).getTime();
@@ -383,29 +388,33 @@ export function layoutWeek<T extends GridEventLike>(
       const anyHidden =
         colBanners.some((b) => hiddenBanners.has(b)) ||
         colChips.some((chip) => hiddenChips.has(chip));
-      // An occupant's bottom slot is (slot + rows/span − 1); it doesn't fit
-      // when that reaches slotCount, and collides with "+N more" at
-      // slotCount − 1.
-      const needsMore =
-        anyHidden ||
-        colBanners.some(
-          (b) => !hiddenBanners.has(b) && b.slot + b.rows > slotCount
-        ) ||
-        colChips.some(
-          (chip) => !hiddenChips.has(chip) && chip.slot + chip.span > slotCount
-        );
-      if (!needsMore) continue;
+      // How far down the column an occupant may reach. The last slot goes to
+      // the "+N more" counter only when the counter needs a slot at all AND
+      // something is actually hidden here; until then it is a slot of content
+      // like any other.
+      const limit = anyHidden && reserveCounterSlot ? slotCount - 1 : slotCount;
       for (const b of colBanners) {
-        if (!hiddenBanners.has(b) && b.slot + b.rows > slotCount - 1) {
+        // A banner crosses columns and must stand the same height in every one
+        // of them, so it cannot be trimmed to suit the room in a single
+        // column. All or nothing.
+        if (!hiddenBanners.has(b) && b.slot + b.rows > limit) {
           hiddenBanners.add(b);
           changed = true;
         }
       }
       for (const chip of colChips) {
-        if (!hiddenChips.has(chip) && chip.slot + chip.span > slotCount - 1) {
+        if (hiddenChips.has(chip) || chip.slot + chip.span <= limit) continue;
+        const room = limit - chip.slot;
+        if (room >= 1) {
+          // Trimmed to the room left rather than dropped into the counter. A
+          // title on one ellipsised line is worth more than a blank slot and a
+          // larger number — and it is always the last event that half-fits, so
+          // the reader is on their way to the day's list anyway.
+          chip.span = room;
+        } else {
           hiddenChips.add(chip);
-          changed = true;
         }
+        changed = true;
       }
     }
   }

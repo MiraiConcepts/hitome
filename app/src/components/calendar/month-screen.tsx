@@ -158,17 +158,20 @@ export function MonthScreen() {
     setSettledMonth((prev) => (sameMonth(prev, anchor) ? prev : anchor));
   }, []);
 
-  const onPressDay = useCallback(
-    (day: string) => setEditor({ mode: 'create', day }),
-    []
-  );
+  // Tap a cell (or an event in a cell holding more than it can show) — the
+  // day's full list.
+  const onOpenDay = useCallback((day: string) => setPopoverDay(day), []);
 
   const onPressEvent = useCallback((event: CalEvent) => {
     setPopoverDay(null);
     setEditor({ mode: 'edit', event });
   }, []);
 
-  const onLongPressDay = useCallback((day: string) => setPopoverDay(day), []);
+  // Hold a cell anywhere, its events included — a new event on that day.
+  const onCreateOnDay = useCallback(
+    (day: string) => setEditor({ mode: 'create', day }),
+    []
+  );
 
   function goToday() {
     const target = monthOfDay(null, new Date());
@@ -257,13 +260,22 @@ export function MonthScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      {/* Bottom included: the grid fills its pane exactly, so without it the
+          last week row ran under the gesture bar and the days in it were half
+          readable. The snackbar and the version badge sit outside this and
+          apply the inset themselves, so nothing here doubles up. */}
+      <SafeAreaView
+        style={styles.safeArea}
+        edges={['top', 'left', 'right', 'bottom']}
+      >
         <View style={styles.content}>
           <MonthHeader
             label={monthLabel}
             monthIndex={month.year * 12 + month.month0}
             loading={loading && events.length === 0}
             refreshing={manualRefreshing}
+            today={today}
+            offline={Boolean(error)}
             fetchedAt={fetchedAt}
             onToday={goToday}
             onRefresh={onManualRefresh}
@@ -320,9 +332,9 @@ export function MonthScreen() {
                 onMonthChange={onMonthChange}
                 onMonthSettled={onMonthSettled}
                 onAnchored={onGridAnchored}
-                onPressDay={onPressDay}
+                onOpenDay={onOpenDay}
                 onPressEvent={onPressEvent}
-                onLongPressDay={onLongPressDay}
+                onCreateOnDay={onCreateOnDay}
               />
             )}
             {(!gridAnchored || !gridSize) && (

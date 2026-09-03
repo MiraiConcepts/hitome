@@ -1,13 +1,15 @@
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import {
   Platform,
   Pressable,
   StyleSheet,
   View,
+  type GestureResponderEvent,
   type ViewStyle,
 } from 'react-native';
 
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -25,16 +27,36 @@ import { useTheme } from '@/hooks/use-theme';
 import { addDays, layoutWeek } from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
 
-/** Height of one banner/chip slot inside a day cell. */
-export const SLOT_HEIGHT = 18;
-/** Clearance under the overflow counter. Slots divide the row by whole
- *  SLOT_HEIGHTs, so the leftover beneath the last one can be as little as 2dp
- *  — pinning the counter to that slot's top leaves it flush with the cell's
- *  bottom edge. Anchoring from the bottom instead guarantees this gap. */
-const MORE_BOTTOM_INSET = 4;
+/** Height of one banner/chip slot inside a day cell: one line of event text
+ *  (EVENT_LINE_HEIGHT), the dp the strip stands proud of it at each end, and
+ *  the gap to the strip below — 14 + 2 + 4.
+ *
+ *  A strip is sized to the slots it was granted rather than to the lines it
+ *  renders, so every gap in a column is EVENT_GAP whatever sits above it. That
+ *  forces a two-slot strip to be `2 × one-slot + EVENT_GAP`: the gap that
+ *  would have separated two single strips is inside it. Shrink it below that
+ *  and the difference does not vanish — it reappears as a wider gap under it.
+ *
+ *  Raising this trades events for room: a slot per cell is roughly five dp of
+ *  row height, so 20 shows four events before the "+N" counter where 18 showed
+ *  five. */
+export const SLOT_HEIGHT = 20;
+/** Clear space between one strip and the next — the app's spacing unit, which
+ *  is also what separates everything else in the UI. It comes out of the slot,
+ *  so raising it makes strips shorter rather than pushing them apart. */
+export const EVENT_GAP = Spacing.one;
+/** Clearance under the overflow counter, which is anchored to the cell's
+ *  bottom edge rather than laid into a slot. */
+const MORE_BOTTOM_INSET = 2;
+/** The counter's own box — its line, nothing more. */
+const COUNTER_HEIGHT = 14;
+/** What the counter needs beneath the last strip to sit clear of it. Read by
+ *  month-grid to decide whether a slot has to be surrendered for it. */
+export const COUNTER_FOOTPRINT = COUNTER_HEIGHT + MORE_BOTTOM_INSET;
 
-/** Height of the day-number line at the top of each cell. */
-export const DAY_NUMBER_HEIGHT = 22;
+/** Height of the day-number line at the top of each cell — the number's own
+ *  box plus the gap that holds the first event off it. */
+export const DAY_NUMBER_HEIGHT = 24;
 
 type WeekRowProps = {
   /** Week-start (Monday) dateString — the row's identity. */
@@ -44,6 +66,9 @@ type WeekRowProps = {
   cellWidth: number;
   /** Visible event slots per cell (from row height); ≤0 renders numbers only. */
   slotCount: number;
+  /** Whether the overflow counter has to take the last slot, or fits in the
+   *  space left beneath it (see month-grid). */
+  counterNeedsSlot: boolean;
   /** Events touching this week (pre-bucketed by the grid). */
   events: CalEvent[];
   todayStr: string;
@@ -54,11 +79,16 @@ type WeekRowProps = {
   /** Web only: a month begins in this row, making it one of the CSS
    *  scroll-snap positions the browser pages between (see month-grid). */
   isMonthStart?: boolean;
-  onPressDay: (day: string) => void;
+  /** Show a day's full list. Tapping a cell asks for this — anywhere in it,
+   *  events included, once the cell has more than it can show. Empty days
+   *  have nothing to list, so the row never asks for one. */
+  onOpenDay: (day: string) => void;
+  /** Open the editor on a single event. */
   onPressEvent: (event: CalEvent) => void;
-  /** Long-press a cell to see everything on that day. Empty days have
-   *  nothing to show, so they do not arm the gesture at all. */
-  onLongPressDay: (day: string) => void;
+  /** Hold a cell to start a new event on that day. Armed everywhere in the
+   *  cell, over its events included, so the gesture is the cell's and not the
+   *  empty space's. */
+  onCreateOnDay: (day: string) => void;
 };
 
 const pct = (n: number) => `${(n / 7) * 100}%` as const;
@@ -102,6 +132,31 @@ const OTHER_MONTH_FILL = '#2E3135';
 /** How long a neighbouring month's shading takes to settle in or out. */
 const DIM_MS = 200;
 
+/** How long a hold must last to count as one. Stated here rather than left to
+ *  Pressable's own default because the ink below is timed to it: the wash
+ *  reaches full strength exactly as the hold fires, which is what makes the
+ *  fill read as the gesture's progress rather than as decoration. */
+const LONG_PRESS_MS = 500;
+/** How long a touch must stay put before it counts as a press at all. The grid
+ *  lives inside a scroller, and a scroll begins with a touch that looks exactly
+ *  like a press — without this, every drag lit the ink under the finger before
+ *  the list moved. Long enough to outlast a flick's first frames, short enough
+ *  that a real press still feels immediate. */
+const PRESS_DELAY_MS = 90;
+/** How fast the ink clears once the finger lifts — quick, so a plain tap
+ *  flashes rather than lingering. */
+const INK_RELEASE_MS = 150;
+/** How fast the ink reaches full strength. Short: the colour arrives at once,
+ *  and it is the spreading circle, not the tint, that reports the hold. */
+const INK_FADE_MS = 90;
+/** The ink itself. Fixed rather than a palette token, for the same reason as
+ *  the fills above: it has to read on the bare background, on a neighbouring
+ *  month's grey AND on today's blue, and one value does all three — the dark
+ *  scheme's link blue, light enough to lift even off TODAY_FILL. */
+const INK_COLOR = '#5B9DFF';
+/** The ink at full strength. */
+const INK_OPACITY = 0.28;
+
 /** Month ordinal — the unit a row's two shares are compared by. */
 const monthOrdOf = (d: Date) => d.getFullYear() * 12 + d.getMonth();
 
@@ -141,14 +196,15 @@ export const WeekRow = memo(function WeekRow({
   rowHeight,
   cellWidth,
   slotCount,
+  counterNeedsSlot,
   events,
   todayStr,
   focusedYear,
   focusedMonth0,
   isMonthStart,
-  onPressDay,
+  onOpenDay,
   onPressEvent,
-  onLongPressDay,
+  onCreateOnDay,
 }: WeekRowProps) {
   const theme = useTheme();
 
@@ -199,13 +255,112 @@ export const WeekRow = memo(function WeekRow({
   const firstFill = useAnimatedStyle(() => ({ opacity: firstDim.value }));
   const lastFill = useAnimatedStyle(() => ({ opacity: lastDim.value }));
 
+  // Ink: a circle spreading from the point touched until it has filled the
+  // cell. One per row rather than one per cell, moved to whichever column is
+  // under the finger — a press that starts on a chip or banner inks the cell
+  // beneath it, which is the point: the gestures belong to the cell, so the
+  // feedback has to as well.
+  const inkCol = useSharedValue(-1);
+  const inkX = useSharedValue(0);
+  const inkY = useSharedValue(0);
+  const inkGrow = useSharedValue(0);
+  const inkFade = useSharedValue(0);
+  // Reaches every corner of a cell from wherever the finger landed, so the
+  // spread always ends with the cell full rather than with one corner missed.
+  // The overspill is clipped away by the well around it.
+  const inkRadius = Math.hypot(cellWidth, rowHeight);
+  const pressIn = useCallback(
+    (col: number, x: number, y: number) => {
+      inkCol.value = col;
+      inkX.value = Number.isFinite(x) ? x : cellWidth / 2;
+      inkY.value = Number.isFinite(y) ? y : rowHeight / 2;
+      // Starts as a dot rather than as nothing, so the touch registers on the
+      // first frame. Linear from there, so how far the ink has spread is
+      // honestly how much of the hold has elapsed — an eased spread looks
+      // finished long before the press fires.
+      inkGrow.value = 0.12;
+      inkGrow.value = withTiming(1, {
+        duration: LONG_PRESS_MS,
+        easing: Easing.linear,
+      });
+      inkFade.value = withTiming(1, { duration: INK_FADE_MS });
+    },
+    [inkCol, inkX, inkY, inkGrow, inkFade, cellWidth, rowHeight]
+  );
+  const pressOut = useCallback(() => {
+    inkFade.value = withTiming(0, { duration: INK_RELEASE_MS });
+  }, [inkFade]);
+  // The well is the cell's own box, clipping the circle inside it so the ink
+  // never bleeds into the day next door.
+  const inkWellStyle = useAnimatedStyle(() => ({
+    left: inkCol.value * cellWidth,
+    width: cellWidth,
+    opacity: inkFade.value,
+  }));
+  const inkStyle = useAnimatedStyle(() => ({
+    left: inkX.value - inkRadius,
+    top: inkY.value - inkRadius,
+    transform: [{ scale: inkGrow.value }],
+  }));
+
   const layout = useMemo(() => {
     const chipSpan = (event: CalEvent) =>
       chipTitleLines(event.summary, cellWidth);
     const bannerRows = (event: CalEvent, spanCols: number) =>
       bannerTitleLines(event.summary, spanCols * cellWidth);
-    return layoutWeek(days[0], events, slotCount, chipSpan, bannerRows);
-  }, [days, events, slotCount, cellWidth]);
+    return layoutWeek(
+      days[0],
+      events,
+      slotCount,
+      chipSpan,
+      bannerRows,
+      counterNeedsSlot
+    );
+  }, [days, events, slotCount, counterNeedsSlot, cellWidth]);
+
+  const dayAt = useCallback((col: number) => toDateString(days[col]), [days]);
+
+  /** Tap: the day's list. An empty day has no list, so it stays inert — the
+   *  cell is still there to be held. */
+  const openDay = useCallback(
+    (col: number) => {
+      const day = dayAt(col);
+      if (daysWithEvents.has(day)) onOpenDay(day);
+    },
+    [dayAt, daysWithEvents, onOpenDay]
+  );
+
+  /** Hold: a new event on that day. */
+  const createOn = useCallback(
+    (col: number) => onCreateOnDay(dayAt(col)),
+    [dayAt, onCreateOnDay]
+  );
+
+  /** Tap on an event. Once a cell holds more than it can show, its chips are
+   *  an arbitrary few of the day's events and singling one out is misleading —
+   *  so an overflowing cell answers every tap with the whole day's list, the
+   *  only place the hidden ones can be reached. */
+  const pressEvent = useCallback(
+    (event: CalEvent, col: number) => {
+      if (layout.overflow[col] > 0) openDay(col);
+      else onPressEvent(event);
+    },
+    [layout, openDay, onPressEvent]
+  );
+
+  /** The column under the finger inside a banner, which may span several. Its
+   *  box starts at its own first column, so the offset is measured from there.
+   *  A banner is one bar but the day beneath it is still what is being
+   *  pressed — holding the third day of a span creates on the third day. */
+  const bannerCol = useCallback(
+    (e: GestureResponderEvent, startCol: number, span: number) => {
+      const x = e.nativeEvent.locationX;
+      const offset =
+        cellWidth > 0 && Number.isFinite(x) ? Math.floor(x / cellWidth) : 0;
+      return startCol + Math.min(Math.max(offset, 0), span - 1);
+    },
+    [cellWidth]
+  );
 
   return (
     <View
@@ -246,12 +401,14 @@ export const WeekRow = memo(function WeekRow({
             <Pressable
               key={dateString}
               testID={`day-cell-${dateString}`}
-              onPress={() => onPressDay(dateString)}
-              onLongPress={
-                daysWithEvents.has(dateString)
-                  ? () => onLongPressDay(dateString)
-                  : undefined
+              onPress={() => openDay(col)}
+              onLongPress={() => createOn(col)}
+              onPressIn={(e) =>
+                pressIn(col, e.nativeEvent.locationX, e.nativeEvent.locationY)
               }
+              onPressOut={pressOut}
+              delayLongPress={LONG_PRESS_MS}
+              unstable_pressDelay={PRESS_DELAY_MS}
               style={[
                 styles.cell,
                 tint != null && { backgroundColor: tint },
@@ -279,6 +436,24 @@ export const WeekRow = memo(function WeekRow({
             </Pressable>
           );
         })}
+        {/* Last in the cells layer: over the fills and the day number, under
+            the events — a chip pressed through stays crisp on top of it. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.inkWell, inkWellStyle]}
+        >
+          <Animated.View
+            style={[
+              styles.ink,
+              {
+                width: inkRadius * 2,
+                height: inkRadius * 2,
+                borderRadius: inkRadius,
+              },
+              inkStyle,
+            ]}
+          />
+        </Animated.View>
       </View>
 
       {/* The weekend split, drawn between the cells and the events: above the
@@ -293,16 +468,38 @@ export const WeekRow = memo(function WeekRow({
         ]}
       />
 
-      {/* box-none: empty-area taps fall through to the day cells; only the
-          chips and banners capture their own pixels. The overflow counter is
-          a plain label, so the cell keeps both gestures underneath it. */}
+      {/* box-none: empty-area presses fall through to the day cells. Chips and
+          banners do capture their own pixels, but they carry the cell's two
+          gestures themselves, so covering a strip of a cell costs it nothing.
+          The overflow counter stays a plain label — no handlers to carry. */}
       <View style={styles.overlay}>
         {layout.banners.map((banner) => (
           <EventBanner
             key={banner.event.id}
             placement={banner}
             titleLines={banner.rows > 1 ? 2 : 1}
-            onPress={() => onPressEvent(banner.event)}
+            onPress={(e) =>
+              pressEvent(
+                banner.event,
+                bannerCol(e, banner.startCol, banner.span)
+              )
+            }
+            onLongPress={(e) =>
+              createOn(bannerCol(e, banner.startCol, banner.span))
+            }
+            onPressIn={(e) => {
+              const col = bannerCol(e, banner.startCol, banner.span);
+              pressIn(
+                col,
+                e.nativeEvent.locationX - (col - banner.startCol) * cellWidth,
+                DAY_NUMBER_HEIGHT +
+                  banner.slot * SLOT_HEIGHT +
+                  e.nativeEvent.locationY
+              );
+            }}
+            onPressOut={pressOut}
+            delayLongPress={LONG_PRESS_MS}
+            unstable_pressDelay={PRESS_DELAY_MS}
             style={{
               position: 'absolute',
               left: pct(banner.startCol),
@@ -310,7 +507,13 @@ export const WeekRow = memo(function WeekRow({
               // edges instead of shifting the whole bar sideways.
               right: pct(7 - banner.startCol - banner.span),
               top: banner.slot * SLOT_HEIGHT,
-              height: banner.rows * SLOT_HEIGHT - 2,
+              // Fixed to the slots reserved, NOT to the lines that render.
+              // Sizing to content looks tidier per strip and is wrong in
+              // aggregate: the leftover of an over-granted strip turns into
+              // gap, so the space between two events depended on how many
+              // lines the one above happened to use. A constant gap is worth
+              // more than a snug box, so the box gets the slack instead.
+              height: banner.rows * SLOT_HEIGHT - EVENT_GAP,
             }}
           />
         ))}
@@ -319,13 +522,29 @@ export const WeekRow = memo(function WeekRow({
             key={chip.event.id}
             event={chip.event}
             titleLines={Math.min(2, chip.span)}
-            onPress={() => onPressEvent(chip.event)}
+            onPress={() => pressEvent(chip.event, chip.col)}
+            onLongPress={() => createOn(chip.col)}
+            onPressIn={(e) =>
+              pressIn(
+                chip.col,
+                e.nativeEvent.locationX,
+                DAY_NUMBER_HEIGHT +
+                  chip.slot * SLOT_HEIGHT +
+                  e.nativeEvent.locationY
+              )
+            }
+            onPressOut={pressOut}
+            delayLongPress={LONG_PRESS_MS}
+            unstable_pressDelay={PRESS_DELAY_MS}
             style={{
               position: 'absolute',
               left: pct(chip.col),
               width: pct(1),
               top: chip.slot * SLOT_HEIGHT,
-              height: chip.span * SLOT_HEIGHT - 2,
+              // Fixed to its slots, as for banners above — and the bar
+              // stretches to it, so a one-line chip and a one-line banner
+              // beside it still stand the same height.
+              height: chip.span * SLOT_HEIGHT - EVENT_GAP,
             }}
           />
         ))}
@@ -343,8 +562,12 @@ export const WeekRow = memo(function WeekRow({
                   left: pct(col),
                   width: pct(1),
                   bottom: MORE_BOTTOM_INSET,
-                  height: SLOT_HEIGHT - 2,
+                  height: COUNTER_HEIGHT,
                   justifyContent: 'center',
+                  // Trailing corner: the day number holds the leading one, and
+                  // every strip is left-aligned, so the count sits where
+                  // nothing else in the cell does.
+                  alignItems: 'flex-end',
                 }}
               >
                 <ThemedText numberOfLines={1} style={styles.more}>
@@ -392,6 +615,17 @@ const styles = StyleSheet.create({
   dayNumber: {
     fontSize: 14,
   },
+  inkWell: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  ink: {
+    position: 'absolute',
+    backgroundColor: INK_COLOR,
+    opacity: INK_OPACITY,
+  },
   weekSplit: {
     position: 'absolute',
     top: -RULE_WIDTH,
@@ -409,9 +643,14 @@ const styles = StyleSheet.create({
   },
   more: {
     fontSize: 12,
-    // Explicit, so the text centres in the slot rather than inheriting a line
+    // The same weight as the day number: both are the cell's own chrome
+    // rather than one of its events, and they sit in opposite corners.
+    fontWeight: '700',
+    // Explicit, so the text centres in its box rather than inheriting a line
     // box taller than it and drifting low.
     lineHeight: 14,
-    paddingLeft: 5,
+    // Mirrors the day number's own inset on the other side, and clears the
+    // cell's right-hand rule.
+    paddingRight: 5,
   },
 });

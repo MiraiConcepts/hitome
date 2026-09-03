@@ -82,6 +82,29 @@ export function dayLabel(day: string): string {
   });
 }
 
+/** e.g. 'Tue 1 September' — dayLabel with the month spelled out, for the
+ *  header, which has the room. Locale-formatted like every other label here,
+ *  so the ordering follows the device rather than this file. */
+export function longDayLabel(day: string): string {
+  return (parseDay(day) ?? new Date()).toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'long',
+  });
+}
+
+/** How long ago `from` was, coarsely: 'just now', '5m ago', '2h ago',
+ *  '3d ago'. Rounded down — an age is a floor, never a promise — and capped at
+ *  days, because past that the exact number stops meaning anything. */
+export function agoLabel(from: Date, now: Date): string {
+  const minutes = Math.floor((now.getTime() - from.getTime()) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 /** dateString shifted by n days (local). */
 export function addDays(day: string, n: number): string {
   const d = parseDay(day) ?? new Date();

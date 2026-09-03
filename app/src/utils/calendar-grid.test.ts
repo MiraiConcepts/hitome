@@ -549,7 +549,7 @@ describe('layoutWeek', () => {
     expect(layout.overflow).toEqual([0, 0, 0, 0, 0, 0, 0]);
   });
 
-  it('hides a spanning chip that cannot fully fit and counts it once', () => {
+  it('trims a spanning chip to the room left rather than dropping it', () => {
     const layout = layoutWeek(
       WEEK,
       [
@@ -559,9 +559,49 @@ describe('layoutWeek', () => {
       3,
       (e) => (e.id === 'b' ? 3 : 1)
     );
-    // b needs slots 1–3 but only 0–2 are visible → it hides whole; a stays.
-    expect(layout.chips).toMatchObject([{ event: { id: 'a' }, slot: 0 }]);
+    // b asks for slots 1–3 and only 0–2 are visible, so it takes the two it
+    // can have and truncates. Nothing is hidden, so no counter and no blank.
+    expect(layout.chips).toMatchObject([
+      { event: { id: 'a' }, slot: 0, span: 1 },
+      { event: { id: 'b' }, slot: 1, span: 2 },
+    ]);
+    expect(layout.overflow).toEqual([0, 0, 0, 0, 0, 0, 0]);
+  });
+
+  it('gives the last slot to the counter once something is truly hidden', () => {
+    const layout = layoutWeek(
+      WEEK,
+      [
+        ev('a', new Date(2026, 6, 9, 9), new Date(2026, 6, 9, 10)),
+        ev('b', new Date(2026, 6, 9, 10), new Date(2026, 6, 9, 11)),
+        ev('c', new Date(2026, 6, 9, 11), new Date(2026, 6, 9, 12)),
+      ],
+      3,
+      (e) => (e.id === 'b' ? 2 : 1)
+    );
+    // a at 0, b asks for 1–2, c lands at 3 with nowhere to go — so c hides,
+    // the counter claims slot 2, and b trims to the single slot left to it.
+    expect(layout.chips).toMatchObject([
+      { event: { id: 'a' }, slot: 0, span: 1 },
+      { event: { id: 'b' }, slot: 1, span: 1 },
+    ]);
     expect(layout.overflow).toEqual([0, 0, 0, 1, 0, 0, 0]);
+  });
+
+  it('hides a chip with no visible slot at all', () => {
+    const layout = layoutWeek(
+      WEEK,
+      [
+        ev('a', new Date(2026, 6, 9, 9), new Date(2026, 6, 9, 10)),
+        ev('b', new Date(2026, 6, 9, 10), new Date(2026, 6, 9, 11)),
+        ev('c', new Date(2026, 6, 9, 11), new Date(2026, 6, 9, 12)),
+      ],
+      2
+    );
+    // Three single-slot chips into two slots: c has no slot to trim into, so
+    // it hides and the counter takes slot 1 — which pushes b out too.
+    expect(layout.chips).toMatchObject([{ event: { id: 'a' }, slot: 0 }]);
+    expect(layout.overflow).toEqual([0, 0, 0, 2, 0, 0, 0]);
   });
 
   it('hides everything when slotCount is 0', () => {

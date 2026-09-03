@@ -1,4 +1,10 @@
-import { eventDays, nextFullHour, parseDayTime, toDateString } from './date';
+import {
+  agoLabel,
+  eventDays,
+  nextFullHour,
+  parseDayTime,
+  toDateString,
+} from './date';
 
 describe('toDateString', () => {
   it('formats local dates with zero padding', () => {
@@ -56,5 +62,28 @@ describe('nextFullHour', () => {
   it('rounds up to the next hour', () => {
     expect(nextFullHour(new Date(2026, 6, 2, 14, 23)).getHours()).toBe(15);
     expect(nextFullHour(new Date(2026, 6, 2, 14, 0)).getHours()).toBe(15);
+  });
+});
+
+describe('agoLabel', () => {
+  const now = new Date(2026, 8, 1, 12, 0);
+  const minutesBefore = (n: number) => new Date(now.getTime() - n * 60_000);
+
+  it('reads the first minute as just now', () => {
+    expect(agoLabel(now, now)).toBe('just now');
+    expect(agoLabel(minutesBefore(0.9), now)).toBe('just now');
+  });
+
+  it('counts minutes, then hours, then days', () => {
+    expect(agoLabel(minutesBefore(1), now)).toBe('1m ago');
+    expect(agoLabel(minutesBefore(59), now)).toBe('59m ago');
+    expect(agoLabel(minutesBefore(60), now)).toBe('1h ago');
+    expect(agoLabel(minutesBefore(120), now)).toBe('2h ago');
+    expect(agoLabel(minutesBefore(60 * 24), now)).toBe('1d ago');
+    expect(agoLabel(minutesBefore(60 * 24 * 3 + 30), now)).toBe('3d ago');
+  });
+
+  it('rounds down rather than up', () => {
+    expect(agoLabel(minutesBefore(119), now)).toBe('1h ago');
   });
 });
