@@ -1,23 +1,8 @@
-diff --git a/node_modules/react-native-android-widget/.bun-tag-4136aebfb846ae94 b/.bun-tag-4136aebfb846ae94
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
-diff --git a/node_modules/react-native-android-widget/.bun-tag-8b218605c9a901dc b/.bun-tag-8b218605c9a901dc
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
-diff --git a/node_modules/react-native-android-widget/.bun-tag-906bc642eebbaf32 b/.bun-tag-906bc642eebbaf32
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
-diff --git a/node_modules/react-native-android-widget/.bun-tag-99a6212790326dd9 b/.bun-tag-99a6212790326dd9
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
-diff --git a/node_modules/react-native-android-widget/.bun-tag-ac6aef17229dc530 b/.bun-tag-ac6aef17229dc530
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java b/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java
-index 2d88172e426ccd70288005d4b7c15d7b534d20d9..c61353ad72abceeaaa5a0edffa0a10d71bd205e0 100644
+index 5650d1e4b9abaa30a2e1ab2a5fddefc9057d4e25..45f8e0b6b0228ae90d6eb0c4aa09629828b9381d 100644
 --- a/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java
 +++ b/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java
-@@ -189,6 +189,39 @@ public class RNWidget {
+@@ -200,6 +200,39 @@ public class RNWidget {
      }
  
      private void registerClickTask(int id, ClickableView clickableView, RemoteViews widgetView, Integer button) {
@@ -58,10 +43,10 @@ index 2d88172e426ccd70288005d4b7c15d7b534d20d9..c61353ad72abceeaaa5a0edffa0a10d7
          intent.setComponent(new ComponentName(appContext, RNWidgetUtil.getWidgetProviderClassName(appContext, widgetName)));
          intent.putExtra("widgetId", id);
 diff --git a/android/src/main/java/com/reactnativeandroidwidget/RNWidgetCollectionService.java b/android/src/main/java/com/reactnativeandroidwidget/RNWidgetCollectionService.java
-index 2bdbab9fe634d23e90a4b0b58d591de7745b18c2..ad27ab05bee61693fd1482ce3025b1efc5b66e12 100644
+index f818d97e1985938d4af6bfc20bce9855cc2ff4a5..1e6b7b13f7b0cd1764a80f4cec04ce398a30fc59 100644
 --- a/android/src/main/java/com/reactnativeandroidwidget/RNWidgetCollectionService.java
 +++ b/android/src/main/java/com/reactnativeandroidwidget/RNWidgetCollectionService.java
-@@ -143,6 +143,22 @@ class ListRemoteViewsFactory implements RemoteViewsService.RemoteViewsFactory {
+@@ -155,6 +155,22 @@ class ListRemoteViewsFactory implements RemoteViewsService.RemoteViewsFactory {
      }
  
      private PendingIntent createPendingIntent(Bundle clickableArea) {
@@ -85,7 +70,7 @@ index 2bdbab9fe634d23e90a4b0b58d591de7745b18c2..ad27ab05bee61693fd1482ce3025b1ef
          intent.setComponent(new ComponentName(mContext, RNWidgetUtil.getWidgetProviderClassName(mContext, widgetName)));
          intent.putExtra("widgetId", mAppWidgetId);
 diff --git a/android/src/main/java/com/reactnativeandroidwidget/RNWidgetProvider.java b/android/src/main/java/com/reactnativeandroidwidget/RNWidgetProvider.java
-index 647d8f43d744d1e4b6a9c66de2d6a7f6861cbe04..d06b9b0b6e7d4e216967859f4351ed98d29146be 100644
+index 647d8f43d744d1e4b6a9c66de2d6a7f6861cbe04..37c79da389ac0068d8e313be3bbd733cd7178f63 100644
 --- a/android/src/main/java/com/reactnativeandroidwidget/RNWidgetProvider.java
 +++ b/android/src/main/java/com/reactnativeandroidwidget/RNWidgetProvider.java
 @@ -133,6 +133,15 @@ public class RNWidgetProvider extends AppWidgetProvider {
@@ -105,7 +90,7 @@ index 647d8f43d744d1e4b6a9c66de2d6a7f6861cbe04..d06b9b0b6e7d4e216967859f4351ed98
          } catch (Exception e) {
              e.printStackTrace();
 diff --git a/android/src/main/java/com/reactnativeandroidwidget/RNWidgetUtil.java b/android/src/main/java/com/reactnativeandroidwidget/RNWidgetUtil.java
-index a057c09736ee40464ca7d9d618079114bdd5518c..fcd56449ab2b36ec2f6af76d87a5058cfe16acb6 100644
+index a057c09736ee40464ca7d9d618079114bdd5518c..33aa478240d746388c433b45835e10cfd5695a5e 100644
 --- a/android/src/main/java/com/reactnativeandroidwidget/RNWidgetUtil.java
 +++ b/android/src/main/java/com/reactnativeandroidwidget/RNWidgetUtil.java
 @@ -2,10 +2,13 @@ package com.reactnativeandroidwidget;
