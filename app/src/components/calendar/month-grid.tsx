@@ -68,6 +68,9 @@ type Props = {
   /** Fired once, when the initial month's row first becomes viewable — i.e.
    *  the grid is verifiably rendering at its landing position. */
   onAnchored: () => void;
+  /** A day to flash, with a nonce so the same day can flash more than once —
+   *  how a widget tap says which day it landed on (see month-screen). */
+  pulse: { day: string; nonce: number } | null;
   onOpenDay: (day: string) => void;
   onPressEvent: (event: CalEvent) => void;
   onCreateOnDay: (day: string) => void;
@@ -177,6 +180,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     onMonthChange,
     onMonthSettled,
     onAnchored,
+    pulse,
     onOpenDay,
     onPressEvent,
     onCreateOnDay,
@@ -250,6 +254,9 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   const currentRow = useRef(launchRow);
   /** The month a gesture started from — what the flip is measured against. */
   const dragFrom = useRef(initialIndex);
+  /** And the offset it started from, which is NOT that month's offset while the
+   *  grid is sitting in the launch pose — see landingIndex. */
+  const dragFromOffset = useRef(0);
   // Settle latch. The month is reported once the scroll has been quiet for
   // SETTLE_MS — after the drag, after the glide, and after a browser snap
   // alike. Read through a ref so a pending timer never fires a stale month.
@@ -314,8 +321,9 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
 
   /** Note where a gesture began; its landing is measured from there. Only a
    *  real drag reaches this — the platform raises it for nothing else. */
-  const beginGesture = () => {
+  const beginGesture = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     dragFrom.current = currentIndex.current;
+    dragFromOffset.current = e.nativeEvent.contentOffset.y;
   };
 
   /** Land the drag on its month. Android only — web is snapped by the browser
@@ -324,6 +332,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     const target = clampIndex(
       landingIndex(
         dragFrom.current,
+        dragFromOffset.current,
         e.nativeEvent.contentOffset.y,
         snapOffsets,
         e.nativeEvent.velocity?.y ?? 0
@@ -419,8 +428,8 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   // focus and the chips it first rendered with. Pressing Today four months
   // back landed on the right month with every day dimmed and no events on it.
   const extraData = useMemo(
-    () => ({ focusedMonth, weekEvents }),
-    [focusedMonth, weekEvents]
+    () => ({ focusedMonth, weekEvents, pulse }),
+    [focusedMonth, weekEvents, pulse]
   );
 
   const renderItem = ({ item, index }: ListRenderItemInfo<string>) => (
@@ -435,6 +444,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
       focusedYear={focusedMonth.year}
       focusedMonth0={focusedMonth.month0}
       isMonthStart={monthStartRows.has(index)}
+      pulse={pulse}
       onOpenDay={onOpenDay}
       onPressEvent={onPressEvent}
       onCreateOnDay={onCreateOnDay}

@@ -152,7 +152,15 @@ const FLIP_VELOCITY = 0.3;
 /**
  * Where a gesture lands: the month it began on, plus or minus one. Direction
  * comes from the distance moved rather than the velocity's sign, which differs
- * between platforms. `snapOffsets` are scroll offsets in the same unit as
+ * between platforms — and it is measured from `fromOffset`, where the finger
+ * actually went down, NOT from the month's own offset.
+ *
+ * Those are the same thing whenever the grid is resting on a month, which was
+ * always true until the today-centred launch pose. Opening a row above the
+ * month line makes `offset - snapOffsets[from]` a whole row of phantom
+ * backwards travel before the screen is touched — enough on its own to clear
+ * the flip threshold, so the first gesture after launch paged backwards
+ * whichever way it was thrown. `snapOffsets` are scroll offsets in the same unit as
  * `offset` (rows × rowHeight) — months sit 4 or 5 rows apart, so the fraction
  * is measured against the real gap to the neighbour rather than a fixed page
  * height. Out of range in the direction of travel means there is nothing to
@@ -160,11 +168,12 @@ const FLIP_VELOCITY = 0.3;
  */
 export function landingIndex(
   from: number,
+  fromOffset: number,
   offset: number,
   snapOffsets: readonly number[],
   velocity: number
 ): number {
-  const moved = offset - snapOffsets[from];
+  const moved = offset - fromOffset;
   const direction = Math.sign(moved);
   if (direction === 0) return from;
   const next = from + direction;

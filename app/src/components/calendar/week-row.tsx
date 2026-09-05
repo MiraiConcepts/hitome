@@ -12,6 +12,8 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -79,6 +81,9 @@ type WeekRowProps = {
   /** Web only: a month begins in this row, making it one of the CSS
    *  scroll-snap positions the browser pages between (see month-grid). */
   isMonthStart?: boolean;
+  /** A day to flash and a nonce that re-fires it; ignored unless the day falls
+   *  in this week (see month-grid). */
+  pulse: { day: string; nonce: number } | null;
   /** Show a day's full list. Tapping a cell asks for this — anywhere in it,
    *  events included, once the cell has more than it can show. Empty days
    *  have nothing to list, so the row never asks for one. */
@@ -136,7 +141,7 @@ const DIM_MS = 200;
  *  Pressable's own default because the ink below is timed to it: the wash
  *  reaches full strength exactly as the hold fires, which is what makes the
  *  fill read as the gesture's progress rather than as decoration. */
-const LONG_PRESS_MS = 500;
+const LONG_PRESS_MS = 350;
 /** How long a touch must stay put before it counts as a press at all. The grid
  *  lives inside a scroller, and a scroll begins with a touch that looks exactly
  *  like a press — without this, every drag lit the ink under the finger before
@@ -156,6 +161,14 @@ const INK_FADE_MS = 90;
 const INK_COLOR = '#5B9DFF';
 /** The ink at full strength. */
 const INK_OPACITY = 0.28;
+
+/** A pulse is the same ink without a finger: it spreads from the cell's middle
+ *  because there is no touch point to spread from, eases out rather than
+ *  running linear (it reports nothing, so it has no progress to be honest
+ *  about), holds long enough to be seen, and clears itself. */
+const PULSE_GROW_MS = 320;
+const PULSE_HOLD_MS = 700;
+const PULSE_FADE_MS = 320;
 
 /** Month ordinal — the unit a row's two shares are compared by. */
 const monthOrdOf = (d: Date) => d.getFullYear() * 12 + d.getMonth();
@@ -202,6 +215,7 @@ export const WeekRow = memo(function WeekRow({
   focusedYear,
   focusedMonth0,
   isMonthStart,
+  pulse,
   onOpenDay,
   onPressEvent,
   onCreateOnDay,
@@ -290,6 +304,32 @@ export const WeekRow = memo(function WeekRow({
   const pressOut = useCallback(() => {
     inkFade.value = withTiming(0, { duration: INK_RELEASE_MS });
   }, [inkFade]);
+
+  // Flash a day the app was sent to, so dismissing whatever opened over it
+  // leaves you knowing which cell you came from. Keyed on the nonce, not the
+  // day, so the same day can be flashed twice running.
+  const pulseNonce = pulse?.nonce ?? null;
+  const pulseDay = pulse?.day ?? null;
+  useEffect(() => {
+    if (pulseNonce === null || pulseDay === null) return;
+    const col = days.findIndex((d) => toDateString(d) === pulseDay);
+    if (col < 0) return;
+    inkCol.value = col;
+    inkX.value = cellWidth / 2;
+    inkY.value = rowHeight / 2;
+    inkGrow.value = 0.12;
+    inkGrow.value = withTiming(1, {
+      duration: PULSE_GROW_MS,
+      easing: Easing.out(Easing.quad),
+    });
+    inkFade.value = withSequence(
+      withTiming(1, { duration: INK_FADE_MS }),
+      withDelay(PULSE_HOLD_MS, withTiming(0, { duration: PULSE_FADE_MS }))
+    );
+    // days/cellWidth/rowHeight are read at fire time and are stable for a
+    // mounted row; the nonce is what makes this run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pulseNonce, pulseDay]);
   // The well is the cell's own box, clipping the circle inside it so the ink
   // never bleeds into the day next door.
   const inkWellStyle = useAnimatedStyle(() => ({

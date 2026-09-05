@@ -243,50 +243,71 @@ describe('landingIndex', () => {
   const BACK = SNAP[2] - SNAP[1]; // 400 — four rows to the previous one
   const at = (moved: number) => SNAP[from] + moved;
 
+  it('measures the drag from the finger, not from the month it began in', () => {
+    // The launch pose rests a row ABOVE the month line, so the offset is
+    // already behind snapOffsets[from] before the screen is touched. Measuring
+    // against the month makes that phantom row read as backwards travel — and
+    // a row clears the flip threshold on its own, so every first gesture after
+    // launch paged backwards whichever way it was thrown.
+    const pose = SNAP[from] - ROW;
+    expect(landingIndex(from, pose, pose + FWD * 0.5, SNAP, -1)).toBe(from + 1);
+    expect(landingIndex(from, pose, pose - BACK * 0.5, SNAP, 1)).toBe(from - 1);
+    // And a gesture that goes nowhere stays put, phantom row or not.
+    expect(landingIndex(from, pose, pose, SNAP, 0)).toBe(from);
+  });
+
   it('stays put below the distance threshold with no speed', () => {
-    expect(landingIndex(from, at(FWD * 0.14), SNAP, 0)).toBe(from);
-    expect(landingIndex(from, at(-BACK * 0.14), SNAP, 0)).toBe(from);
+    expect(landingIndex(from, SNAP[from], at(FWD * 0.14), SNAP, 0)).toBe(from);
+    expect(landingIndex(from, SNAP[from], at(-BACK * 0.14), SNAP, 0)).toBe(
+      from
+    );
   });
 
   it('flips once the drag passes the threshold, in either direction', () => {
-    expect(landingIndex(from, at(FWD * 0.15), SNAP, 0)).toBe(from + 1);
-    expect(landingIndex(from, at(-BACK * 0.15), SNAP, 0)).toBe(from - 1);
+    expect(landingIndex(from, SNAP[from], at(FWD * 0.15), SNAP, 0)).toBe(
+      from + 1
+    );
+    expect(landingIndex(from, SNAP[from], at(-BACK * 0.15), SNAP, 0)).toBe(
+      from - 1
+    );
   });
 
   it('measures the fraction against the real gap, not a fixed height', () => {
     // Months are 4 or 5 rows apart, so the same distance can be enough one
     // way and not the other: 60px clears 15% of the 400px gap back, but not
     // of the 500px gap forward.
-    expect(landingIndex(from, at(60), SNAP, 0)).toBe(from);
-    expect(landingIndex(from, at(-60), SNAP, 0)).toBe(from - 1);
+    expect(landingIndex(from, SNAP[from], at(60), SNAP, 0)).toBe(from);
+    expect(landingIndex(from, SNAP[from], at(-60), SNAP, 0)).toBe(from - 1);
   });
 
   it('flips on speed alone, however short the drag', () => {
-    expect(landingIndex(from, at(1), SNAP, 0.3)).toBe(from + 1);
-    expect(landingIndex(from, at(-1), SNAP, -0.3)).toBe(from - 1);
+    expect(landingIndex(from, SNAP[from], at(1), SNAP, 0.3)).toBe(from + 1);
+    expect(landingIndex(from, SNAP[from], at(-1), SNAP, -0.3)).toBe(from - 1);
   });
 
   it('takes direction from the drag, not the velocity sign', () => {
     // Platforms disagree on the sign of scroll velocity; a fast drag forward
     // must page forward whichever sign arrives with it.
-    expect(landingIndex(from, at(2), SNAP, -5)).toBe(from + 1);
-    expect(landingIndex(from, at(-2), SNAP, 5)).toBe(from - 1);
+    expect(landingIndex(from, SNAP[from], at(2), SNAP, -5)).toBe(from + 1);
+    expect(landingIndex(from, SNAP[from], at(-2), SNAP, 5)).toBe(from - 1);
   });
 
   it('never moves more than one month, however far or fast', () => {
-    expect(landingIndex(from, at(4000), SNAP, 12)).toBe(from + 1);
-    expect(landingIndex(from, at(-4000), SNAP, -12)).toBe(from - 1);
+    expect(landingIndex(from, SNAP[from], at(4000), SNAP, 12)).toBe(from + 1);
+    expect(landingIndex(from, SNAP[from], at(-4000), SNAP, -12)).toBe(from - 1);
   });
 
   it('holds the month when nothing moved', () => {
-    expect(landingIndex(from, at(0), SNAP, 0)).toBe(from);
-    expect(landingIndex(from, at(0), SNAP, 9)).toBe(from);
+    expect(landingIndex(from, SNAP[from], at(0), SNAP, 0)).toBe(from);
+    expect(landingIndex(from, SNAP[from], at(0), SNAP, 9)).toBe(from);
   });
 
   it('has nothing to flip to at either end of the ribbon', () => {
-    expect(landingIndex(0, SNAP[0] - 900, SNAP, -12)).toBe(0);
+    expect(landingIndex(0, SNAP[0], SNAP[0] - 900, SNAP, -12)).toBe(0);
     const last = SNAP.length - 1;
-    expect(landingIndex(last, SNAP[last] + 900, SNAP, 12)).toBe(last);
+    expect(landingIndex(last, SNAP[last], SNAP[last] + 900, SNAP, 12)).toBe(
+      last
+    );
   });
 });
 
