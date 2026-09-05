@@ -1,13 +1,13 @@
 import type { ComponentType } from 'react';
-import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import { StyleSheet, View, type TextInputProps } from 'react-native';
 
 import type { RecurrencePreset } from '@/caldav/types';
 import { ChipRow } from '@/components/fields/chip-row';
 import { DateField } from '@/components/fields/date-field';
-import { FieldChrome } from '@/components/fields/field-chrome';
+import { FieldRow } from '@/components/fields/field-row';
+import { TextField } from '@/components/fields/text-field';
 import { ThemedText } from '@/components/themed-text';
-import { Fonts, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Spacing } from '@/constants/theme';
 import { addDays } from '@/utils/date';
 
 /** Editor-side recurrence state ('custom' renders read-only, never writes). */
@@ -50,20 +50,16 @@ export function RecurrenceField({
   value,
   onChange,
   startDay,
-  TextInputComponent = TextInput,
+  TextInputComponent,
   testID,
 }: Props) {
-  const theme = useTheme();
   if (value.kind === 'custom') {
     return (
-      <View style={styles.column} testID={testID}>
-        <ThemedText type="small" themeColor="textSecondary">
-          Repeat
-        </ThemedText>
+      <FieldRow label="Repeat" testID={testID}>
         <ThemedText type="small" themeColor="textSecondary">
           Custom rule (set in another app) — kept as is.
         </ThemedText>
-      </View>
+      </FieldRow>
     );
   }
 
@@ -92,17 +88,16 @@ export function RecurrenceField({
 
   return (
     <View style={styles.column} testID={testID}>
-      <ThemedText type="small" themeColor="textSecondary">
-        Repeat
-      </ThemedText>
-      <ChipRow
-        options={PRESET_OPTIONS}
-        value={preset ?? 'none'}
-        onChange={selectPreset}
-        testID={testID ? `${testID}-preset` : undefined}
-      />
+      <FieldRow label="Repeat">
+        <ChipRow
+          options={PRESET_OPTIONS}
+          value={preset ?? 'none'}
+          onChange={selectPreset}
+          testID={testID ? `${testID}-preset` : undefined}
+        />
+      </FieldRow>
       {preset && (
-        <View style={styles.endRow}>
+        <FieldRow label="Ends">
           <ChipRow
             options={END_OPTIONS}
             value={end.type}
@@ -125,11 +120,9 @@ export function RecurrenceField({
           )}
           {end.type === 'count' && (
             <View style={styles.countRow}>
-              <TextInputComponent
-                style={[
-                  styles.countInput,
-                  { color: theme.text, fontFamily: Fonts.sans },
-                ]}
+              <TextField
+                TextInputComponent={TextInputComponent}
+                style={styles.countInput}
                 value={end.n > 0 ? String(end.n) : ''}
                 onChangeText={(text) => {
                   const n = Number(text.replace(/[^0-9]/g, ''));
@@ -141,6 +134,8 @@ export function RecurrenceField({
                 }}
                 keyboardType="number-pad"
                 inputMode="numeric"
+                returnKeyType="done"
+                submitBehavior="blurAndSubmit"
                 testID={testID ? `${testID}-count` : undefined}
               />
               <ThemedText type="small" themeColor="textSecondary">
@@ -148,7 +143,7 @@ export function RecurrenceField({
               </ThemedText>
             </View>
           )}
-        </View>
+        </FieldRow>
       )}
     </View>
   );
@@ -156,10 +151,7 @@ export function RecurrenceField({
 
 const styles = StyleSheet.create({
   column: {
-    gap: Spacing.one + Spacing.half,
-  },
-  endRow: {
-    gap: Spacing.two,
+    gap: Spacing.two + Spacing.half,
   },
   countRow: {
     flexDirection: 'row',
@@ -167,8 +159,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   countInput: {
-    ...FieldChrome,
-    minWidth: 64,
+    minWidth: 72,
     textAlign: 'center',
   },
 });

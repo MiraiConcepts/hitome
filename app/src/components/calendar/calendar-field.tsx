@@ -1,9 +1,6 @@
-import { StyleSheet, View } from 'react-native';
-
 import type { CalendarChoice } from '@/caldav/events';
 import { ChipRow } from '@/components/fields/chip-row';
-import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { AccentColor } from '@/constants/theme';
 
 type Props = {
   calendars: CalendarChoice[];
@@ -14,29 +11,24 @@ type Props = {
 };
 
 /**
- * Create-only picker: which calendar a new event is written into. The form
- * mounts it only when the account has more than one calendar — a single
- * calendar makes the choice moot.
+ * Create-only picker: which calendar a new event is written into, each
+ * chip in its calendar's own color (the accent for an uncolored one — the
+ * same fallback the grid's chips use). The form mounts it only when the
+ * account has more than one calendar — a single calendar makes the choice
+ * moot. No caption: the names say what the row is.
  */
 export function CalendarField({ calendars, value, onChange, testID }: Props) {
-  const options = calendars.map((c) => ({ value: c.url, label: c.name }));
+  const options = calendars.map((c) => ({
+    value: c.url,
+    label: c.name,
+    color: c.color ?? AccentColor,
+  }));
   return (
-    <View style={styles.column} testID={testID}>
-      <ThemedText type="small" themeColor="textSecondary">
-        Calendar
-      </ThemedText>
-      <ChipRow
-        options={options}
-        value={value}
-        onChange={onChange}
-        testID={testID ? `${testID}-pick` : undefined}
-      />
-    </View>
+    <ChipRow
+      options={options}
+      value={value}
+      onChange={onChange}
+      testID={testID ? `${testID}-pick` : undefined}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  column: {
-    gap: Spacing.one + Spacing.half,
-  },
-});

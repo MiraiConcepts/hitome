@@ -1,8 +1,6 @@
-import { StyleSheet, View } from 'react-native';
-
 import { ChipRow } from '@/components/fields/chip-row';
+import { FieldRow } from '@/components/fields/field-row';
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
 
 /**
  * Editor-side alarm state. 'set' covers any duration offset (foreign
@@ -53,14 +51,11 @@ type Props = {
 export function AlarmField({ value, onChange, allDay, hint, testID }: Props) {
   if (value.kind === 'foreign') {
     return (
-      <View style={styles.column} testID={testID}>
-        <ThemedText type="small" themeColor="textSecondary">
-          Alert
-        </ThemedText>
+      <FieldRow label="Alert" testID={testID}>
         <ThemedText type="small" themeColor="textSecondary">
           Custom alert (set in another app) — kept as is.
         </ThemedText>
-      </View>
+      </FieldRow>
     );
   }
 
@@ -75,10 +70,7 @@ export function AlarmField({ value, onChange, allDay, hint, testID }: Props) {
       : [...presets];
 
   return (
-    <View style={styles.column} testID={testID}>
-      <ThemedText type="small" themeColor="textSecondary">
-        Alert
-      </ThemedText>
+    <FieldRow label="Alert" testID={testID}>
       <ChipRow
         options={options}
         value={selected}
@@ -96,12 +88,6 @@ export function AlarmField({ value, onChange, allDay, hint, testID }: Props) {
           {hint}
         </ThemedText>
       )}
-    </View>
+    </FieldRow>
   );
 }
-
-const styles = StyleSheet.create({
-  column: {
-    gap: Spacing.one + Spacing.half,
-  },
-});

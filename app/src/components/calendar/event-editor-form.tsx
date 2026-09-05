@@ -1,5 +1,6 @@
-import { useEffect, useState, type ComponentType } from 'react';
+import type { ComponentType, Ref } from 'react';
 import {
+  Platform,
   Pressable,
   StyleSheet,
   Switch,
@@ -8,327 +9,154 @@ import {
   type TextInputProps,
 } from 'react-native';
 
-import {
-  notificationsBlocked,
-  requestPermissionIfNeeded,
-} from '@/alarms/scheduler';
-import {
-  type CalendarChoice,
-  ConflictError,
-  createEvent,
-  defaultCalendarUrl,
-  deleteEvent,
-  listCalendars,
-  updateEvent,
-} from '@/caldav/events';
-import type {
-  AlarmInput,
-  CalEvent,
-  EventChanges,
-  RecurrenceInput,
-} from '@/caldav/types';
-import { AlarmField, type AlarmState } from '@/components/calendar/alarm-field';
+import { AlarmField } from '@/components/calendar/alarm-field';
 import { CalendarField } from '@/components/calendar/calendar-field';
-import {
-  alarmEqual,
-  initialFormState,
-  recurEqual,
-} from '@/components/calendar/editor-state';
 import { LocationField } from '@/components/calendar/location-field';
-import {
-  RecurrenceField,
-  type RecurrenceState,
-} from '@/components/calendar/recurrence-field';
+import { HEADER_GROUND } from '@/components/calendar/month-header';
+import { RecurrenceField } from '@/components/calendar/recurrence-field';
+import type { EventEditorController } from '@/components/calendar/use-event-editor';
 import { DateField } from '@/components/fields/date-field';
+import { FieldRow } from '@/components/fields/field-row';
+import { TextField } from '@/components/fields/text-field';
 import { TimeField } from '@/components/fields/time-field';
 import { ThemedText } from '@/components/themed-text';
 import {
   AccentColor,
-  BrandColor,
   DangerColor,
-  Fonts,
+  FontFamilyBold,
   OnAccentColor,
   Spacing,
 } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  addDays,
-  dayLabel,
-  parseDay,
-  parseDayTime,
-  toDateString,
-  toTimeString,
-} from '@/utils/date';
+import { dayLabel, parseDay } from '@/utils/date';
 
-export type EditorResult =
-  | 'created'
-  | 'updated'
-  | { deleted: CalEvent }
-  | 'conflict';
-
-type Props = {
-  event: CalEvent | null;
-  defaultDay: string;
-  onClose: () => void;
-  onDone: (result: EditorResult) => void;
-  /** Sheet shell passes BottomSheetTextInput for keyboard-aware inputs. */
-  TextInputComponent?: ComponentType<TextInputProps>;
-};
+export type { EditorResult } from '@/components/calendar/use-event-editor';
 
 /**
- * The editor form, shell-agnostic: all fields, validation and the CalDAV
- * write (diff-based on edit — untouched ICS properties stay byte-identical).
- * Presentation (centered dialog vs bottom sheet) is the shells' job.
+ * The editor's three pieces. Shells lay them out — the header pinned at the
+ * top, the fields scrolling, the actions pinned at the bottom (above the
+ * keyboard in the sheet) — so Save is reachable from any field without
+ * scrolling the form or dismissing the keyboard first.
+ *
+ * Density is the point: 36pt fields, 28pt chips, labels beside controls
+ * and a 10pt rhythm put a new event on one phone screen. A long form (many
+ * calendars, a repeat with an end date) still scrolls.
  */
-export function EventEditorForm({
-  event,
-  defaultDay,
-  onClose,
-  onDone,
-  TextInputComponent = TextInput,
-}: Props) {
-  const theme = useTheme();
-  const [initial] = useState(() => initialFormState(event, defaultDay));
 
-  const [summary, setSummary] = useState(initial.summary);
-  const [allDay, setAllDay] = useState(initial.allDay);
-  const [startDay, setStartDay] = useState(initial.startDay);
-  const [startTime, setStartTime] = useState(initial.startTime);
-  const [endDay, setEndDay] = useState(initial.endDay);
-  const [endTime, setEndTime] = useState(initial.endTime);
-  const [location, setLocation] = useState(initial.location);
-  const [description, setDescription] = useState(initial.description);
-  const [recurrence, setRecurrence] = useState<RecurrenceState>(
-    initial.recurrence
+/** The header's measurements — the month header's bar, scaled to a sheet. */
+const Bar = {
+  paddingHorizontal: Spacing.four - Spacing.one,
+  paddingTop: Spacing.two,
+  paddingBottom: Spacing.three - Spacing.one,
+  titleSize: 20,
+  titleLineRatio: 1.3,
+  subtitleSize: 12,
+  labelGap: Spacing.half,
+} as const;
+
+/** Days an all-day event covers, inclusive of both ends; 1 for a single day. */
+function spanDays(startDay: string, endDay: string): number {
+  const start = parseDay(startDay);
+  const end = parseDay(endDay);
+  if (!start || !end) return 1;
+  return Math.max(
+    1,
+    Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1
   );
-  const [alarm, setAlarm] = useState<AlarmState>(initial.alarm);
-  const [lastValidDay, setLastValidDay] = useState(initial.startDay);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [alarmHint, setAlarmHint] = useState<string | null>(null);
-  // Create-only: the calendars to choose from and the selected write target.
-  const [calendars, setCalendars] = useState<CalendarChoice[]>([]);
-  const [calendarUrl, setCalendarUrl] = useState<string | undefined>(undefined);
+}
 
-  useEffect(() => {
-    // Load the calendar list for the create picker, defaulting the selection to
-    // the primary calendar. On failure the picker just doesn't show and the
-    // create falls back to the default calendar (createEvent handles undefined).
-    if (event) return;
-    let alive = true;
-    Promise.all([listCalendars(), defaultCalendarUrl()])
-      .then(([list, url]) => {
-        if (!alive) return;
-        setCalendars(list);
-        setCalendarUrl(url);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [event]);
-
-  function refreshAlarmHint() {
-    // Best-effort — the alarm still saves to the event either way.
-    notificationsBlocked()
-      .then((blocked) =>
-        setAlarmHint(
-          blocked
-            ? "Notifications are off — reminders won't ring on this device."
-            : null
-        )
-      )
-      .catch(() => {});
+/** The header's second line: what kind of edit this is, and when the event
+ *  runs — read live from the fields, so it doubles as a summary of them. */
+function whenLabel(editor: EventEditorController): string {
+  const mode = editor.event ? 'Edit event' : 'New event';
+  if (editor.allDay) {
+    const days = spanDays(editor.startDay, editor.endDay);
+    return days > 1 ? `${mode} · All day · ${days} days` : `${mode} · All day`;
   }
+  const sameDay = editor.endDay === editor.startDay;
+  const end = sameDay
+    ? editor.endTime
+    : `${dayLabel(editor.endDay)} ${editor.endTime}`;
+  return `${mode} · ${editor.startTime} – ${end}`;
+}
 
-  const prefilledAlarm = initial.alarm.kind === 'set';
-  useEffect(() => {
-    if (prefilledAlarm) refreshAlarmHint();
-  }, [prefilledAlarm]);
+/**
+ * The date-as-title header: the month header's idiom (accent ink, bold, on
+ * the black header ground), with a live line under it summarising the event's
+ * timing. Shells pin it above the scrolling fields.
+ */
+export function EventEditorHeader({
+  editor,
+}: {
+  editor: EventEditorController;
+}) {
+  return (
+    <View style={styles.header}>
+      <ThemedText style={styles.headerTitle} testID="editor-title">
+        {dayLabel(editor.headerDay)}
+      </ThemedText>
+      <ThemedText style={styles.headerSubtitle} numberOfLines={1}>
+        {whenLabel(editor)}
+      </ThemedText>
+    </View>
+  );
+}
 
-  const inputStyle = [
-    styles.input,
-    { color: theme.text, fontFamily: Fonts.sans },
-  ];
-  const placeholderColor = theme.textSecondary;
+type FieldsProps = {
+  editor: EventEditorController;
+  /** Sheet shell passes BottomSheetTextInput for keyboard-aware inputs. */
+  TextInputComponent?: ComponentType<TextInputProps>;
+  /** The title input, for a shell that focuses it itself (the sheet, once
+   *  it has settled — focusing during the slide-in raises the keyboard
+   *  mid-animation and, on web, scrolls the modal host off its bottom). */
+  titleRef?: Ref<TextInput>;
+  /** Focus the title on mount — the dialog shell, which does not move. */
+  autoFocusTitle?: boolean;
+  /** A field at the tail of the form (location, notes) took focus — the
+   *  sheet scrolls it out from under the keyboard. */
+  onFocusTail?: () => void;
+};
 
-  /** Start moved — keep the event's duration by shifting the end with it. */
-  function moveStart(nextDay: string, nextTime: string) {
-    if (parseDay(nextDay)) setLastValidDay(nextDay);
-    if (allDay) {
-      const oldStart = parseDay(startDay);
-      const oldEnd = parseDay(endDay);
-      if (oldStart && oldEnd && parseDay(nextDay)) {
-        const days = Math.round(
-          (oldEnd.getTime() - oldStart.getTime()) / 86_400_000
-        );
-        setEndDay(addDays(nextDay, Math.max(0, days)));
-      }
-      setStartDay(nextDay);
-      return;
-    }
-    const oldStart = parseDayTime(startDay, startTime);
-    const oldEnd = parseDayTime(endDay, endTime);
-    const newStart = parseDayTime(nextDay, nextTime);
-    if (oldStart && oldEnd && newStart) {
-      const newEnd = new Date(
-        newStart.getTime() + (oldEnd.getTime() - oldStart.getTime())
-      );
-      setEndDay(toDateString(newEnd));
-      setEndTime(toTimeString(newEnd));
-    }
-    setStartDay(nextDay);
-    setStartTime(nextTime);
-  }
-
-  function resolveTimes(): { start: Date; end: Date } | null {
-    if (allDay) {
-      const start = parseDay(startDay);
-      const end = parseDay(endDay);
-      if (!start || !end || end < start) return null;
-      return { start, end }; // inclusive end; the ICS layer writes DTEND +1d
-    }
-    const start = parseDayTime(startDay, startTime);
-    const end = parseDayTime(endDay, endTime);
-    if (!start || !end || end <= start) return null;
-    return { start, end };
-  }
-
-  /** RecurrenceInput for the write, null for none, or a validation problem. */
-  function resolveRecurrence(): RecurrenceInput | null | { error: string } {
-    if (recurrence.kind !== 'preset') return null;
-    const input: RecurrenceInput = { preset: recurrence.preset };
-    if (recurrence.end.type === 'until') {
-      const until = parseDay(recurrence.end.day);
-      if (!until) return { error: 'Pick a repeat end date' };
-      if (recurrence.end.day < startDay)
-        return { error: 'Repeat end is before the start' };
-      input.until = until;
-    } else if (recurrence.end.type === 'count') {
-      if (!Number.isInteger(recurrence.end.n) || recurrence.end.n < 1)
-        return { error: 'Repeat count must be at least 1' };
-      input.count = recurrence.end.n;
-    }
-    return input;
-  }
-
-  async function save() {
-    const trimmed = summary.trim();
-    if (!trimmed) {
-      setProblem('Title is required');
-      return;
-    }
-    const times = resolveTimes();
-    if (!times) {
-      setProblem(
-        allDay ? 'End date is before the start' : 'End must be after the start'
-      );
-      return;
-    }
-    const rec = resolveRecurrence();
-    if (rec && 'error' in rec) {
-      setProblem(rec.error);
-      return;
-    }
-    const alarmInput: AlarmInput | null =
-      alarm.kind === 'set' ? { offsetMinutes: alarm.offsetMinutes } : null;
-
-    setBusy(true);
-    setProblem(null);
-    try {
-      if (!event) {
-        await createEvent(
-          {
-            summary: trimmed,
-            ...times,
-            allDay,
-            location: location.trim() || undefined,
-            description: description.trim() || undefined,
-            ...(rec ? { recurrence: rec } : {}),
-            ...(alarmInput ? { alarm: alarmInput } : {}),
-          },
-          calendarUrl
-        );
-        onDone('created');
-        return;
-      }
-
-      // Diff-based changes: untouched fields stay byte-identical in the ICS
-      // (keeps Apple TZID DTSTARTs — and foreign RRULEs/VALARMs — intact).
-      const changes: EventChanges = {};
-      if (trimmed !== event.summary) changes.summary = trimmed;
-      if (location.trim() !== (event.location ?? ''))
-        changes.location = location.trim();
-      if (description.trim() !== (event.description ?? ''))
-        changes.description = description.trim();
-      const timesChanged =
-        allDay !== initial.allDay ||
-        startDay !== initial.startDay ||
-        endDay !== initial.endDay ||
-        (!allDay &&
-          (startTime !== initial.startTime || endTime !== initial.endTime));
-      if (timesChanged) {
-        changes.start = times.start;
-        changes.end = times.end;
-        changes.allDay = allDay;
-      }
-      if (
-        initial.recurrence.kind !== 'custom' &&
-        !recurEqual(recurrence, initial.recurrence)
-      ) {
-        changes.recurrence = rec;
-      }
-      if (
-        initial.alarm.kind !== 'foreign' &&
-        !alarmEqual(alarm, initial.alarm)
-      ) {
-        changes.alarm = alarmInput;
-      }
-
-      if (Object.keys(changes).length > 0) await updateEvent(event, changes);
-      onDone('updated');
-    } catch (err) {
-      if (err instanceof ConflictError) {
-        onDone('conflict');
-        return;
-      }
-      setBusy(false);
-      setProblem(err instanceof Error ? err.message : 'Save failed');
-    }
-  }
-
-  async function remove() {
-    if (!event) return;
-    setBusy(true);
-    setProblem(null);
-    try {
-      await deleteEvent(event);
-      onDone({ deleted: event });
-    } catch (err) {
-      if (err instanceof ConflictError) {
-        onDone('conflict');
-        return;
-      }
-      setBusy(false);
-      setProblem(err instanceof Error ? err.message : 'Delete failed');
-    }
-  }
-
-  const headerDay = parseDay(startDay) ? startDay : lastValidDay;
+/** Every field, in order. The scrolling part of the editor. */
+export function EventEditorFields({
+  editor,
+  TextInputComponent,
+  titleRef,
+  autoFocusTitle = false,
+  onFocusTail,
+}: FieldsProps) {
+  const theme = useTheme();
+  const {
+    event,
+    summary,
+    setSummary,
+    allDay,
+    setAllDay,
+    startDay,
+    startTime,
+    endDay,
+    endTime,
+    moveStart,
+    setEndDay,
+    setEndTime,
+    calendars,
+    calendarUrl,
+    setCalendarUrl,
+    headerDay,
+  } = editor;
 
   return (
-    <View style={styles.form} testID="event-editor">
-      <ThemedText type="subtitle" style={styles.title} testID="editor-title">
-        {dayLabel(headerDay)}
-      </ThemedText>
-
-      <TextInputComponent
-        style={inputStyle}
+    <View style={styles.fields}>
+      <TextField
+        ref={titleRef}
+        TextInputComponent={TextInputComponent}
+        style={styles.titleInput}
         value={summary}
         onChangeText={setSummary}
         placeholder="Title"
-        placeholderTextColor={placeholderColor}
-        autoFocus={!event}
+        autoFocus={autoFocusTitle}
+        returnKeyType="done"
+        submitBehavior="blurAndSubmit"
         testID="editor-summary"
       />
 
@@ -341,26 +169,7 @@ export function EventEditorForm({
         />
       )}
 
-      <View style={styles.row}>
-        <ThemedText type="small">All-day</ThemedText>
-        <Switch
-          value={allDay}
-          onValueChange={(next) => {
-            setAllDay(next);
-            // The alarm preset sets differ; an incompatible pick is cleared.
-            if (alarm.kind === 'set') setAlarm({ kind: 'none' });
-            if (parseDay(startDay) && endDay < startDay) setEndDay(startDay);
-          }}
-          trackColor={{ true: AccentColor }}
-          thumbColor={OnAccentColor}
-          testID="editor-all-day"
-        />
-      </View>
-
-      <View style={styles.field}>
-        <ThemedText type="small" themeColor="textSecondary">
-          Starts
-        </ThemedText>
+      <FieldRow label="Starts">
         <View style={styles.row}>
           <View style={styles.dateCell}>
             <DateField
@@ -379,12 +188,9 @@ export function EventEditorForm({
             </View>
           )}
         </View>
-      </View>
+      </FieldRow>
 
-      <View style={styles.field}>
-        <ThemedText type="small" themeColor="textSecondary">
-          Ends
-        </ThemedText>
+      <FieldRow label="Ends">
         <View style={styles.row}>
           <View style={styles.dateCell}>
             <DateField
@@ -404,62 +210,118 @@ export function EventEditorForm({
             </View>
           )}
         </View>
-      </View>
+      </FieldRow>
+
+      {/* A small right-aligned toggle under the times — the label is the
+          target too, so the row is easy to hit without being a bar. */}
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityState={{ checked: allDay }}
+        onPress={() => setAllDay(!allDay)}
+        hitSlop={6}
+        style={styles.switchRow}
+      >
+        <ThemedText type="small" style={styles.switchLabel}>
+          All-day
+        </ThemedText>
+        <Switch
+          value={allDay}
+          onValueChange={setAllDay}
+          trackColor={{ true: AccentColor, false: theme.backgroundSelected }}
+          thumbColor={allDay ? OnAccentColor : theme.textSecondary}
+          {...Platform.select({
+            web: { activeThumbColor: OnAccentColor },
+            default: {},
+          })}
+          style={styles.switch}
+          testID="editor-all-day"
+        />
+      </Pressable>
 
       <RecurrenceField
-        value={recurrence}
-        onChange={setRecurrence}
+        value={editor.recurrence}
+        onChange={editor.setRecurrence}
         startDay={headerDay}
         TextInputComponent={TextInputComponent}
         testID="editor-repeat"
       />
 
       <AlarmField
-        value={alarm}
-        onChange={(next) => {
-          setAlarm(next);
-          if (next.kind === 'set') {
-            // First alarm = the user gesture we ask POST_NOTIFICATIONS on.
-            requestPermissionIfNeeded()
-              .catch(() => {})
-              .finally(refreshAlarmHint);
-          }
-        }}
+        value={editor.alarm}
+        onChange={editor.setAlarm}
         allDay={allDay}
-        hint={alarmHint}
+        hint={editor.alarmHint}
         testID="editor-alert"
       />
 
       <LocationField
-        value={location}
-        onChange={setLocation}
-        style={inputStyle}
-        placeholderTextColor={placeholderColor}
+        value={editor.location}
+        onChange={editor.setLocation}
         TextInputComponent={TextInputComponent}
+        onFocus={onFocusTail}
         testID="editor-location"
       />
-      <TextInputComponent
-        style={[...inputStyle, styles.notes]}
-        value={description}
-        onChangeText={setDescription}
+
+      <TextField
+        TextInputComponent={TextInputComponent}
+        style={styles.notes}
+        value={editor.description}
+        onChangeText={editor.setDescription}
         placeholder="Notes"
-        placeholderTextColor={placeholderColor}
+        onFocus={onFocusTail}
         multiline
         testID="editor-notes"
       />
+    </View>
+  );
+}
 
+type ActionsProps = {
+  editor: EventEditorController;
+  onClose: () => void;
+  /** Extra room under the buttons — the sheet passes the gesture-bar inset. */
+  bottomInset?: number;
+};
+
+/**
+ * The action bar: Delete on the left (edit only), Cancel and Save on the
+ * right. A validation problem shows here, above the buttons, so it is in
+ * view at the moment Save is pressed rather than somewhere up the form.
+ */
+export function EventEditorActions({
+  editor,
+  onClose,
+  bottomInset = 0,
+}: ActionsProps) {
+  const theme = useTheme();
+  const { event, busy, problem, save, remove } = editor;
+  return (
+    <View
+      style={[
+        styles.actions,
+        {
+          backgroundColor: theme.background,
+          borderTopColor: DIVIDER,
+          paddingBottom: styles.actions.paddingVertical + bottomInset,
+        },
+      ]}
+    >
       {problem && (
-        <ThemedText type="small" style={{ color: DangerColor }}>
+        <ThemedText type="small" style={styles.problem} testID="editor-problem">
           {problem}
         </ThemedText>
       )}
-
-      <View style={styles.actions}>
+      <View style={styles.actionRow}>
         {event && (
           <Pressable
             onPress={remove}
             disabled={busy}
-            style={busy && styles.disabled}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.textButton,
+              pressed && { backgroundColor: theme.backgroundSelected },
+              busy && styles.disabled,
+            ]}
             testID="editor-delete"
           >
             <ThemedText type="smallBold" style={{ color: DangerColor }}>
@@ -471,7 +333,11 @@ export function EventEditorForm({
           <Pressable
             onPress={onClose}
             disabled={busy}
-            style={busy && styles.disabled}
+            style={({ pressed }) => [
+              styles.textButton,
+              pressed && { backgroundColor: theme.backgroundSelected },
+              busy && styles.disabled,
+            ]}
             testID="editor-cancel"
           >
             <ThemedText type="smallBold" themeColor="textSecondary">
@@ -481,7 +347,11 @@ export function EventEditorForm({
           <Pressable
             onPress={save}
             disabled={busy}
-            style={[styles.saveButton, busy && styles.disabled]}
+            style={({ pressed }) => [
+              styles.saveButton,
+              pressed && styles.saveButtonPressed,
+              busy && styles.disabled,
+            ]}
             testID="editor-save"
           >
             <ThemedText type="smallBold" style={styles.saveLabel}>
@@ -494,35 +364,49 @@ export function EventEditorForm({
   );
 }
 
+/** The rule above the action bar — the grid's and the widget's divider grey,
+ *  which reads on either scheme. */
+const DIVIDER = '#60646C';
+
+/** Every button in the action bar is this tall. */
+const BUTTON_HEIGHT = 36;
+
 const styles = StyleSheet.create({
-  form: {
-    padding: Spacing.four,
-    gap: Spacing.three,
+  header: {
+    backgroundColor: HEADER_GROUND,
+    paddingHorizontal: Bar.paddingHorizontal,
+    paddingTop: Bar.paddingTop,
+    paddingBottom: Bar.paddingBottom,
+    gap: Bar.labelGap,
   },
-  title: {
-    fontSize: 20,
-    lineHeight: 26,
-    color: BrandColor,
+  headerTitle: {
+    fontFamily: FontFamilyBold,
+    color: AccentColor,
+    fontSize: Bar.titleSize,
+    lineHeight: Math.round(Bar.titleSize * Bar.titleLineRatio),
   },
-  input: {
-    borderRadius: Spacing.one,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    fontSize: 16,
-    backgroundColor: 'rgba(128,128,128,0.15)',
+  headerSubtitle: {
+    color: AccentColor,
+    fontSize: Bar.subtitleSize,
+    lineHeight: Bar.subtitleSize + 4,
+  },
+  fields: {
+    paddingHorizontal: Bar.paddingHorizontal,
+    paddingTop: Spacing.three - Spacing.half,
+    paddingBottom: Spacing.two,
+    gap: Spacing.two + Spacing.half,
+  },
+  titleInput: {
+    minHeight: 40,
+    fontSize: 17,
   },
   notes: {
-    minHeight: 72,
     textAlignVertical: 'top',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
-  },
-  field: {
-    gap: Spacing.one,
+    gap: Spacing.two,
   },
   dateCell: {
     flex: 3,
@@ -530,26 +414,63 @@ const styles = StyleSheet.create({
   timeCell: {
     flex: 2,
   },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: Spacing.two,
+    marginTop: -Spacing.one,
+  },
+  switchLabel: {
+    fontSize: 13,
+    lineHeight: 16,
+  },
+  switch: {
+    // The native track is a generous 48×24 on Android; 3/4 of that sits
+    // level with the 13pt label without changing its hit area.
+    transform: [{ scale: Platform.OS === 'web' ? 1 : 0.8 }],
+    marginVertical: -4,
+  },
   actions: {
+    paddingHorizontal: Bar.paddingHorizontal,
+    paddingVertical: Spacing.two,
+    gap: Spacing.two,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  problem: {
+    color: DangerColor,
+  },
+  actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: Spacing.two,
+    gap: Spacing.one + Spacing.half,
   },
   actionsRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.four,
+    gap: Spacing.one + Spacing.half,
     marginLeft: 'auto',
   },
+  textButton: {
+    minHeight: BUTTON_HEIGHT,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.one,
+  },
   saveButton: {
+    minHeight: BUTTON_HEIGHT,
+    justifyContent: 'center',
     backgroundColor: AccentColor,
     borderRadius: Spacing.one,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.four - Spacing.half,
+  },
+  saveButtonPressed: {
+    opacity: 0.85,
   },
   saveLabel: {
     color: OnAccentColor,
+    fontFamily: FontFamilyBold,
   },
   disabled: {
     opacity: 0.5,

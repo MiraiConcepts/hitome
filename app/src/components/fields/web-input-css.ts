@@ -13,15 +13,14 @@ export function ensureFieldCss(): void {
 .hitome-field-input {
   appearance: none;
   -webkit-appearance: none;
-  border: none;
   cursor: pointer;
+  outline: none;
 }
 .hitome-field-input::-webkit-calendar-picker-indicator {
   display: none;
 }
 .hitome-field-input:focus-visible {
-  outline: 2px solid ${AccentColor};
-  outline-offset: -2px;
+  border-color: ${AccentColor};
 }
 `;
   document.head.appendChild(style);

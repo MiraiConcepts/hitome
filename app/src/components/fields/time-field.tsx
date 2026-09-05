@@ -2,7 +2,7 @@
 // Geometry/behavior twin: time-field.web.tsx (DOM <input type="time">).
 import { Host, TimePickerDialog } from '@expo/ui/jetpack-compose';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text } from 'react-native';
 
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -19,8 +19,17 @@ export function TimeField({ value, onChange, testID }: TimeFieldProps) {
       <Pressable
         testID={testID}
         accessibilityRole="button"
-        onPress={() => setOpen(true)}
-        style={styles.field}
+        onPress={() => {
+          Keyboard.dismiss();
+          setOpen(true);
+        }}
+        style={({ pressed }) => [
+          styles.field,
+          {
+            borderColor: theme.backgroundSelected,
+            backgroundColor: pressed ? theme.backgroundSelected : 'transparent',
+          },
+        ]}
       >
         <Text style={[styles.value, { color: theme.text }]}>{value}</Text>
       </Pressable>
@@ -49,6 +58,7 @@ export function TimeField({ value, onChange, testID }: TimeFieldProps) {
 const styles = StyleSheet.create({
   field: {
     ...FieldChrome,
+    justifyContent: 'center',
   },
   value: {
     fontSize: FieldChrome.fontSize,

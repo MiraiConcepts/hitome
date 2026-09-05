@@ -39,9 +39,11 @@ export function DateField({
       }}
       style={{
         borderRadius: FieldChrome.borderRadius,
+        border: `${FieldChrome.borderWidth}px solid ${theme.backgroundSelected}`,
         padding: `${FieldChrome.paddingVertical}px ${FieldChrome.paddingHorizontal}px`,
+        minHeight: FieldChrome.minHeight,
         fontSize: FieldChrome.fontSize,
-        backgroundColor: FieldChrome.backgroundColor,
+        backgroundColor: 'transparent',
         color: theme.text,
         fontFamily: Fonts.sans,
         // Flips the browser picker popup + glyphs to the app's scheme.

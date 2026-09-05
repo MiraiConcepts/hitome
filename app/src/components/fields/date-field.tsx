@@ -2,7 +2,7 @@
 // Geometry/behavior twin: date-field.web.tsx (DOM <input type="date">).
 import { DatePickerDialog, Host } from '@expo/ui/jetpack-compose';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text } from 'react-native';
 
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -42,8 +42,19 @@ export function DateField({
       <Pressable
         testID={testID}
         accessibilityRole="button"
-        onPress={() => setOpen(true)}
-        style={styles.field}
+        onPress={() => {
+          // The dialog is its own window; a keyboard left up from a text
+          // field would sit under it and come back in the way after.
+          Keyboard.dismiss();
+          setOpen(true);
+        }}
+        style={({ pressed }) => [
+          styles.field,
+          {
+            borderColor: theme.backgroundSelected,
+            backgroundColor: pressed ? theme.backgroundSelected : 'transparent',
+          },
+        ]}
       >
         <Text style={[styles.value, { color: theme.text }]}>
           {pretty(value)}
@@ -76,6 +87,7 @@ export function DateField({
 const styles = StyleSheet.create({
   field: {
     ...FieldChrome,
+    justifyContent: 'center',
   },
   value: {
     fontSize: FieldChrome.fontSize,

@@ -29,9 +29,11 @@ export function TimeField({ value, onChange, testID }: TimeFieldProps) {
       }}
       style={{
         borderRadius: FieldChrome.borderRadius,
+        border: `${FieldChrome.borderWidth}px solid ${theme.backgroundSelected}`,
         padding: `${FieldChrome.paddingVertical}px ${FieldChrome.paddingHorizontal}px`,
+        minHeight: FieldChrome.minHeight,
         fontSize: FieldChrome.fontSize,
-        backgroundColor: FieldChrome.backgroundColor,
+        backgroundColor: 'transparent',
         color: theme.text,
         fontFamily: Fonts.sans,
         colorScheme: scheme,

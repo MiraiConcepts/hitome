@@ -20,11 +20,22 @@ export type TimeFieldProps = {
   testID?: string;
 };
 
-/** Mirrors the editor's input chrome (event-editor styles.input). */
+/**
+ * The editor's field geometry — text inputs, date/time chips and the repeat
+ * count share it, so every box in the form is the same height and radius.
+ * Outlined, not filled: a 1px rule in the raised surface color
+ * (`backgroundSelected`, applied by each field from `useTheme`) on the
+ * sheet's own ground, turning accent on focus. Compact on purpose — 36pt
+ * boxes keep a new event on one screen without scrolling.
+ */
 export const FieldChrome = {
   borderRadius: Spacing.one,
-  paddingHorizontal: Spacing.three,
-  paddingVertical: Spacing.two,
-  fontSize: 16,
-  backgroundColor: 'rgba(128,128,128,0.15)',
+  borderWidth: 1,
+  paddingHorizontal: Spacing.three - Spacing.one,
+  paddingVertical: Spacing.one + Spacing.half,
+  minHeight: 36,
+  fontSize: 15,
 } as const;
+
+/** The label column beside a row of controls ("Starts", "Repeat"). */
+export const LabelColumnWidth = 52;

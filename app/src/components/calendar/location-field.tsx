@@ -7,16 +7,17 @@ import {
   type TextInputProps,
 } from 'react-native';
 
+import { TextField } from '@/components/fields/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useLocationSearch } from '@/hooks/use-location-search';
+import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
   value: string;
   onChange: (next: string) => void;
-  style?: TextInputProps['style'];
-  placeholderTextColor?: TextInputProps['placeholderTextColor'];
   TextInputComponent?: ComponentType<TextInputProps>;
+  onFocus?: () => void;
   testID?: string;
 };
 
@@ -28,11 +29,11 @@ type Props = {
 export function LocationField({
   value,
   onChange,
-  style,
-  placeholderTextColor,
   TextInputComponent = TextInput,
+  onFocus,
   testID,
 }: Props) {
+  const theme = useTheme();
   const [focused, setFocused] = useState(false);
   // The prefilled value counts as picked — no queries until the user types.
   const [picked, setPicked] = useState<string | null>(value || null);
@@ -40,17 +41,21 @@ export function LocationField({
 
   return (
     <View style={styles.column}>
-      <TextInputComponent
-        style={style}
+      <TextField
+        TextInputComponent={TextInputComponent}
         value={value}
         onChangeText={(next) => {
           setPicked(null);
           onChange(next);
         }}
-        onFocus={() => setFocused(true)}
+        onFocus={() => {
+          setFocused(true);
+          onFocus?.();
+        }}
         onBlur={() => setFocused(false)}
         placeholder="Location"
-        placeholderTextColor={placeholderTextColor}
+        returnKeyType="done"
+        submitBehavior="blurAndSubmit"
         testID={testID}
       />
       {suggestions.length > 0 && (
@@ -61,7 +66,14 @@ export function LocationField({
           {suggestions.map((label) => (
             <Pressable
               key={label}
-              style={styles.item}
+              style={({ pressed }) => [
+                styles.item,
+                {
+                  backgroundColor: pressed
+                    ? theme.backgroundSelected
+                    : theme.backgroundElement,
+                },
+              ]}
               // onPressIn beats the input's blur — a tap can't lose the race
               // against the suggestion list unmounting.
               onPressIn={() => {
@@ -69,7 +81,9 @@ export function LocationField({
                 onChange(label);
               }}
             >
-              <ThemedText type="small">{label}</ThemedText>
+              <ThemedText type="small" numberOfLines={2}>
+                {label}
+              </ThemedText>
             </Pressable>
           ))}
           <ThemedText type="code" themeColor="textSecondary">
@@ -83,17 +97,14 @@ export function LocationField({
 
 const styles = StyleSheet.create({
   column: {
-    gap: Spacing.one,
+    gap: Spacing.two,
   },
   list: {
     gap: Spacing.one,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
   },
   item: {
-    paddingVertical: Spacing.one + Spacing.half,
-    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
     borderRadius: Spacing.one,
-    backgroundColor: 'rgba(128,128,128,0.10)',
   },
 });
