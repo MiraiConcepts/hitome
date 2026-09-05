@@ -184,8 +184,19 @@ export function EventEditorSheet({
 
   // The library leaves the Android back button to us (predictive back is off
   // in app.json, so BackHandler is reliable).
+  //
+  // Claiming the press unconditionally swallowed every one that landed during
+  // the dismiss animation: `dismiss()` on a sheet already on its way out is a
+  // no-op, and this handler stays mounted until onDismiss unmounts it. Backing
+  // out at thumb speed — press to close the sheet, press again to leave —
+  // therefore ate the second press, and the app appeared to ignore the back
+  // button for a beat. Only the press that starts the dismissal is ours; once
+  // it is running, later presses fall through to the system and exit.
+  const dismissing = useRef(false);
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (dismissing.current) return false;
+      dismissing.current = true;
       sheetRef.current?.dismiss();
       return true;
     });
@@ -199,7 +210,11 @@ export function EventEditorSheet({
       // A new event starts in the title — once the sheet has settled, so the
       // keyboard rises under a resting sheet rather than a moving one.
       onChange={(index) => {
-        if (index < 0 || event || focusedTitle.current) return;
+        if (index < 0) return;
+        // Settled open again — a dismissal that did not take (a pan-down let
+        // go short of the threshold). Back is ours once more.
+        dismissing.current = false;
+        if (event || focusedTitle.current) return;
         focusedTitle.current = true;
         titleRef.current?.focus();
       }}
