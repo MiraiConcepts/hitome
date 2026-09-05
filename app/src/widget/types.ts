@@ -7,6 +7,11 @@ import type { EventIcon } from '@/caldav/types';
 
 /** One upcoming event as the widget renders it. */
 export type WidgetEvent = {
+  /** CalEvent.id — `uid:occurrenceStart`, so an occurrence of a series is
+   *  distinguishable from its siblings. Carried so a tapped row can deep-link
+   *  to the event itself rather than to its month; the app re-reads the server
+   *  before trusting it, since this snapshot can be half an hour old. */
+  id: string;
   summary: string;
   /** ISO timestamp. */
   start: string;

@@ -39,6 +39,7 @@ export function toWidgetEvent(e: CalEvent): WidgetEvent {
   const meetingLink = findMeetingLink(e);
   const plainLink = e.link ? normalizeLink(e.link) : undefined;
   return {
+    id: e.id,
     summary: e.summary,
     start: e.start.toISOString(),
     end: e.end.toISOString(),

@@ -13,6 +13,7 @@ const ev = (
   start: Date,
   overrides: Partial<WidgetEvent> = {}
 ): WidgetEvent => ({
+  id: `x:${start.toISOString()}`,
   summary: 'x',
   start: start.toISOString(),
   end: new Date(start.getTime() + 3_600_000).toISOString(),

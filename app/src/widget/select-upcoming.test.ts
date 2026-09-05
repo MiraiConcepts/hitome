@@ -96,6 +96,7 @@ describe('toWidgetEvent', () => {
       new Date(Date.UTC(2026, 6, 8, 5, 0))
     );
     expect(toWidgetEvent({ ...event, location: 'Lau Pa Sat' })).toEqual({
+      id: 'lunch:2026-07-08T04:00:00.000Z',
       summary: 'lunch',
       start: '2026-07-08T04:00:00.000Z',
       end: '2026-07-08T05:00:00.000Z',

@@ -1,4 +1,3 @@
-import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -29,6 +28,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { davConfigured } from '@/config';
 import { AccentColor, Colors, Spacing } from '@/constants/theme';
+import { useDeepLink } from '@/hooks/use-deep-link';
 import { useMonthEvents } from '@/hooks/use-month-events';
 import type { MonthAnchor } from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
@@ -40,6 +40,18 @@ type EditorState =
   | { mode: 'edit'; event: CalEvent };
 
 type Snack = { message: string; undo?: CalEvent } | null;
+
+/** A widget row tapped and not yet resolved: the id to look for, the day to
+ *  fall back to, and the freshness stamp that was current when the tap landed.
+ *  A miss only means "gone" once that stamp has moved — i.e. the server has
+ *  answered since. Comparing stamps rather than clocks keeps this pure and is
+ *  the more precise question anyway. */
+type PendingEvent = { id: string; day: string; since: Date | null } | null;
+
+/** How long to wait for a fetch before treating a widget-tapped event as gone.
+ *  Off the tailnet nothing will ever land, and hanging on an unresolved tap is
+ *  worse than showing the day. */
+const RESOLVE_TIMEOUT_MS = 6_000;
 
 function monthOfDay(day: string | null, fallback: Date): MonthAnchor {
   const date = (day ? parseDay(day) : null) ?? fallback;
@@ -55,11 +67,12 @@ export function MonthScreen() {
   const today = toDateString(new Date());
 
   // Widget deep links: `?day=YYYY-MM-DD` lands the grid on that day's month;
+  // `?event=<id>` additionally opens that event once a fetch has landed;
   // `?new=` (a nonce so repeat taps re-fire) opens the new-event editor.
-  const params = useLocalSearchParams<{ day?: string; new?: string }>();
-  const dayParam =
-    typeof params.day === 'string' && parseDay(params.day) ? params.day : null;
-  const newParam = typeof params.new === 'string' ? params.new : null;
+  const link = useDeepLink();
+  const dayParam = link.day && parseDay(link.day) ? link.day : null;
+  const eventParam = link.event;
+  const newParam = link.new;
 
   const bottomInset = Platform.select({
     web: Spacing.four,
@@ -132,6 +145,25 @@ export function MonthScreen() {
     gridRef.current?.scrollToMonth(target.year, target.month0, false);
   }, [pendingScrollDay, gridSize]);
 
+  // A tapped widget row carries the event's id alongside its day. The widget's
+  // snapshot can be half an hour old, so the id is not trusted on sight: it is
+  // matched against the month's events, and only declared gone once the server
+  // has answered since the tap (or has clearly stopped answering). Gone means
+  // the day's list — "here is what is actually on that day" is the honest reply
+  // to a tap on something that no longer exists.
+  const [pendingEvent, setPendingEvent] = useState<PendingEvent>(() =>
+    eventParam && dayParam
+      ? { id: eventParam, day: dayParam, since: null }
+      : null
+  );
+  /** The day a widget tap landed on, waiting for the grid to be visible before
+   *  it is flashed. */
+  const [arrivedDay, setArrivedDay] = useState<string | null>(null);
+  /** What the grid should flash, and a nonce so the same day can flash twice. */
+  const [pulse, setPulse] = useState<{ day: string; nonce: number } | null>(
+    null
+  );
+
   const monthDate = useMemo(
     () => new Date(month.year, month.month0, 1),
     [month]
@@ -142,6 +174,55 @@ export function MonthScreen() {
   );
   const { events, loading, error, refresh, fetchedAt } =
     useMonthEvents(settledDate);
+
+  // A widget row's id, resolved against the month's events — reconciled during
+  // render like the other deep links above, not in an effect.
+  const [handledEventParam, setHandledEventParam] = useState(eventParam);
+  if (eventParam && eventParam !== handledEventParam) {
+    setHandledEventParam(eventParam);
+    if (dayParam) {
+      setPendingEvent({ id: eventParam, day: dayParam, since: fetchedAt });
+    }
+  }
+  if (pendingEvent) {
+    const match = events.find((event) => event.id === pendingEvent.id);
+    if (match) {
+      // No flash here: the editor names the day in its own title, and you are
+      // looking at the very thing you tapped. Flashing on dismissal answers a
+      // question nobody asked.
+      setPendingEvent(null);
+      setEditor({ mode: 'edit', event: match });
+    } else if (fetchedAt !== pendingEvent.since) {
+      // Missing is not yet gone — the month may simply not have loaded. Only a
+      // fetch that landed since the tap settles it, and this one has.
+      setPendingEvent(null);
+      setArrivedDay(pendingEvent.day);
+      setPopoverDay(pendingEvent.day);
+    }
+  }
+
+  // Nothing may ever land — off the tailnet the fetch never answers, and
+  // sitting on an unresolved tap is worse than showing the day.
+  useEffect(() => {
+    if (!pendingEvent) return;
+    const timer = setTimeout(() => {
+      setPendingEvent(null);
+      setArrivedDay(pendingEvent.day);
+      setPopoverDay(pendingEvent.day);
+    }, RESOLVE_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [pendingEvent]);
+
+  // Flash the day only when the tapped event turned out to be gone — the one
+  // case where what opened is not what was asked for, so the day is worth
+  // pointing at. Held until the grid is actually visible: firing it under the
+  // popover would spend the whole animation behind it. Reads the pre-update
+  // popover, so the render that opens one does not also flash beneath it.
+  const overlayOpen = editor.mode !== 'closed' || popoverDay !== null;
+  if (arrivedDay && !overlayOpen) {
+    setPulse((prev) => ({ day: arrivedDay, nonce: (prev?.nonce ?? 0) + 1 }));
+    setArrivedDay(null);
+  }
 
   // Auto-dismiss the snackbar.
   useEffect(() => {
@@ -260,14 +341,12 @@ export function MonthScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      {/* Bottom included: the grid fills its pane exactly, so without it the
-          last week row ran under the gesture bar and the days in it were half
-          readable. The snackbar and the version badge sit outside this and
-          apply the inset themselves, so nothing here doubles up. */}
-      <SafeAreaView
-        style={styles.safeArea}
-        edges={['top', 'left', 'right', 'bottom']}
-      >
+      {/* No bottom edge: the grid runs to the screen's bottom and the last row
+          sits under the gesture bar, which is the trade taken deliberately —
+          insetting it cost every row height and shortened every scroll. The
+          snackbar and the version badge sit outside this and apply the inset
+          themselves, so they stay clear of the bar regardless. */}
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <View style={styles.content}>
           <MonthHeader
             label={monthLabel}
@@ -332,6 +411,7 @@ export function MonthScreen() {
                 onMonthChange={onMonthChange}
                 onMonthSettled={onMonthSettled}
                 onAnchored={onGridAnchored}
+                pulse={pulse}
                 onOpenDay={onOpenDay}
                 onPressEvent={onPressEvent}
                 onCreateOnDay={onCreateOnDay}

@@ -196,7 +196,12 @@ function EventRow({
   return (
     <FlexWidget
       clickAction="OPEN_URI"
-      clickActionData={{ uri: `app:///?day=${day}` }}
+      // The event AND its day: the app opens the event when the id still
+      // resolves against a fresh fetch, and falls back to the day's list when
+      // it does not — which is the truthful answer, since the event is gone.
+      clickActionData={{
+        uri: `app:///?day=${day}&event=${encodeURIComponent(event.id)}`,
+      }}
       style={{
         width: 'match_parent',
         flexDirection: 'column',

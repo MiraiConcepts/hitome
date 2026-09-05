@@ -11,6 +11,8 @@ import { BootScreen } from '@/components/boot-screen';
 import { VersionBadge } from '@/components/version-badge';
 import { useAlarmReconcile } from '@/hooks/use-alarm-reconcile';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { DeepLinkProvider } from '@/hooks/use-deep-link';
+import { useDeepLinkSource } from '@/hooks/use-deep-link-source';
 import { useHydrated } from '@/hooks/use-hydrated';
 import { useSilentReload } from '@/hooks/use-silent-reload';
 import { refreshAgendaWidget } from '@/widget/app-refresh';
@@ -24,6 +26,7 @@ export default function RootLayout() {
     Satoshi_bold: require('../../assets/fonts/Satoshi_bold.otf'),
   });
   const hydrated = useHydrated();
+  const { link, ready: linkReady } = useDeepLinkSource();
   useSilentReload();
   useAlarmReconcile();
   useEffect(() => {
@@ -41,7 +44,9 @@ export default function RootLayout() {
   // bottom-sheet vs centered-dialog form from that width) and fonts (no
   // Satoshi swap mid-boot). fontError falls through so a failed font load
   // degrades to fallback fonts instead of a stuck spinner.
-  const ready = hydrated && (fontsLoaded || !!fontError);
+  // linkReady joins the gate because the screen seeds state from the link: a
+  // render before it lands opens the wrong event, not merely the wrong frame.
+  const ready = hydrated && linkReady && (fontsLoaded || !!fontError);
   return (
     // Required by react-native-gesture-handler (canvas pan/pinch) on every
     // platform, web included — gestures aren't recognized outside this view.
@@ -51,10 +56,10 @@ export default function RootLayout() {
             the router content. */}
         <BottomSheetModalProvider>
           {ready ? (
-            <>
+            <DeepLinkProvider value={link}>
               <Slot />
               <VersionBadge />
-            </>
+            </DeepLinkProvider>
           ) : (
             <BootScreen />
           )}
