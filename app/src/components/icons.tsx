@@ -4,7 +4,12 @@
 // (`size`, `color`) to keep call sites simple.
 import { SvgXml } from 'react-native-svg';
 
-import { AddOutlineBody, RefreshOutlineBody } from '@/constants/icon-paths';
+import {
+  AddOutlineBody,
+  ChevronLeftOutlineBody,
+  RefreshOutlineBody,
+  SettingsOutlineBody,
+} from '@/constants/icon-paths';
 
 type IconProps = { size?: number; color: string };
 
@@ -20,4 +25,12 @@ export function RefreshIcon({ size = 24, color }: IconProps) {
 
 export function AddIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(AddOutlineBody, size, color)} />;
+}
+
+export function SettingsIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(SettingsOutlineBody, size, color)} />;
+}
+
+export function ChevronLeftIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(ChevronLeftOutlineBody, size, color)} />;
 }

@@ -4,8 +4,16 @@
 // would route through a third-party push service). Android is the real
 // delivery path. Geometry/behavior twin: scheduler.ts.
 import { ALARM_ID_PREFIX, type DesiredAlarm } from './occurrences';
+import type { PermissionSnapshot } from './status';
 
 const CHECK_MS = 30_000;
+
+/** Named for the twin's channel; web has no channels, so this is diagnostics
+ *  copy only. */
+export const CHANNEL_ID = 'browser';
+
+/** The web test fires at once — there is no background delivery to wait for. */
+export const TEST_DELAY_SECONDS = 0;
 
 const scheduled = new Map<string, DesiredAlarm>();
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -54,6 +62,33 @@ export async function requestPermissionIfNeeded(): Promise<void> {
 
 export async function notificationsBlocked(): Promise<boolean> {
   return !supported() || Notification.permission === 'denied';
+}
+
+export async function permissionSnapshot(): Promise<PermissionSnapshot> {
+  if (!supported())
+    return { supported: false, granted: false, canAskAgain: false };
+  const permission = Notification.permission;
+  return {
+    supported: true,
+    granted: permission === 'granted',
+    // 'default' is the only state a prompt can still be raised from.
+    canAskAgain: permission === 'default',
+  };
+}
+
+/** Immediate, for the same reason the scheduler is a timer: there is nothing
+ *  to wake, so nothing is proven by delaying it. */
+export async function sendTestNotification(): Promise<void> {
+  await ensureSetup();
+  if (!supported() || Notification.permission !== 'granted') return;
+  try {
+    new Notification('hitome', {
+      body: 'Test notification — reminders can ring in this tab.',
+      tag: 'test-notification',
+    });
+  } catch {
+    // ServiceWorker-only browsers — same silence as checkDue().
+  }
 }
 
 export async function listScheduledAlarmIds(): Promise<string[]> {

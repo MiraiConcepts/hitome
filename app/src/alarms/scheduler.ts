@@ -6,8 +6,16 @@
 import * as Notifications from 'expo-notifications';
 
 import { ALARM_ID_PREFIX, type DesiredAlarm } from './occurrences';
+import type { PermissionSnapshot } from './status';
 
-const CHANNEL_ID = 'event-alarms';
+export const CHANNEL_ID = 'event-alarms';
+
+/** The test notification's id — deliberately outside ALARM_ID_PREFIX so a
+ *  reconcile can never mistake it for a stale reminder and cancel it. */
+const TEST_ID = 'test-notification';
+
+/** How far out the test fires, so the app can be backgrounded to watch it. */
+export const TEST_DELAY_SECONDS = 5;
 
 let setupDone = false;
 
@@ -42,6 +50,38 @@ export async function requestPermissionIfNeeded(): Promise<void> {
 export async function notificationsBlocked(): Promise<boolean> {
   const status = await Notifications.getPermissionsAsync();
   return !status.granted && !status.canAskAgain;
+}
+
+/** Raw permission state for the settings screen's status row. */
+export async function permissionSnapshot(): Promise<PermissionSnapshot> {
+  const status = await Notifications.getPermissionsAsync();
+  return {
+    supported: true,
+    granted: status.granted,
+    canAskAgain: status.canAskAgain,
+  };
+}
+
+/**
+ * One-off notification a few seconds out — the only way to prove from inside
+ * the app that the channel, the permission and AlarmManager all line up. Goes
+ * through the same channel and trigger type as a real reminder, so a test that
+ * rings means reminders can ring.
+ */
+export async function sendTestNotification(): Promise<void> {
+  await ensureSetup();
+  await Notifications.scheduleNotificationAsync({
+    identifier: TEST_ID,
+    content: {
+      title: 'hitome',
+      body: 'Test notification — event reminders can ring on this device.',
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: new Date(Date.now() + TEST_DELAY_SECONDS * 1000),
+      channelId: CHANNEL_ID,
+    },
+  });
 }
 
 export async function listScheduledAlarmIds(): Promise<string[]> {

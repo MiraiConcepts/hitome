@@ -2,7 +2,7 @@ import '@/polyfills';
 
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Slot, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -57,7 +57,11 @@ export default function RootLayout() {
         <BottomSheetModalProvider>
           {ready ? (
             <DeepLinkProvider value={link}>
-              <Slot />
+              {/* A stack, not a Slot: settings is a pushed screen, so Android's
+                  back press and the browser's back button both pop it for free.
+                  No headers — every screen draws its own bar (the month view's
+                  is part of the calendar's chrome, not navigation furniture). */}
+              <Stack screenOptions={{ headerShown: false }} />
               <VersionBadge />
             </DeepLinkProvider>
           ) : (

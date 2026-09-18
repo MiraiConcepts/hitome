@@ -10,7 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { AddIcon, RefreshIcon } from '@/components/icons';
+import { AddIcon, RefreshIcon, SettingsIcon } from '@/components/icons';
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, FontFamilyBold, Spacing } from '@/constants/theme';
 import { agoLabel, longDayLabel } from '@/utils/date';
@@ -35,6 +35,7 @@ type Props = {
   onToday: () => void;
   onRefresh: () => void;
   onAdd: () => void;
+  onSettings: () => void;
 };
 
 /**
@@ -92,6 +93,7 @@ export function MonthHeader({
   onToday,
   onRefresh,
   onAdd,
+  onSettings,
 }: Props) {
   // The displayed label trails the prop through a directional slide-fade:
   // scrolling to a later month carries the old label up and out and the new
@@ -239,6 +241,15 @@ export function MonthHeader({
           <Animated.View style={spinStyle}>
             <RefreshIcon size={Bar.iconSize} color={AccentColor} />
           </Animated.View>
+        </Pressable>
+        <Pressable
+          testID="calendar-settings"
+          onPress={onSettings}
+          hitSlop={8}
+          style={styles.iconButton}
+          accessibilityLabel="Settings"
+        >
+          <SettingsIcon size={Bar.iconSize} color={AccentColor} />
         </Pressable>
       </View>
     </View>

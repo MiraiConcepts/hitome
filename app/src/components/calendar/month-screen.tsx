@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -359,6 +360,7 @@ export function MonthScreen() {
             onToday={goToday}
             onRefresh={onManualRefresh}
             onAdd={() => setEditor({ mode: 'create', day: today })}
+            onSettings={() => router.navigate('/settings')}
           />
 
           {error && (
