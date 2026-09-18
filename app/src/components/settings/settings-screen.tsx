@@ -6,6 +6,7 @@ import {
 } from 'react-native-safe-area-context';
 
 import { AboutSection } from '@/components/settings/about-section';
+import { CalendarsSection } from '@/components/settings/calendars-section';
 import { ConnectionSection } from '@/components/settings/connection-section';
 import { NotificationsSection } from '@/components/settings/notifications-section';
 import { SettingsHeader } from '@/components/settings/settings-parts';
@@ -41,6 +42,7 @@ export function SettingsScreen() {
           testID="settings-screen"
         >
           <ConnectionSection />
+          <CalendarsSection />
           <NotificationsSection />
           <AboutSection />
         </ScrollView>

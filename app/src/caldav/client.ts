@@ -1,5 +1,6 @@
 import { DAVClient, type DAVCalendar } from 'tsdav';
 
+import { ensureDefaultCalendar } from '@/config/calendar-pref';
 import type { DavConfig } from '@/config/dav-config';
 import { ensureDavConfig, subscribeDavConfig } from '@/config/dav-store';
 
@@ -11,16 +12,11 @@ import type { EventIcon } from './types';
 let clientPromise: Promise<DAVClient> | null = null;
 let calendarsPromise: Promise<DAVCalendar[]> | null = null;
 
-// The account's primary calendar: new events default here and it's the write
-// fallback. CalDAV/Radicale expose no "default calendar" flag, so match the
-// known display name and fall back to discovery order. Personal single-user
-// app — safe to hardcode; update here if the calendar is renamed server-side.
-const DEFAULT_CALENDAR_NAME = 'carrein-calendar';
-
-// Per-calendar marker glyph, by calendar name — the one place (with
-// DEFAULT_CALENDAR_NAME) that personal calendar identity is hardcoded. The
-// birthday calendar draws a gift instead of the generic sun.
-const CALENDAR_ICON: Record<string, EventIcon> = { 'carrein-birthday': 'gift' };
+// A calendar whose name says birthdays draws a gift instead of the generic
+// sun. Previously a map keyed on one person's calendar name
+// ('carrein-birthday'), which meant the glyph existed for exactly one server;
+// a name check works for anyone who named the calendar what it holds.
+const BIRTHDAY_NAME = /birthday/i;
 
 /**
  * A client for one connection. The login is optional: a reverse proxy that
@@ -102,7 +98,7 @@ export function getCalendars(): Promise<DAVCalendar[]> {
 }
 
 /** Human name for a calendar (tsdav types displayName as string | Record); falls
- *  back to the collection's URL tail (…/carrein-calendar/ → carrein-calendar). */
+ *  back to the collection's URL tail (…/personal/ → personal). */
 export function calendarName(calendar: DAVCalendar): string {
   const name = calendar.displayName;
   if (typeof name === 'string' && name.trim()) return name.trim();
@@ -121,22 +117,33 @@ export function calendarColor(calendar: DAVCalendar): string | undefined {
   return typeof color === 'string' && color.trim() ? color.trim() : undefined;
 }
 
-/** The calendar's marker glyph (CALENDAR_ICON), or undefined for the generic
- *  sun/repeat/alarm markers. */
+/** The calendar's marker glyph, or undefined for the generic sun/repeat/alarm
+ *  markers. */
 export function calendarIcon(calendar: DAVCalendar): EventIcon | undefined {
-  return CALENDAR_ICON[calendarName(calendar).toLowerCase()];
+  return BIRTHDAY_NAME.test(calendarName(calendar)) ? 'gift' : undefined;
 }
 
-function pickDefault(calendars: DAVCalendar[]): DAVCalendar {
-  const primary = calendars.find(
-    (c) => calendarName(c).toLowerCase() === DEFAULT_CALENDAR_NAME
-  );
-  return primary ?? calendars[0];
+function pickDefault(
+  calendars: DAVCalendar[],
+  preferred: string | null
+): DAVCalendar {
+  // CalDAV exposes no "default calendar" flag, so the choice is the app's:
+  // whatever was picked in settings, else discovery order.
+  const chosen = preferred
+    ? calendars.find((c) => c.url === preferred)
+    : undefined;
+  return chosen ?? calendars[0];
 }
 
-/** Default calendar for writes: the known primary by name, else discovery order. */
-export function getDefaultCalendar(): Promise<DAVCalendar> {
-  return getCalendars().then(pickDefault);
+/** Default calendar for writes: the one chosen in settings, else the first
+ *  discovered. A stored choice that no longer exists on the server (renamed,
+ *  deleted, different account) falls through to the same fallback. */
+export async function getDefaultCalendar(): Promise<DAVCalendar> {
+  const [calendars, preferred] = await Promise.all([
+    getCalendars(),
+    ensureDefaultCalendar(),
+  ]);
+  return pickDefault(calendars, preferred);
 }
 
 /**
@@ -145,11 +152,12 @@ export function getDefaultCalendar(): Promise<DAVCalendar> {
  * event's object URL (restore a delete back into its original calendar).
  */
 export function getCalendarFor(url: string): Promise<DAVCalendar> {
-  return getCalendars().then((calendars) => {
+  return getCalendars().then(async (calendars) => {
     const owning = calendars
       .filter((c) => url.startsWith(c.url))
       .sort((a, b) => b.url.length - a.url.length)[0];
-    return owning ?? pickDefault(calendars);
+    if (owning) return owning;
+    return pickDefault(calendars, await ensureDefaultCalendar());
   });
 }
 
