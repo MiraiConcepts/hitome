@@ -20,6 +20,10 @@ import {
   useDavConfig,
 } from '@/config/dav-store';
 
+/** Wider than the editor's 52pt column: these captions are whole words, and
+ *  "Password" wraps to two lines at the default. */
+const LABEL_WIDTH = 76;
+
 type Props = {
   /** Called after a successful save — the setup screen uses it to get out of
    *  the way; settings uses it to say so. */
@@ -113,7 +117,7 @@ export function ServerForm({
 
   return (
     <>
-      <FieldRow label="Server">
+      <FieldRow label="Server" labelWidth={LABEL_WIDTH}>
         <TextField
           value={url}
           onChangeText={setUrl}
@@ -126,7 +130,7 @@ export function ServerForm({
           testID="settings-url"
         />
       </FieldRow>
-      <FieldRow label="User">
+      <FieldRow label="User" labelWidth={LABEL_WIDTH}>
         <TextField
           value={username}
           onChangeText={setUsername}
@@ -137,7 +141,7 @@ export function ServerForm({
           testID="settings-username"
         />
       </FieldRow>
-      <FieldRow label="Password">
+      <FieldRow label="Password" labelWidth={LABEL_WIDTH}>
         <TextField
           value={password}
           onChangeText={setPassword}

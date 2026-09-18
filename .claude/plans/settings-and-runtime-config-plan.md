@@ -74,12 +74,26 @@ because several answers reversed earlier ones):
   the e2e suite is red on `main` and steps 3-13 never run. Reproduced on a clean
   checkout of `a21c201`. Not fixed here; tracked separately.
 
-## Not verified here
+## Verified on an emulator (2026-09-19)
 
-- Anything on a real device: the setup gate cold, the keystore round-trip, the
-  test notification actually ringing in the background, and whether SecureStore
-  is readable from the headless widget task (the one live risk — the fallback is
-  to keep the URL in `expo-file-system` and only the password in SecureStore).
-- The Calendars list's happy path — no reachable Radicale in the dev
-  environment at the time. Its error path renders, and it shares
-  `listCalendars()` with the editor's existing picker.
+Against the real tailnet Radicale, on a Pixel 9 Pro XL emulator:
+
+- Setup gate cold, with `EXPO_PUBLIC_DAV_URL` prefilling the address; Connect
+  probed and saved with no login (the proxy injects), and the calendar came up
+  with real events.
+- Test notification posted on channel `event-alarms`, importance 4, while the
+  app was on the home screen.
+- Permission row moved "Not asked yet" → "Allowed" and dropped the Enable
+  button; "Scheduled" read a real reconciler count.
+- Calendars listed both collections with their server colours.
+- **SecureStore is readable from the headless widget task** — the open risk.
+  Force-stopped the app, tapped the widget's own refresh, and Last Updated
+  advanced with events intact. No `expo-file-system` fallback needed.
+
+Two bugs the emulator caught, both fixed in the commit carrying this note:
+`ensureDavConfig()` returning the launch-time null forever after a save, and
+"Password" wrapping in the editor's 52pt caption column.
+
+Still unverified: a physical device, and a real reminder firing at its own
+scheduled time (the test notification exercises the same channel and trigger
+type).

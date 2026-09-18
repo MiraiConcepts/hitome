@@ -9,6 +9,9 @@ import { LabelColumnWidth } from './field-chrome';
 type Props = {
   label: string;
   children: ReactNode;
+  /** Widen the caption column for captions that are words rather than the
+   *  editor's abbreviations ("Password" wraps at the default 52). */
+  labelWidth?: number;
   testID?: string;
 };
 
@@ -17,10 +20,17 @@ type Props = {
  * the controls filling the rest. Labels beside controls rather than above
  * them is what buys the form its height back.
  */
-export function FieldRow({ label, children, testID }: Props) {
+export function FieldRow({
+  label,
+  children,
+  labelWidth = LabelColumnWidth,
+  testID,
+}: Props) {
   return (
     <View style={styles.row} testID={testID}>
-      <FieldLabel style={styles.label}>{label}</FieldLabel>
+      <FieldLabel style={[styles.label, { width: labelWidth }]}>
+        {label}
+      </FieldLabel>
       <View style={styles.content}>{children}</View>
     </View>
   );
@@ -33,7 +43,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   label: {
-    width: LabelColumnWidth,
     // Centred on the first 28pt chip / 36pt field beside it.
     paddingTop: 8,
   },

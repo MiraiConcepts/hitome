@@ -37,6 +37,12 @@ let published = false;
 function publish(next: DavConfig | null): void {
   config = next;
   status = next ? 'configured' : 'unconfigured';
+  // ensureDavConfig() hands back this promise forever, so it has to carry the
+  // current value — not the one read at launch. Without this a save left every
+  // async caller (the client, the widget, the alarm runner) still awaiting the
+  // null from startup, and the calendar reported "no server configured" while
+  // the settings screen showed the server it had just connected to.
+  loading = Promise.resolve(next);
   // The initial load is not a change: it is the first time anyone has seen the
   // value. Telling the client to drop its connection here would null a cache
   // entry for a login still in flight, costing a second one.
