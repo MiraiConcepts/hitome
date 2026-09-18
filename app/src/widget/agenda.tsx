@@ -14,7 +14,6 @@ import {
   TextWidget,
 } from 'react-native-android-widget';
 
-import { davConfigured } from '@/config';
 import {
   AddOutlineBody,
   GiftOutlineBody,
@@ -325,13 +324,15 @@ function Body({
   cache,
   now,
   palette,
+  configured,
 }: {
   cache: WidgetCache | null;
   now: Date;
   palette: Palette;
+  configured: boolean;
 }) {
-  const message = !davConfigured
-    ? 'No server URL in this build'
+  const message = !configured
+    ? 'Open hitome to set up your calendar'
     : !cache
       ? 'Calendar unreachable — tap ↻ on the tailnet'
       : cache.events.length === 0
@@ -376,10 +377,12 @@ function Agenda({
   cache,
   now,
   palette,
+  configured,
 }: {
   cache: WidgetCache | null;
   now: Date;
   palette: Palette;
+  configured: boolean;
 }) {
   const onAccent = hex(OnAccentColor);
   return (
@@ -453,18 +456,42 @@ function Agenda({
           paddingBottom: 10,
         }}
       >
-        <Body cache={cache} now={now} palette={palette} />
+        <Body
+          cache={cache}
+          now={now}
+          palette={palette}
+          configured={configured}
+        />
       </FlexWidget>
     </FlexWidget>
   );
 }
 
 /** Light/dark pair so the launcher can match the system theme; `now` fixed once
- * so both halves and every day header agree. */
-export function renderAgenda(cache: WidgetCache | null): WidgetRepresentation {
+ * so both halves and every day header agree. `configured` is passed in rather
+ * than read here: the render is synchronous and the stored config is not, so
+ * the caller is the one that can have awaited it. */
+export function renderAgenda(
+  cache: WidgetCache | null,
+  configured: boolean
+): WidgetRepresentation {
   const now = new Date();
   return {
-    light: <Agenda cache={cache} now={now} palette={Colors.light} />,
-    dark: <Agenda cache={cache} now={now} palette={Colors.dark} />,
+    light: (
+      <Agenda
+        cache={cache}
+        now={now}
+        palette={Colors.light}
+        configured={configured}
+      />
+    ),
+    dark: (
+      <Agenda
+        cache={cache}
+        now={now}
+        palette={Colors.dark}
+        configured={configured}
+      />
+    ),
   };
 }

@@ -30,6 +30,9 @@ type Props = {
   today: string;
   /** The last fetch failed and the calendar is running on cached data. */
   offline: boolean;
+  /** That failure was the server refusing the login — a different problem with
+   *  a different fix, and one a timestamp says nothing useful about. */
+  authFailed: boolean;
   /** When the server last answered; null until the first landed fetch. */
   fetchedAt: Date | null;
   onToday: () => void;
@@ -89,6 +92,7 @@ export function MonthHeader({
   refreshing,
   today,
   offline,
+  authFailed,
   fetchedAt,
   onToday,
   onRefresh,
@@ -216,10 +220,12 @@ export function MonthHeader({
         >
           {!offline
             ? longDayLabel(today)
-            : fetchedAt
-              ? `Offline · Updated ${agoLabel(fetchedAt, new Date())}`
-              : // Nothing has ever landed, so there is no age to report.
-                'Offline'}
+            : authFailed
+              ? 'Login rejected · open Settings'
+              : fetchedAt
+                ? `Offline · Updated ${agoLabel(fetchedAt, new Date())}`
+                : // Nothing has ever landed, so there is no age to report.
+                  'Offline'}
         </ThemedText>
       </View>
       <View style={styles.controls}>

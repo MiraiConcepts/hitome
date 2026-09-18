@@ -27,7 +27,6 @@ import {
 import { HEADER_GROUND, MonthHeader } from '@/components/calendar/month-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { davConfigured } from '@/config';
 import { AccentColor, Colors, Spacing } from '@/constants/theme';
 import { useDeepLink } from '@/hooks/use-deep-link';
 import { useMonthEvents } from '@/hooks/use-month-events';
@@ -173,7 +172,7 @@ export function MonthScreen() {
     () => new Date(settledMonth.year, settledMonth.month0, 1),
     [settledMonth]
   );
-  const { events, loading, error, refresh, fetchedAt } =
+  const { events, loading, error, authFailed, refresh, fetchedAt } =
     useMonthEvents(settledDate);
 
   // A widget row's id, resolved against the month's events — reconciled during
@@ -313,28 +312,6 @@ export function MonthScreen() {
     []
   );
 
-  if (!davConfigured) {
-    return (
-      <ThemedView style={styles.container}>
-        <View style={styles.setupWrapper}>
-          <ThemedView type="backgroundElement" style={styles.setupCard}>
-            <ThemedText type="subtitle">
-              No calendar server configured
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              This build has no CalDAV server URL. Set{' '}
-              <ThemedText type="code">EXPO_PUBLIC_DAV_URL</ThemedText> when
-              building the app (see{' '}
-              <ThemedText type="code">app/.env.example</ThemedText>) and rebuild
-              — the URL is baked in at build time. Web builds default to{' '}
-              <ThemedText type="code">/dav/</ThemedText> on their own origin.
-            </ThemedText>
-          </ThemedView>
-        </View>
-      </ThemedView>
-    );
-  }
-
   const monthLabel = monthDate.toLocaleDateString(undefined, {
     month: 'long',
     year: 'numeric',
@@ -356,6 +333,7 @@ export function MonthScreen() {
             refreshing={manualRefreshing}
             today={today}
             offline={Boolean(error)}
+            authFailed={authFailed}
             fetchedAt={fetchedAt}
             onToday={goToday}
             onRefresh={onManualRefresh}
@@ -368,9 +346,14 @@ export function MonthScreen() {
               <ThemedText type="small" style={styles.errorText}>
                 {error}
               </ThemedText>
-              <Pressable onPress={refresh}>
+              {/* A rejected login is not something retrying fixes. */}
+              <Pressable
+                onPress={
+                  authFailed ? () => router.navigate('/settings') : refresh
+                }
+              >
                 <ThemedText type="smallBold" style={{ color: AccentColor }}>
-                  Retry
+                  {authFailed ? 'Settings' : 'Retry'}
                 </ThemedText>
               </Pressable>
             </ThemedView>
@@ -481,18 +464,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     width: '100%',
-  },
-  setupWrapper: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.four,
-  },
-  setupCard: {
-    gap: Spacing.three,
-    padding: Spacing.four,
-    borderRadius: Spacing.one,
-    maxWidth: 480,
   },
   errorBanner: {
     flexDirection: 'row',

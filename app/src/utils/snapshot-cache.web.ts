@@ -32,3 +32,12 @@ export function writeSnapshot(key: string, value: unknown): void {
       // Not worth surfacing — the cache only ever costs freshness.
     });
 }
+
+/** Drop every snapshot — see the native twin for why a server change must. */
+export async function clearSnapshots(): Promise<void> {
+  try {
+    await (await db()).clear(STORE);
+  } catch {
+    // Same best-effort contract as the rest of this module.
+  }
+}

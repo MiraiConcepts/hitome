@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
-import { fetchMonth } from '@/caldav/events';
+import { fetchMonth, isAuthFailure } from '@/caldav/events';
 import type { CalEvent } from '@/caldav/types';
-import { davConfigured } from '@/config';
+import { getDavStatus, useDavStatus } from '@/config/dav-store';
 import { gridFetchRange } from '@/utils/calendar-grid';
 import { reviveEvents, serializeEvents } from '@/utils/event-snapshot';
 import {
@@ -60,8 +60,14 @@ export function useMonthEvents(visibleMonth: Date) {
    *  the widget show. Only a landed fetch moves it; a failure leaves the last
    *  good time standing, which is what makes it meaningful when offline. */
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
-  const [loading, setLoading] = useState(davConfigured);
+  // 'loading' until the stored config lands, so the first paint is a spinner
+  // rather than a claim either way.
+  const status = useDavStatus();
+  const [loading, setLoading] = useState(status !== 'unconfigured');
   const [error, setError] = useState<string | null>(null);
+  /** The last failure was the server refusing the login, not the network being
+   *  unreachable. Separate because the fix is — go to settings, not wait. */
+  const [authFailed, setAuthFailed] = useState(false);
   // Guards loading/error against out-of-order settled-month fetches; landed
   // data is always applied (it's authoritative for its own month regardless).
   const seq = useRef(0);
@@ -90,7 +96,9 @@ export function useMonthEvents(visibleMonth: Date) {
    *  when the bucket is already fresh. */
   const fetchMonthInto = useCallback(
     async (y: number, m0: number, primary: boolean) => {
-      if (!davConfigured) return;
+      // Read through the store rather than closing over the hook's value:
+      // this callback is memoized and the config can land after it is made.
+      if (getDavStatus() !== 'configured') return;
       const monthKey = monthKeyOf(y, m0);
       if (!primary) {
         if (inflight.current.has(monthKey)) return;
@@ -115,10 +123,14 @@ export function useMonthEvents(visibleMonth: Date) {
           applyFetch(prev, monthKey, range, result, Date.now())
         );
         setFetchedAt(new Date());
-        if (primary && seq.current === ticket) setError(null);
+        if (primary && seq.current === ticket) {
+          setError(null);
+          setAuthFailed(false);
+        }
         writeSnapshot(cacheKey(monthKey), serializeEvents(result));
       } catch (err) {
         if (primary && seq.current === ticket) {
+          setAuthFailed(isAuthFailure(err));
           setError(
             err instanceof Error
               ? err.message
@@ -167,7 +179,7 @@ export function useMonthEvents(visibleMonth: Date) {
     // debugging). So an open view revalidates on return-to-foreground and polls
     // gently while visible; hidden/backgrounded costs zero network. On web,
     // AppState maps to the Page Visibility API via react-native-web.
-    if (!davConfigured) return;
+    if (status !== 'configured') return;
     let interval: ReturnType<typeof setInterval> | null = null;
 
     const stopPolling = () => {
@@ -212,9 +224,9 @@ export function useMonthEvents(visibleMonth: Date) {
         window.removeEventListener('focus', onWindowFocus);
       }
     };
-  }, [refresh]);
+  }, [refresh, status]);
 
   const events = useMemo(() => mergeEvents(store), [store]);
 
-  return { events, loading, error, refresh, fetchedAt };
+  return { events, loading, error, authFailed, refresh, fetchedAt };
 }

@@ -25,8 +25,30 @@ export class ConflictError extends Error {
   }
 }
 
+/**
+ * The server would not accept the login (401/403). Worth its own type now that
+ * the login is something a person typed: "wrong password" and "off the
+ * network" used to land in the same generic banner, which made a rotated
+ * password look exactly like being off the tailnet.
+ */
+export class AuthError extends Error {
+  constructor() {
+    super('The server rejected the saved login');
+    this.name = 'AuthError';
+  }
+}
+
+/** True for the failures that mean "fix the connection", from any layer —
+ *  tsdav reports its discovery 401 as a message string, not a status. */
+export function isAuthFailure(err: unknown): boolean {
+  if (err instanceof AuthError) return true;
+  const message = err instanceof Error ? err.message : '';
+  return /invalid credentials|\b401\b|\b403\b/i.test(message);
+}
+
 function ensureOk(res: Response, action: string): void {
   if (res.status === 412) throw new ConflictError();
+  if (res.status === 401 || res.status === 403) throw new AuthError();
   if (!res.ok) throw new Error(`CalDAV ${action} failed (HTTP ${res.status})`);
 }
 

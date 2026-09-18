@@ -39,9 +39,12 @@ its reminders on the device itself.
 - Location autocomplete is the only third-party call, and it fails silently:
   debounced, cached, and abandoned for the session after three consecutive
   failures, leaving an ordinary text field behind.
-- No credentials exist client-side. The app is served from the same origin as
-  the calendar server and the host proxy injects the authorization, so no
-  bundle, image, device or CI secret holds the password.
+- No credentials are ever built in. On the web the app is served from the same
+  origin as the calendar server and the host proxy injects the authorization,
+  so no browser holds a password at all. On Android the server address and
+  login are asked for on first run and kept in the device keystore — so no
+  bundle, image or CI secret holds either, and pointing it at a new server is
+  something you do on the phone rather than in a release.
 - Web and Android ship from one tag. The same commit produces the container
   image and the signed APK, so the two halves cannot report different versions.
   Android is delivered as a release artifact tracked by an updater rather than

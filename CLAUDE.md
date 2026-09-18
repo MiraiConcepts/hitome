@@ -28,9 +28,10 @@ macOS file watcher — edits silently never reach the bundle) or run the Gradle
 helper scripts.
 
 - Always `cd app/` first, then plain `bun run web:proxy` — NOT `--bun`
-  (breaks file watching → stale bundles). `web:proxy` forces the same-origin
-  `/dav/` URL and Metro on :8082; plain `web` bakes the tailnet URL from
-  `app/.env` into the bundle and CORS-breaks behind the proxy.
+  (breaks file watching → stale bundles). `web:proxy` is plain `web` on :8082,
+  which is the port both dockerized proxies expect; the web build always talks
+  to `/dav/` on whatever origin it was loaded from, so browsing Metro directly
+  reaches no Radicale.
 - Browse the dockerized dev proxy at `http://localhost:8882` (injects DAV
   auth), NOT Metro's `:8082` directly (CORS). Start it from
   `tooling/dev-proxy/`: `docker compose up -d` (needs its gitignored `.env`;
@@ -63,10 +64,17 @@ helper scripts.
 
 ## Invariants
 
-- **No CalDAV credentials client-side or in CI** — not in the repo, images,
-  bundles, GitHub secrets, or devices. The host Caddy injects Authorization on
-  `/dav/*` (password lives only in the server `.env`). Never reintroduce
-  credential baking or client-side credential storage as defaults.
+- **No CalDAV credentials in the repo, CI, images or bundles** — ever. Nothing
+  is baked: not the password, and (since v0.4) not the server URL either.
+  - **Web** is unchanged and holds nothing: it derives `/dav/` from the page's
+    own origin and the host Caddy injects Authorization (password lives only in
+    the server `.env`). No browser ever stores a credential.
+  - **Android** asks on first run and keeps the address + login in the OS
+    keystore (`expo-secure-store`, `src/config/dav-storage.ts`) — the device,
+    entered by the user, never the build. The login stays optional, because
+    pointing the app at the injecting proxy means sending none.
+  - Never reintroduce credential baking, and never store a credential anywhere
+    a browser can read it.
 - Rounded UI is 4px (`Spacing.one`; literal `4` in the widget). Exception:
   month-grid banners and chip bars are square and flush.
 - Ports on this Mac: 8080 and 8880 belong to unrelated dev servers, 8881 is

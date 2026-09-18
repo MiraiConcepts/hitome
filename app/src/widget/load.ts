@@ -1,13 +1,15 @@
 // Fetch→cache pipeline shared by the headless task handler and the app-side
 // refresh: fresh data when the server answers, last-good snapshot otherwise.
-import { davConfigured } from '@/config';
+import { ensureDavConfig } from '@/config/dav-store';
 
 import { readWidgetCache, writeWidgetCache } from './cache';
 import { fetchUpcoming } from './fetch-upcoming';
 import type { WidgetCache } from './types';
 
 export async function loadAgendaCache(): Promise<WidgetCache | null> {
-  if (davConfigured) {
+  // The headless task runs in a fresh JS context with no React tree, so the
+  // stored config has to be read here rather than inherited from the app.
+  if (await ensureDavConfig()) {
     try {
       const now = new Date();
       const cache: WidgetCache = {

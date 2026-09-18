@@ -8,7 +8,9 @@ import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { BootScreen } from '@/components/boot-screen';
+import { SetupScreen } from '@/components/settings/setup-screen';
 import { VersionBadge } from '@/components/version-badge';
+import { ensureDavConfig, useDavStatus } from '@/config/dav-store';
 import { useAlarmReconcile } from '@/hooks/use-alarm-reconcile';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DeepLinkProvider } from '@/hooks/use-deep-link';
@@ -26,6 +28,14 @@ export default function RootLayout() {
     Satoshi_bold: require('../../assets/fonts/Satoshi_bold.otf'),
   });
   const hydrated = useHydrated();
+  // The CalDAV connection is read from storage now rather than baked into the
+  // bundle, so it is a fourth thing the shell has to wait for. 'loading' is a
+  // real state: concluding "not configured" from a null that has not been read
+  // yet would flash the setup screen at someone who is already set up.
+  const davStatus = useDavStatus();
+  useEffect(() => {
+    ensureDavConfig();
+  }, []);
   const { link, ready: linkReady } = useDeepLinkSource();
   useSilentReload();
   useAlarmReconcile();
@@ -46,7 +56,11 @@ export default function RootLayout() {
   // degrades to fallback fonts instead of a stuck spinner.
   // linkReady joins the gate because the screen seeds state from the link: a
   // render before it lands opens the wrong event, not merely the wrong frame.
-  const ready = hydrated && linkReady && (fontsLoaded || !!fontError);
+  const ready =
+    hydrated &&
+    linkReady &&
+    (fontsLoaded || !!fontError) &&
+    davStatus !== 'loading';
   return (
     // Required by react-native-gesture-handler (canvas pan/pinch) on every
     // platform, web included — gestures aren't recognized outside this view.
@@ -57,11 +71,19 @@ export default function RootLayout() {
         <BottomSheetModalProvider>
           {ready ? (
             <DeepLinkProvider value={link}>
-              {/* A stack, not a Slot: settings is a pushed screen, so Android's
-                  back press and the browser's back button both pop it for free.
-                  No headers — every screen draws its own bar (the month view's
-                  is part of the calendar's chrome, not navigation furniture). */}
-              <Stack screenOptions={{ headerShown: false }} />
+              {/* Nothing in this app works without a server, so setup is a gate
+                  rather than a route — a deep link into the calendar has
+                  nothing to show either. */}
+              {davStatus === 'unconfigured' ? (
+                <SetupScreen />
+              ) : (
+                /* A stack, not a Slot: settings is a pushed screen, so
+                   Android's back press and the browser's back button both pop
+                   it for free. No headers — every screen draws its own bar (the
+                   month view's is part of the calendar's chrome, not navigation
+                   furniture). */
+                <Stack screenOptions={{ headerShown: false }} />
+              )}
               <VersionBadge />
             </DeepLinkProvider>
           ) : (

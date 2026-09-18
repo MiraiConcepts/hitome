@@ -2,6 +2,8 @@
 // app/index.ts (imported before the register module that pulls this in).
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 
+import { ensureDavConfig } from '@/config/dav-store';
+
 import { renderAgenda } from './agenda';
 import { readWidgetCache } from './cache';
 import { loadAgendaCache } from './load';
@@ -12,14 +14,19 @@ export async function widgetTaskHandler(
   switch (props.widgetAction) {
     case 'WIDGET_DELETED':
       return;
-    case 'WIDGET_RESIZED':
-      // Re-render only — no network on a resize.
-      props.renderWidget(renderAgenda(await readWidgetCache()));
+    case 'WIDGET_RESIZED': {
+      // Re-render only — no network on a resize. Still has to read the config,
+      // since "not set up yet" is part of what the widget draws.
+      const configured = Boolean(await ensureDavConfig());
+      props.renderWidget(renderAgenda(await readWidgetCache(), configured));
       return;
-    default:
+    }
+    default: {
       // WIDGET_ADDED, WIDGET_UPDATE (30-min cycle), and WIDGET_CLICK — the
       // only custom clickAction is the refresh tap, so every click refetches.
-      props.renderWidget(renderAgenda(await loadAgendaCache()));
+      const cache = await loadAgendaCache();
+      props.renderWidget(renderAgenda(cache, Boolean(await ensureDavConfig())));
       return;
+    }
   }
 }

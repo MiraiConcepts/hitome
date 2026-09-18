@@ -38,5 +38,3 @@ jobs:
           tags: |
             ghcr.io/miraiconcepts/hitome:latest
             ghcr.io/miraiconcepts/hitome:${{ github.ref_name }}
-          build-args: |
-            EXPO_PUBLIC_DAV_URL=/dav/

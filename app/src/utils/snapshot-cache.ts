@@ -28,3 +28,21 @@ export function writeSnapshot(key: string, value: unknown): void {
     // Not worth surfacing — the cache only ever costs freshness.
   }
 }
+
+/**
+ * Drop every snapshot. Called when the calendar server changes: keys are not
+ * namespaced by server, and a cached CalEvent carries the old host's absolute
+ * url and etag — so a stale snapshot would not merely be out of date, it would
+ * paint one server's events under another's name and aim an undo-delete at the
+ * wrong host.
+ */
+export async function clearSnapshots(): Promise<void> {
+  try {
+    for (const entry of Paths.document.list()) {
+      if (entry instanceof File && /^snapshot-.*\.json$/.test(entry.name))
+        entry.delete();
+    }
+  } catch {
+    // Same best-effort contract as the rest of this module.
+  }
+}

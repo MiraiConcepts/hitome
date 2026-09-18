@@ -93,20 +93,25 @@ to the same Radicale.
 
 ## 3. Credentials (server-side injection)
 
-**No credentials exist in the image, the bundle, the repo, GitHub, or on any
-client device.** The only baked value is `EXPO_PUBLIC_DAV_URL=/dav/` (a relative
-URL that resolves against the page origin at runtime).
+**No credentials exist in the image, the bundle, the repo or GitHub.** The web
+app is credential-less by construction: it derives `/dav/` from the page's own
+origin at runtime and the proxy in front supplies the Authorization, so nothing
+is stored in any browser. Nothing is baked into the web image at all now — not
+even the URL.
 
 - The password lives in exactly one place: `HITOME_DAV_B64` in the server `.env`
   (base64 of `user:app-password`); Caddy attaches it upstream on `/dav/*`.
 - Rotating the password = update Radicale + the `.env` value → restart caddy.
   No image rebuild, no client changes.
-- The Android app points at this same origin (`https://<host>:<port>/dav/`) and is
-  likewise credential-less; its server URL is baked at APK build time — in CI from
-  the repo Actions **variable** `HITOME_DAV_URL` (a variable, not a secret; see
-  `docs/Release.md`), or locally from `app/.env` (never committed).
-- Dev fallback: `EXPO_PUBLIC_DAV_USER`/`_PASS` in `app/.env` make the client attach
-  Basic auth itself (e.g. Android dev pointing straight at Radicale). Optional.
+- The Android app asks for its server on first run and keeps the address and
+  login in the device keystore (`expo-secure-store`) — nothing is baked into the
+  APK any more, so a URL or port change no longer needs a release. Pointed at
+  this same origin (`https://<host>:<port>/dav/`) it should be left with **no**
+  login, so the proxy's injected Authorization is what reaches Radicale; pointed
+  straight at Radicale it takes the Radicale login instead. The setup screen
+  connects before it saves, so either way you find out on the spot.
+- A deployer following this document gets the same shape: their web app needs no
+  configuration, and their phone needs the address typed once.
 
 ## 4. Verify after deploy
 

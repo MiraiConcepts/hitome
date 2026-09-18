@@ -1,6 +1,7 @@
 import { DAVClient, type DAVCalendar } from 'tsdav';
 
-import { DAV } from '@/config';
+import type { DavConfig } from '@/config/dav-config';
+import { ensureDavConfig, subscribeDavConfig } from '@/config/dav-store';
 
 import type { EventIcon } from './types';
 
@@ -21,20 +22,56 @@ const DEFAULT_CALENDAR_NAME = 'carrein-calendar';
 // birthday calendar draws a gift instead of the generic sun.
 const CALENDAR_ICON: Record<string, EventIcon> = { 'carrein-birthday': 'gift' };
 
-async function connect(): Promise<DAVClient> {
-  // Credential-less by default — the reverse proxy injects Authorization on
-  // /dav/* (verified: tsdav completes the full round-trip with empty
-  // credentials). Username/password attach only when provided (dev fallback
-  // pointing straight at Radicale).
-  const hasCreds = Boolean(DAV.user && DAV.pass);
-  const client = new DAVClient({
-    serverUrl: DAV.url,
-    credentials: hasCreds ? { username: DAV.user, password: DAV.pass } : {},
-    authMethod: 'Basic',
+/**
+ * A client for one connection. The login is optional: a reverse proxy that
+ * injects Authorization on /dav/* (the web deployment, and an Android build
+ * pointed at the same endpoint) wants the client to send nothing at all.
+ *
+ * "Nothing" needs saying carefully. Under Basic — tsdav's default, applied
+ * even when no authMethod is given — getBasicAuthHeaders stringifies whatever
+ * it is handed, so empty credentials still put
+ * `Basic base64("undefined:undefined")` on every request. That has been
+ * harmless only because the proxy replaces the header; pointed at a bare
+ * Radicale it is a guaranteed 401. 'Custom' with a header function that
+ * returns nothing is the one way to actually send no Authorization.
+ */
+function clientFor(config: DavConfig): DAVClient {
+  const hasLogin = Boolean(config.username);
+  return new DAVClient({
+    serverUrl: config.url,
+    credentials: hasLogin
+      ? { username: config.username, password: config.password }
+      : {},
+    ...(hasLogin
+      ? { authMethod: 'Basic' as const }
+      : { authMethod: 'Custom' as const, authFunction: async () => ({}) }),
     defaultAccountType: 'caldav',
   });
+}
+
+async function connect(): Promise<DAVClient> {
+  const config = await ensureDavConfig();
+  if (!config) throw new Error('No calendar server configured');
+  const client = clientFor(config);
   await client.login(); // PROPFIND: discovers principal + calendar-home-set
   return client;
+}
+
+/**
+ * Connect with a config that is not (yet) the stored one — the settings form's
+ * "does this actually work" check, run before anything is saved. Deliberately
+ * uncached: it must not become the app's client, and a failure must not poison
+ * the real one. Fetching the calendars is part of the check, not extra: an
+ * account with none is indistinguishable from an empty calendar afterwards.
+ */
+export async function probeConnection(
+  config: DavConfig
+): Promise<DAVCalendar[]> {
+  const client = clientFor(config);
+  await client.login();
+  const calendars = await client.fetchCalendars();
+  if (!calendars.length) throw new Error('No CalDAV calendars found');
+  return calendars;
 }
 
 export function getClient(): Promise<DAVClient> {
@@ -121,3 +158,7 @@ export function resetClient(): void {
   clientPromise = null;
   calendarsPromise = null;
 }
+
+// A cached client captured its server's URL and credentials when it was
+// constructed, so a config change has to take it with it.
+subscribeDavConfig(resetClient);

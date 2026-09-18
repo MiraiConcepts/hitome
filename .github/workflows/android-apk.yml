@@ -9,8 +9,10 @@ name: Android APK
 # tooling/android-builder/sign-release.sh remains a working fallback for a run
 # whose signing step failed or a release that needs re-cutting by hand.
 #
-# The baked server URL comes from the repo Actions VARIABLE `HITOME_DAV_URL`
-# (a variable, not a secret — the URL is public-by-decision; see docs/Release.md).
+# No server URL is baked in any more: the app asks for one on first run and
+# keeps it (with the login) in the device keystore. `HITOME_DAV_URL` is still
+# passed through if the repo variable is set, but only to prefill that field —
+# the APK is fully usable without it.
 
 on:
   workflow_dispatch:
@@ -105,17 +107,14 @@ jobs:
             --ks-pass "pass:$KEYSTORE_PASSWORD" --key-pass "pass:$KEY_PASSWORD" \
             --out "hitome-$TAG.apk" "hitome-$TAG-unsigned.apk"
 
-      # Same two checks sign-release.sh made locally: the signature is real,
-      # and the server URL actually got baked in. A release that fails either
-      # is worse than no release, so this gates publishing.
-      - name: Verify signature and baked URL
+      # The signature is real. (The companion check — that a server URL got
+      # baked into the APK — is gone with the baking: the app is configured on
+      # the device now, so a release with no URL in it is the correct outcome.)
+      - name: Verify signature
         if: startsWith(github.ref, 'refs/tags/')
         env:
           TAG: ${{ github.ref_name }}
-        run: |
-          java -jar apksigner.jar verify --print-certs "hitome-$TAG.apk" | head -3
-          grep -ca 'ts.net' "hitome-$TAG.apk" >/dev/null \
-            && echo "baked URL present" || { echo "FAIL: baked URL missing"; exit 1; }
+        run: java -jar apksigner.jar verify --print-certs "hitome-$TAG.apk" | head -3
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')
