@@ -54,6 +54,18 @@ describe('findMeetingLink', () => {
     ).toBeUndefined();
   });
 
+  it('finds a meeting URL in the location before the description', () => {
+    expect(
+      findMeetingLink({
+        location: 'Online (Google Meet): https://meet.google.com/twa-oqdz-rkn',
+        description: 'Backup: https://zoom.us/j/1',
+      })
+    ).toBe('https://meet.google.com/twa-oqdz-rkn');
+    expect(
+      findMeetingLink({ location: 'Lau Pa Sat, 18 Raffles Quay' })
+    ).toBeUndefined();
+  });
+
   it('returns undefined when nothing matches', () => {
     expect(findMeetingLink({})).toBeUndefined();
   });

@@ -177,4 +177,23 @@ describe('toWidgetEvent', () => {
     expect(both.meetingLink).toBe('https://zoom.us/j/9');
     expect(both.link).toBe('https://example.com/agenda');
   });
+
+  it('turns a meeting URL in the location into a Join chip, not a maps chip', () => {
+    const event = mkEvent(
+      'consult',
+      new Date(Date.UTC(2026, 8, 15, 12, 0)),
+      new Date(Date.UTC(2026, 8, 15, 12, 15))
+    );
+    const online = toWidgetEvent({
+      ...event,
+      location: 'Online (Google Meet): https://meet.google.com/svm-reve-grt',
+    });
+    expect(online.meetingLink).toBe('https://meet.google.com/svm-reve-grt');
+    expect('location' in online).toBe(false);
+    // An ordinary URL in the location is still just a place label.
+    expect(
+      toWidgetEvent({ ...event, location: 'See https://example.com/venue' })
+        .location
+    ).toBe('See https://example.com/venue');
+  });
 });

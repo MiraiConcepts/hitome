@@ -1,7 +1,11 @@
 // Pure selection logic for the agenda widget — no tsdav/expo imports.
 import type { CalEvent } from '@/caldav/types';
 
-import { findMeetingLink, normalizeLink } from './meeting-link';
+import {
+  findMeetingLink,
+  meetingLinkInText,
+  normalizeLink,
+} from './meeting-link';
 import type { WidgetEvent } from './types';
 
 /** How many events the widget shows. */
@@ -38,13 +42,17 @@ export function toWidgetEvent(e: CalEvent): WidgetEvent {
   // any other URL property keeps its own plain link line.
   const meetingLink = findMeetingLink(e);
   const plainLink = e.link ? normalizeLink(e.link) : undefined;
+  // A location that carries a join link is not a place — it would render as a
+  // maps chip pointing at a URL. The Join chip already covers it.
+  const place =
+    e.location && !meetingLinkInText(e.location) ? e.location : undefined;
   return {
     id: e.id,
     summary: e.summary,
     start: e.start.toISOString(),
     end: e.end.toISOString(),
     allDay: e.allDay,
-    ...(e.location ? { location: singleLineLocation(e.location) } : {}),
+    ...(place ? { location: singleLineLocation(place) } : {}),
     ...(meetingLink ? { meetingLink } : {}),
     ...(plainLink && plainLink !== meetingLink ? { link: plainLink } : {}),
     ...(e.recurring ? { recurring: true } : {}),

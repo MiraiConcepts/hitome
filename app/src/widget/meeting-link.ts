@@ -32,15 +32,28 @@ export function isMeetingLink(url: string): boolean {
 
 const URL_IN_TEXT = /https?:\/\/[^\s<>"')\]]+/gi;
 
+/** The first meeting-host URL in free text, trailing punctuation stripped. */
+export function meetingLinkInText(text: string): string | undefined {
+  for (const match of text.match(URL_IN_TEXT) ?? []) {
+    const url = match.replace(/[.,;!?]+$/, '');
+    if (isMeetingLink(url)) return url;
+  }
+  return undefined;
+}
+
 /**
- * The event's joinable meeting URL, if any. Sources, most-trusted first: the
- * CONFERENCE property (that is its whole purpose, any https value counts),
- * the URL property when it points at a known meeting host, then the first
- * meeting-host URL found in the description text.
+ * The event's joinable meeting URL, if any. RFC 7986 gave join links a home in
+ * CONFERENCE, but support is thin and writers scatter them, so we look in every
+ * field that carries one. Sources, most-trusted first: the CONFERENCE property
+ * (that is its whole purpose, any https value counts), the URL property when it
+ * points at a known meeting host, then the first meeting-host URL in the
+ * location — LOCATION is free-form TEXT, and plenty of writers put the join
+ * link there rather than a place — then in the description text.
  */
 export function findMeetingLink(e: {
   conference?: string;
   link?: string;
+  location?: string;
   description?: string;
 }): string | undefined {
   if (e.conference && /^https?:\/\//i.test(e.conference.trim())) {
@@ -50,11 +63,9 @@ export function findMeetingLink(e: {
     const normalized = normalizeLink(e.link);
     if (isMeetingLink(normalized)) return normalized;
   }
-  if (e.description) {
-    for (const match of e.description.match(URL_IN_TEXT) ?? []) {
-      const url = match.replace(/[.,;!?]+$/, '');
-      if (isMeetingLink(url)) return url;
-    }
-  }
-  return undefined;
+  return (
+    (e.location && meetingLinkInText(e.location)) ||
+    (e.description && meetingLinkInText(e.description)) ||
+    undefined
+  );
 }
