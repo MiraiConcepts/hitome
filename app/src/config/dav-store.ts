@@ -30,11 +30,20 @@ let status: DavStatus = 'loading';
 let loading: Promise<DavConfig | null> | null = null;
 
 const listeners = new Set<() => void>();
+/** Notified only on a real change — not on the first load. */
+const changeListeners = new Set<() => void>();
+let published = false;
 
 function publish(next: DavConfig | null): void {
   config = next;
   status = next ? 'configured' : 'unconfigured';
+  // The initial load is not a change: it is the first time anyone has seen the
+  // value. Telling the client to drop its connection here would null a cache
+  // entry for a login still in flight, costing a second one.
+  const changed = published;
+  published = true;
   for (const listener of listeners) listener();
+  if (changed) for (const listener of changeListeners) listener();
 }
 
 /**
@@ -85,19 +94,26 @@ export async function clearDavConfig(): Promise<void> {
 }
 
 /**
- * Notified on every change, including the initial load. caldav/client
- * subscribes to drop its cached connection — the dependency runs that way
- * round (client imports the store, not the reverse) so the two do not form a
- * cycle.
+ * Notified when the connection actually changes — saved, or disconnected —
+ * and never for the initial load. caldav/client subscribes to drop its cached
+ * connection, and calendar-pref to drop a choice that belonged to the old
+ * account. The dependency runs that way round (they import the store, not the
+ * reverse) so nothing forms a cycle.
  */
 export function subscribeDavConfig(listener: () => void): () => void {
+  changeListeners.add(listener);
+  return () => {
+    changeListeners.delete(listener);
+  };
+}
+
+/** Every publish, initial load included — what React renders from. */
+function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
   };
 }
-
-const subscribe = subscribeDavConfig;
 
 export function useDavStatus(): DavStatus {
   return useSyncExternalStore(subscribe, getDavStatus, getDavStatus);

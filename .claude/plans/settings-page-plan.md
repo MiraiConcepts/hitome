@@ -25,6 +25,14 @@ page need to exist at all?* → **No ("option A")**:
   (config/client rewrite, dev-proxy + prod-sim injection, credential-free image,
   workflow/docs strip) — see the build-log commits.
 
+## Revived 2026-09-19
+
+Two of the three triggers below arrived together: URL churn on Android, and
+direct-credential mode wanted as a first-class feature (so anyone can deploy
+hitome alongside their own Radicale). See
+`.claude/plans/settings-and-runtime-config-plan.md`. Web kept the injection
+posture this plan chose — that part of the decision held.
+
 ## If a settings page is ever revisited
 
 Reasons that would revive it: URL churn on Android without a release pipeline,
