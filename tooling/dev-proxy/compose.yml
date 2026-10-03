@@ -1,4 +1,9 @@
 # Local same-origin dev proxy for hitome (see Caddyfile header for usage).
+# `docker compose` derives its project name from this directory, which is also
+# called dev-proxy in mitsume — without an explicit name, bringing one stack up
+# destroys the other's containers.
+name: hitome-dev-proxy
+
 services:
   dev-proxy:
     container_name: hitome-dev-proxy
