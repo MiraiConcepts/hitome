@@ -4,8 +4,11 @@ import { clearSnapshots } from '@/utils/snapshot-cache';
 
 import type { DavConfig, DavStatus } from './dav-config';
 import {
+  clearLastConfig,
   clearStoredConfig,
+  readLastConfig,
   readStoredConfig,
+  writeLastConfig,
   writeStoredConfig,
 } from './dav-storage';
 
@@ -26,6 +29,10 @@ import {
  */
 
 let config: DavConfig | null = null;
+/** The connection last disconnected, if any — the setup form's starting
+ *  values, so signing out and back in is not a retype. Loaded alongside the
+ *  live config, so it is ready before the setup screen can render. */
+let last: DavConfig | null = null;
 let status: DavStatus = 'loading';
 let loading: Promise<DavConfig | null> | null = null;
 
@@ -59,14 +66,21 @@ function publish(next: DavConfig | null): void {
  */
 export function ensureDavConfig(): Promise<DavConfig | null> {
   if (!loading) {
-    loading = readStoredConfig()
-      .catch(() => null)
-      .then((stored) => {
-        publish(stored);
-        return stored;
-      });
+    loading = Promise.all([
+      readStoredConfig().catch(() => null),
+      readLastConfig().catch(() => null),
+    ]).then(([stored, previous]) => {
+      last = previous;
+      publish(stored);
+      return stored;
+    });
   }
   return loading;
+}
+
+/** The connection last disconnected on this device, or null. */
+export function getLastDavConfig(): DavConfig | null {
+  return last;
 }
 
 /** The loaded config, or null while loading or unconfigured — check status. */
@@ -90,10 +104,25 @@ export async function saveDavConfig(next: DavConfig): Promise<void> {
   // Only when the account actually moved — a password correction against the
   // same server should keep the cache it can still use.
   if (changed) await clearSnapshots();
+  // Connected again: the remembered copy has done its job, and keeping a
+  // second copy of the password around serves nothing.
+  if (last) {
+    await clearLastConfig();
+    last = null;
+  }
   publish(next);
 }
 
+/**
+ * Disconnect. The calendar cache goes, but the address and login are kept
+ * (in the same keystore, under their own key) to prefill the setup screen —
+ * signing out to try something and back in should not mean retyping them.
+ */
 export async function clearDavConfig(): Promise<void> {
+  if (config) {
+    await writeLastConfig(config);
+    last = config;
+  }
   await clearStoredConfig();
   await clearSnapshots();
   publish(null);

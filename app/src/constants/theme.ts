@@ -14,6 +14,13 @@ export const Colors = {
     backgroundElement: '#F0F0F3',
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
+    /** Placeholder text in empty fields: quieter than textSecondary, so a
+     *  hint never reads as something already typed. */
+    placeholder: '#A1A5AC',
+    /** Dashed dividers inside a settings card — between rows and columns. */
+    rule: '#BBBBBB',
+    /** The dotted top edge of a settings card; a step stronger than `rule`. */
+    ruleStrong: '#999999',
     /** Tappable text (Firefox brand blue; lightened in dark for legibility). */
     link: '#0060E0',
   },
@@ -23,6 +30,9 @@ export const Colors = {
     backgroundElement: '#000000',
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
+    placeholder: '#6C7078',
+    rule: '#3F4249',
+    ruleStrong: '#5C6068',
     link: '#5B9DFF',
   },
 } as const;

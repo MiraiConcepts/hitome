@@ -14,7 +14,7 @@ type Props = TextInputProps & {
 
 /**
  * The editor's text input: FieldChrome geometry, outlined in the raised
- * surface color, the secondary shade for placeholders, and an accent
+ * surface color, the placeholder shade for hints, and an accent
  * outline while focused so the field being typed into is unmistakable with
  * the keyboard up. The border exists at rest, so focus never moves layout.
  */
@@ -30,7 +30,7 @@ export function TextField({
 
   return (
     <TextInputComponent
-      placeholderTextColor={theme.textSecondary}
+      placeholderTextColor={theme.placeholder}
       cursorColor={AccentColor}
       selectionColor={AccentColor}
       {...rest}

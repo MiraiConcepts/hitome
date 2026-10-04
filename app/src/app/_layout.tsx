@@ -9,7 +9,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { BootScreen } from '@/components/boot-screen';
 import { SetupScreen } from '@/components/settings/setup-screen';
-import { VersionBadge } from '@/components/version-badge';
 import { ensureDavConfig, useDavStatus } from '@/config/dav-store';
 import { useAlarmReconcile } from '@/hooks/use-alarm-reconcile';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -84,7 +83,6 @@ export default function RootLayout() {
                    furniture). */
                 <Stack screenOptions={{ headerShown: false }} />
               )}
-              <VersionBadge />
             </DeepLinkProvider>
           ) : (
             <BootScreen />

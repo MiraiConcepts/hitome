@@ -6,12 +6,20 @@ import { SvgXml } from 'react-native-svg';
 
 import {
   AddOutlineBody,
+  AlertCircleOutlineBody,
+  CalendarEventOutlineBody,
+  CheckOutlineBody,
   ChevronLeftOutlineBody,
+  InfoCircleOutlineBody,
+  CircleDashedOutlineBody,
+  LockOutlineBody,
   RefreshOutlineBody,
+  ServerOutlineBody,
   SettingsOutlineBody,
+  UserOutlineBody,
 } from '@/constants/icon-paths';
 
-type IconProps = { size?: number; color: string };
+export type IconProps = { size?: number; color: string };
 
 const svg = (body: string, size: number, color: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${size}" height="${size}">${body.replace(
@@ -33,4 +41,36 @@ export function SettingsIcon({ size = 24, color }: IconProps) {
 
 export function ChevronLeftIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(ChevronLeftOutlineBody, size, color)} />;
+}
+
+export function ServerIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(ServerOutlineBody, size, color)} />;
+}
+
+export function UserIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(UserOutlineBody, size, color)} />;
+}
+
+export function LockIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(LockOutlineBody, size, color)} />;
+}
+
+export function CircleDashedIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(CircleDashedOutlineBody, size, color)} />;
+}
+
+export function CalendarEventIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(CalendarEventOutlineBody, size, color)} />;
+}
+
+export function CheckIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(CheckOutlineBody, size, color)} />;
+}
+
+export function AlertCircleIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(AlertCircleOutlineBody, size, color)} />;
+}
+
+export function InfoCircleIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(InfoCircleOutlineBody, size, color)} />;
 }

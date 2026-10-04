@@ -29,3 +29,15 @@ export async function writeStoredConfig(): Promise<void> {
 export async function clearStoredConfig(): Promise<void> {
   // Derived, so there is nothing to clear.
 }
+
+export async function readLastConfig(): Promise<DavConfig | null> {
+  return null;
+}
+
+export async function writeLastConfig(): Promise<void> {
+  // Nothing is typed on web, so there is nothing to remember.
+}
+
+export async function clearLastConfig(): Promise<void> {
+  // Nothing is typed on web, so there is nothing to remember.
+}

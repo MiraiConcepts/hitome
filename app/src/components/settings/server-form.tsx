@@ -1,13 +1,16 @@
 import { useState } from 'react';
+import { StyleSheet, View, type TextInputProps } from 'react-native';
 
 import { probeConnection } from '@/caldav/client';
-import { FieldRow } from '@/components/fields/field-row';
+import { FieldStack } from '@/components/fields/field-stack';
 import { TextField } from '@/components/fields/text-field';
+import { LockIcon, ServerIcon, UserIcon } from '@/components/icons';
 import {
   SettingsButton,
+  CONTROL_HEIGHT,
   SettingsButtonRow,
-  SettingsNote,
-  SettingsProblem,
+  SettingsOutcomeLine,
+  type SettingsOutcome,
 } from '@/components/settings/settings-parts';
 import {
   classifyConnectError,
@@ -16,26 +19,19 @@ import {
 } from '@/config/dav-config';
 import {
   clearDavConfig,
+  getLastDavConfig,
   saveDavConfig,
   useDavConfig,
 } from '@/config/dav-store';
-
-/** Wider than the editor's 52pt column: these captions are whole words, and
- *  "Password" wraps to two lines at the default. */
-const LABEL_WIDTH = 76;
-
-type Props = {
-  /** Called after a successful save — the setup screen uses it to get out of
-   *  the way; settings uses it to say so. */
-  onSaved?: () => void;
-  /** Offered in settings, not during first-run setup (nothing to disconnect). */
-  allowDisconnect?: boolean;
-  saveLabel?: string;
-};
+import { Spacing } from '@/constants/theme';
 
 /**
- * Address + login for a CalDAV server, shared by the first-run setup screen and
- * the Server section of settings.
+ * State and actions for the CalDAV connection form, shared by the first-run
+ * setup screen and the Server section of settings. The two lay the same
+ * fields out differently — setup pins its Connect button to the corner of the
+ * screen, settings keeps Save and Disconnect under the fields — so the form is
+ * split into this hook, the fields (ConnectionFields), and each screen's own
+ * buttons.
  *
  * Save connects before it stores: discovery has to complete, the login has to
  * be accepted, and the account has to actually have a calendar. A configuration
@@ -48,27 +44,25 @@ type Props = {
  * client should send nothing at all, and the connection check is what confirms
  * it either way.
  */
-export function ServerForm({
-  onSaved,
-  allowDisconnect = false,
-  saveLabel = 'Connect',
-}: Props) {
+export function useServerForm(onSaved?: () => void) {
   const config = useDavConfig();
-  const [url, setUrl] = useState(
-    // A build-time URL is a convenience for the dev loop, never a configuration:
-    // it prefills the field and nothing more.
-    config?.url ?? process.env.EXPO_PUBLIC_DAV_URL ?? ''
-  );
-  const [username, setUsername] = useState(config?.username ?? '');
-  const [password, setPassword] = useState(config?.password ?? '');
-  const [problem, setProblem] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  // The live connection, or else the one last disconnected on this device.
+  // Starts empty on a fresh install: nothing about any particular server ships
+  // in a build, not even as a suggestion.
+  const [seed] = useState(() => config ?? getLastDavConfig());
+  const [url, setUrl] = useState(seed?.url ?? '');
+  const [username, setUsername] = useState(seed?.username ?? '');
+  const [password, setPassword] = useState(seed?.password ?? '');
+  const [outcome, setOutcome] = useState<SettingsOutcome>(null);
   const [busy, setBusy] = useState(false);
 
   async function save() {
     const normalized = normalizeDavUrl(url);
     if (!normalized) {
-      setProblem('That does not look like a server address.');
+      setOutcome({
+        tone: 'problem',
+        text: connectFailureMessage('bad-url', ''),
+      });
       return;
     }
     const candidate = {
@@ -76,26 +70,25 @@ export function ServerForm({
       username: username.trim(),
       password,
     };
+    // The last outcome stays up while this one is checked; the button's
+    // spinner says it is working.
     setBusy(true);
-    setProblem(null);
-    setNote(null);
     try {
-      const calendars = await probeConnection(candidate);
+      await probeConnection(candidate);
       await saveDavConfig(candidate);
       // Show the normalized form — the trailing slash and scheme it gained are
       // what will actually be used.
       setUrl(candidate.url);
-      setNote(
-        `Connected — ${calendars.length} calendar${calendars.length === 1 ? '' : 's'} found.`
-      );
+      setOutcome({ tone: 'success', text: 'Connected' });
       onSaved?.();
     } catch (err) {
-      setProblem(
-        connectFailureMessage(
-          classifyConnectError(err),
-          err instanceof Error ? err.message : 'Could not connect'
-        )
-      );
+      setOutcome({
+        tone: 'problem',
+        text: connectFailureMessage(
+          classifyConnectError(err, { hadLogin: Boolean(candidate.username) }),
+          err instanceof Error ? err.message : String(err)
+        ),
+      });
     } finally {
       setBusy(false);
     }
@@ -103,84 +96,130 @@ export function ServerForm({
 
   async function disconnect() {
     setBusy(true);
-    setProblem(null);
-    setNote(null);
     try {
+      // The fields keep their values: the store remembers this connection to
+      // prefill the setup screen, which replaces this one once it is cleared.
       await clearDavConfig();
-      setUrl('');
-      setUsername('');
-      setPassword('');
     } finally {
       setBusy(false);
     }
   }
 
+  return {
+    config,
+    url,
+    setUrl,
+    username,
+    setUsername,
+    password,
+    setPassword,
+    outcome,
+    busy,
+    save,
+    disconnect,
+  };
+}
+
+export type ServerFormState = ReturnType<typeof useServerForm>;
+
+/**
+ * Server URL, username and password — captions above the fields, each with
+ * its glyph — and the outcome of the last attempt beneath them. No buttons and
+ * no surface of its own: the screen around it decides both. Focus and blur
+ * are passed out so a screen can react to typing starting and stopping.
+ */
+export function ConnectionFields({
+  form,
+  onFieldFocus,
+  onFieldBlur,
+}: {
+  form: ServerFormState;
+  onFieldFocus?: () => void;
+  onFieldBlur?: () => void;
+}) {
+  // What every one of the three inputs shares.
+  const common: TextInputProps = {
+    autoCapitalize: 'none',
+    autoCorrect: false,
+    editable: !form.busy,
+    style: styles.input,
+    onFocus: onFieldFocus,
+    onBlur: onFieldBlur,
+  };
   return (
-    <>
-      <FieldRow label="Server" labelWidth={LABEL_WIDTH}>
+    <View style={styles.fields}>
+      <FieldStack label="Server URL" icon={ServerIcon}>
         <TextField
-          value={url}
-          onChangeText={setUrl}
+          {...common}
+          value={form.url}
+          onChangeText={form.setUrl}
           placeholder="https://your-server/dav/"
-          autoCapitalize="none"
-          autoCorrect={false}
           keyboardType="url"
           inputMode="url"
-          editable={!busy}
           testID="settings-url"
         />
-      </FieldRow>
-      <FieldRow label="User" labelWidth={LABEL_WIDTH}>
+      </FieldStack>
+      <FieldStack label="Username" icon={UserIcon}>
         <TextField
-          value={username}
-          onChangeText={setUsername}
+          {...common}
+          value={form.username}
+          onChangeText={form.setUsername}
           placeholder="Optional"
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!busy}
           testID="settings-username"
         />
-      </FieldRow>
-      <FieldRow label="Password" labelWidth={LABEL_WIDTH}>
+      </FieldStack>
+      <FieldStack label="Password" icon={LockIcon}>
         <TextField
-          value={password}
-          onChangeText={setPassword}
+          {...common}
+          value={form.password}
+          onChangeText={form.setPassword}
           placeholder="Optional"
-          autoCapitalize="none"
-          autoCorrect={false}
           secureTextEntry
-          editable={!busy}
           testID="settings-password"
         />
-      </FieldRow>
-      <SettingsNote>
-        Your Radicale login. Leave both blank if a proxy in front of the server
-        already supplies it.
-      </SettingsNote>
+      </FieldStack>
 
-      {problem && (
-        <SettingsProblem testID="settings-problem">{problem}</SettingsProblem>
-      )}
-      {note && <SettingsNote>{note}</SettingsNote>}
+      <SettingsOutcomeLine outcome={form.outcome} testID="settings-problem" />
+    </View>
+  );
+}
 
+/** The settings arrangement: the fields, then Disconnect and Save under them,
+ *  right-aligned with Save last. */
+export function ServerForm() {
+  const form = useServerForm();
+  return (
+    <>
+      <ConnectionFields form={form} />
       <SettingsButtonRow>
-        <SettingsButton
-          label={busy ? 'Connecting…' : saveLabel}
-          variant="filled"
-          disabled={busy}
-          onPress={save}
-          testID="settings-save"
-        />
-        {allowDisconnect && config && (
+        {form.config && (
           <SettingsButton
             label="Disconnect"
             variant="danger"
-            disabled={busy}
-            onPress={disconnect}
+            disabled={form.busy}
+            onPress={form.disconnect}
             testID="settings-disconnect"
           />
         )}
+        <SettingsButton
+          label="Save"
+          variant="filled"
+          busy={form.busy}
+          onPress={form.save}
+          testID="settings-save"
+        />
       </SettingsButtonRow>
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  // Taller than the editor's 36pt fields: three full-width inputs are the
+  // whole screen here, and they are typed into on a phone.
+  input: {
+    minHeight: CONTROL_HEIGHT,
+  },
+  fields: {
+    gap: Spacing.three - Spacing.one,
+  },
+});

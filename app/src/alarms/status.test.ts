@@ -43,31 +43,23 @@ describe('statusCopy', () => {
 
   it('routes a blocked native permission to system settings', () => {
     const copy = statusCopy('blocked', NATIVE);
-    expect(copy.label).toBe('Blocked');
+    expect(copy.label).toBe('Off');
     expect(copy.action).toBe('open-system-settings');
   });
 
-  it('blocked on web has no action and names the browser instead', () => {
-    const copy = statusCopy('blocked', WEB);
-    expect(copy.action).toBe('none');
-    expect(copy.detail).toContain('site settings');
+  it('blocked on web has no action: there are no settings to open', () => {
+    expect(statusCopy('blocked', WEB).action).toBe('none');
   });
 });
 
 describe('scheduledLabel', () => {
   it('distinguishes unknown from none', () => {
-    expect(scheduledLabel(null)).toBe('Counting scheduled reminders…');
-    expect(scheduledLabel(0)).toBe(
-      'No reminders scheduled for the next 14 days.'
-    );
+    expect(scheduledLabel(null)).toBe('Counting…');
+    expect(scheduledLabel(0)).toBe('None in the next 14 days');
   });
 
-  it('singularizes one', () => {
-    expect(scheduledLabel(1)).toBe(
-      '1 reminder scheduled for the next 14 days.'
-    );
-    expect(scheduledLabel(4)).toBe(
-      '4 reminders scheduled for the next 14 days.'
-    );
+  it('gives the count and the window', () => {
+    expect(scheduledLabel(1)).toBe('1 in the next 14 days');
+    expect(scheduledLabel(4)).toBe('4 in the next 14 days');
   });
 });

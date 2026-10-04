@@ -1,5 +1,5 @@
 import {
-  SettingsNote,
+  SettingsBlock,
   SettingsSection,
   SettingsValue,
 } from '@/components/settings/settings-parts';
@@ -26,18 +26,15 @@ export function ConnectionSection() {
           testID="settings-server-url"
         />
         <SettingsValue label="Login" value="Supplied by the server" />
-        <SettingsNote>
-          The web app talks to /dav/ on its own address, and the reverse proxy
-          in front of it supplies the credentials — so no password is ever kept
-          in this browser.
-        </SettingsNote>
       </SettingsSection>
     );
   }
 
   return (
     <SettingsSection title="Server" testID="settings-connection">
-      <ServerForm allowDisconnect saveLabel="Save" />
+      <SettingsBlock>
+        <ServerForm />
+      </SettingsBlock>
     </SettingsSection>
   );
 }

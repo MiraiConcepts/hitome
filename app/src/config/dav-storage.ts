@@ -11,13 +11,40 @@ import * as SecureStore from 'expo-secure-store';
 import type { DavConfig } from './dav-config';
 
 const KEY = 'dav-config';
+/** The connection as it was when it was last disconnected — kept so that
+ *  signing out and back in again does not mean retyping it. */
+const LAST_KEY = 'dav-config-last';
 
 /** True where a typed-in server address is the way in (i.e. not web). */
 export const CONFIGURABLE = true;
 
-export async function readStoredConfig(): Promise<DavConfig | null> {
+export function readStoredConfig(): Promise<DavConfig | null> {
+  return readItem(KEY);
+}
+
+export async function writeStoredConfig(config: DavConfig): Promise<void> {
+  await SecureStore.setItemAsync(KEY, JSON.stringify(config));
+}
+
+export async function clearStoredConfig(): Promise<void> {
+  await SecureStore.deleteItemAsync(KEY);
+}
+
+export function readLastConfig(): Promise<DavConfig | null> {
+  return readItem(LAST_KEY);
+}
+
+export async function writeLastConfig(config: DavConfig): Promise<void> {
+  await SecureStore.setItemAsync(LAST_KEY, JSON.stringify(config));
+}
+
+export async function clearLastConfig(): Promise<void> {
+  await SecureStore.deleteItemAsync(LAST_KEY);
+}
+
+async function readItem(key: string): Promise<DavConfig | null> {
   try {
-    const raw = await SecureStore.getItemAsync(KEY);
+    const raw = await SecureStore.getItemAsync(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<DavConfig>;
     if (typeof parsed.url !== 'string' || !parsed.url) return null;
@@ -31,12 +58,4 @@ export async function readStoredConfig(): Promise<DavConfig | null> {
     // screen is a better answer than a crash on launch.
     return null;
   }
-}
-
-export async function writeStoredConfig(config: DavConfig): Promise<void> {
-  await SecureStore.setItemAsync(KEY, JSON.stringify(config));
-}
-
-export async function clearStoredConfig(): Promise<void> {
-  await SecureStore.deleteItemAsync(KEY);
 }

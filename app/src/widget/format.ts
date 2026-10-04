@@ -30,7 +30,8 @@ const MONTHS_SHORT = [
   'Jun',
   'Jul',
   'Aug',
-  'Sep',
+  // 'Sept', not 'Sep': the app's own month labels abbreviate it this way.
+  'Sept',
   'Oct',
   'Nov',
   'Dec',

@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { listCalendars, type CalendarChoice } from '@/caldav/events';
+import { CheckIcon } from '@/components/icons';
 import {
-  SettingsNote,
-  SettingsProblem,
+  Card,
+  CONTROL_HEIGHT,
+  SettingsBlock,
+  SettingsMessage,
   SettingsSection,
 } from '@/components/settings/settings-parts';
 import { ThemedText } from '@/components/themed-text';
@@ -15,9 +18,7 @@ import { useTheme } from '@/hooks/use-theme';
 /**
  * Which calendar new events go into. Every discovered calendar is read and
  * drawn regardless — this is only the write target, which CalDAV has no way to
- * express, so the app has to. Until now it was matched by hardcoded display
- * name and fell back to discovery order for anyone whose calendar was not
- * called 'carrein-calendar'.
+ * express, so the app has to.
  */
 export function CalendarsSection() {
   const theme = useTheme();
@@ -48,64 +49,68 @@ export function CalendarsSection() {
   return (
     <SettingsSection title="Calendars" testID="settings-calendars">
       {problem && (
-        <SettingsProblem testID="settings-calendars-problem">
-          {problem}
-        </SettingsProblem>
+        <SettingsBlock>
+          <SettingsMessage tone="problem" testID="settings-calendars-problem">
+            {problem}
+          </SettingsMessage>
+        </SettingsBlock>
       )}
-      {!calendars && !problem && <SettingsNote>Loading…</SettingsNote>}
+      {!calendars && !problem && (
+        <SettingsBlock>
+          <SettingsMessage>Loading…</SettingsMessage>
+        </SettingsBlock>
+      )}
       {calendars?.map((calendar) => {
         const selected = calendar.url === selectedUrl;
         return (
-          <Pressable
+          <SettingsBlock
             key={calendar.url}
             onPress={() => setDefaultCalendar(calendar.url)}
-            accessibilityRole="radio"
-            accessibilityState={{ selected }}
-            hitSlop={6}
-            style={({ pressed }) => [
-              styles.row,
-              pressed && { backgroundColor: theme.backgroundSelected },
-            ]}
+            selected={selected}
             testID={`settings-calendar-${calendar.name}`}
           >
-            <View
-              style={[
-                styles.swatch,
-                { backgroundColor: calendar.color ?? theme.backgroundSelected },
-              ]}
-            />
-            <ThemedText type="small" style={styles.name}>
-              {calendar.name}
-            </ThemedText>
-            {selected && (
-              <ThemedText type="smallBold" style={styles.selected}>
-                New events
+            <View style={styles.row}>
+              <View
+                style={[
+                  styles.swatch,
+                  {
+                    backgroundColor: calendar.color ?? theme.backgroundSelected,
+                  },
+                ]}
+              />
+              <ThemedText type="small" style={styles.name}>
+                {calendar.name}
               </ThemedText>
-            )}
-          </Pressable>
+              {selected && <CheckIcon size={CHECK_SIZE} color={AccentColor} />}
+            </View>
+          </SettingsBlock>
         );
       })}
-      {calendars && (
-        <SettingsNote>
-          Every calendar is shown in the grid. This only picks where a new event
-          is created.
-        </SettingsNote>
+      {calendars && calendars.length > 0 && (
+        // What the tick means, once, at the foot of the card — the list
+        // itself stays just the calendars.
+        <SettingsBlock>
+          <SettingsMessage icon={CheckIcon}>
+            Where new events go. Tap a calendar to change.
+          </SettingsMessage>
+        </SettingsBlock>
       )}
     </SettingsSection>
   );
 }
 
+const CHECK_SIZE = 20;
+
 const styles = StyleSheet.create({
+  // A control-height row once SettingsBlock's own padding is added.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    minHeight: 36,
-    paddingHorizontal: Spacing.one,
-    borderRadius: Spacing.one,
+    minHeight: CONTROL_HEIGHT - 2 * Card.padV,
   },
   // The same 8pt dot the day popover and the chip row use for a calendar's
-  // colour; borderRadius 4 on an 8pt box is a circle, not the 4px rounding.
+  // colour; borderRadius 4 on an 8pt box is a circle — the one shape left round.
   swatch: {
     width: 8,
     height: 8,
@@ -113,8 +118,5 @@ const styles = StyleSheet.create({
   },
   name: {
     flex: 1,
-  },
-  selected: {
-    color: AccentColor,
   },
 });

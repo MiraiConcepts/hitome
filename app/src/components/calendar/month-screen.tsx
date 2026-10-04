@@ -312,8 +312,11 @@ export function MonthScreen() {
     []
   );
 
+  // Short month names ('Sept 2026'), the same abbreviation the grid uses for
+  // a month's first day. Spelled out, the longest months wrapped onto a second
+  // line beside the header's buttons on a phone.
   const monthLabel = monthDate.toLocaleDateString(undefined, {
-    month: 'long',
+    month: 'short',
     year: 'numeric',
   });
 
@@ -471,7 +474,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Spacing.three,
     padding: Spacing.three,
-    borderRadius: Spacing.one,
     marginBottom: Spacing.two,
   },
   errorText: {
@@ -522,7 +524,6 @@ const styles = StyleSheet.create({
     gap: Spacing.four,
     // Inverse surface: the snack keeps the dark palette in both schemes.
     backgroundColor: Colors.dark.backgroundSelected,
-    borderRadius: Spacing.one,
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,
     maxWidth: 480,

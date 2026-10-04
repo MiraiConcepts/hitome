@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -10,7 +10,13 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { AddIcon, RefreshIcon, SettingsIcon } from '@/components/icons';
+import {
+  AddIcon,
+  CalendarEventIcon,
+  RefreshIcon,
+  SettingsIcon,
+} from '@/components/icons';
+import { LoadingBar } from '@/components/loading-bar';
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, FontFamilyBold, Spacing } from '@/constants/theme';
 import { agoLabel, longDayLabel } from '@/utils/date';
@@ -21,7 +27,7 @@ type Props = {
   /** year*12 + month0 of the visible month — orders labels so the slide
    *  direction matches the scroll direction. */
   monthIndex: number;
-  /** Show a small spinner next to the label (initial fetch only). */
+  /** Sweep the loading bar along the top edge (initial fetch only). */
   loading: boolean;
   /** Spin the refresh icon (a button-pressed refresh is in flight). */
   refreshing: boolean;
@@ -69,6 +75,13 @@ const Bar = {
  * it. month-screen imports it for the weekday row.
  */
 export const HEADER_GROUND = '#000000';
+
+/** The month title's type ("Oct 2026"), for anything that should be set the
+ *  same way — the setup screen's app name. */
+export const HEADER_TITLE_TYPE = {
+  fontSize: Bar.titleSize,
+  lineHeight: Math.round(Bar.titleSize * Bar.titleLineRatio),
+} as const;
 
 /** Label slide-through when the visible month changes mid-scroll. */
 const LABEL_FADE_OUT_MS = 100;
@@ -188,6 +201,8 @@ export function MonthHeader({
 
   return (
     <View style={styles.header}>
+      {/* The first fetch's progress, along the very top of the screen. */}
+      <LoadingBar visible={loading} />
       <View style={styles.labelColumn}>
         <View style={styles.labelWrap}>
           <Pressable
@@ -206,7 +221,6 @@ export function MonthHeader({
               </ThemedText>
             </Animated.View>
           </Pressable>
-          {loading && <ActivityIndicator size="small" color={AccentColor} />}
         </View>
         {/* Today's date, which is worth reading from any month — it is what
             the blue cell means once you have scrolled away from it. A
@@ -214,19 +228,25 @@ export function MonthHeader({
             so that is the only time it appears, and it appears in red with the
             reason attached. Fixed height in both states, so nothing here can
             push the grid down when it changes. */}
-        <ThemedText
-          testID="calendar-updated"
-          style={[styles.updated, offline && styles.updatedOffline]}
-        >
-          {!offline
-            ? longDayLabel(today)
-            : authFailed
-              ? 'Login rejected · open Settings'
-              : fetchedAt
-                ? `Offline · Updated ${agoLabel(fetchedAt, new Date())}`
-                : // Nothing has ever landed, so there is no age to report.
-                  'Offline'}
-        </ThemedText>
+        <View style={styles.updatedRow}>
+          {!offline && (
+            // Marks the line as today's date rather than the visible month's.
+            <CalendarEventIcon size={Bar.subtitleSize} color={AccentColor} />
+          )}
+          <ThemedText
+            testID="calendar-updated"
+            style={[styles.updated, offline && styles.updatedOffline]}
+          >
+            {!offline
+              ? longDayLabel(today)
+              : authFailed
+                ? 'Login rejected · open Settings'
+                : fetchedAt
+                  ? `Offline · Updated ${agoLabel(fetchedAt, new Date())}`
+                  : // Nothing has ever landed, so there is no age to report.
+                    'Offline'}
+          </ThemedText>
+        </View>
       </View>
       <View style={styles.controls}>
         <Pressable
@@ -292,6 +312,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     flexShrink: 1,
+  },
+  updatedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one + Spacing.half,
   },
   updated: {
     color: AccentColor,

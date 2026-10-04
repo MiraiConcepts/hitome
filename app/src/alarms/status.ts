@@ -31,8 +31,6 @@ export type StatusAction = 'enable' | 'open-system-settings' | 'none';
 export type StatusCopy = {
   /** The status row's value — one or two words. */
   label: string;
-  /** The line under it, explaining what that means for reminders. */
-  detail: string;
   action: StatusAction;
 };
 
@@ -48,36 +46,34 @@ export function statusCopy(
     case 'unsupported':
       return {
         label: 'Unsupported',
-        detail:
-          'This browser cannot show notifications, so reminders stay put.',
         action: 'none',
       };
     case 'granted':
       return {
         label: 'Allowed',
-        detail: 'Reminders can ring here. Send a test to be sure.',
         action: 'none',
       };
     case 'undetermined':
       return {
-        label: 'Not asked yet',
-        detail: 'Allow notifications so event reminders can ring.',
+        // Shown beside the toggle, so it only has to say on or off; how it
+        // got that way (never asked, or switched off) is not the reader's
+        // concern.
+        label: 'Off',
         action: 'enable',
       };
     case 'blocked':
       return {
-        label: 'Blocked',
-        detail: canOpenSystemSettings
-          ? 'Notifications are off for hitome — no reminder will ring until they are turned back on.'
-          : "Notifications are blocked for this site — turn them back on in your browser's site settings.",
+        label: 'Off',
         action: canOpenSystemSettings ? 'open-system-settings' : 'none',
       };
   }
 }
 
-/** '3 reminders scheduled' — the reconciler's real output, in one line. */
+/** The Reminders row's value — how many reminders are set to ring, from the
+ *  reconciler's real output: '3 in the next 14 days'. The row's label says
+ *  what is being counted, so this only gives the number and the window. */
 export function scheduledLabel(count: number | null): string {
-  if (count === null) return 'Counting scheduled reminders…';
-  if (count === 0) return 'No reminders scheduled for the next 14 days.';
-  return `${count} reminder${count === 1 ? '' : 's'} scheduled for the next 14 days.`;
+  if (count === null) return 'Counting…';
+  if (count === 0) return 'None in the next 14 days';
+  return `${count} in the next 14 days`;
 }

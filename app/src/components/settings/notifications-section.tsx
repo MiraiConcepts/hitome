@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { AppState, Linking, Platform } from 'react-native';
 
 import {
-  CHANNEL_ID,
   listScheduledAlarmIds,
   permissionSnapshot,
   requestPermissionIfNeeded,
@@ -17,16 +16,25 @@ import {
 } from '@/alarms/status';
 import {
   SettingsButton,
+  SettingsBlock,
   SettingsButtonRow,
-  SettingsNote,
-  SettingsProblem,
+  SettingsOutcomeLine,
   SettingsSection,
+  SettingsToggle,
   SettingsValue,
+  type SettingsOutcome,
 } from '@/components/settings/settings-parts';
 
 // Android can be sent to the app's own notification settings; a browser's site
 // permission is only reversible from the browser's own UI.
 const CAN_OPEN_SYSTEM_SETTINGS = Platform.OS !== 'web';
+
+const PERMISSION_OFF =
+  'Notifications are off. Turn on Permission to send a test.';
+const TEST_SENT =
+  TEST_DELAY_SECONDS > 0
+    ? `Sent — it should arrive in about ${TEST_DELAY_SECONDS} seconds. Leave the app to check it rings in the background.`
+    : 'Sent — it should have appeared just now.';
 
 /**
  * Reminder plumbing, made visible. Everything under here already existed —
@@ -40,8 +48,7 @@ const CAN_OPEN_SYSTEM_SETTINGS = Platform.OS !== 'web';
 export function NotificationsSection() {
   const [snapshot, setSnapshot] = useState<PermissionSnapshot | null>(null);
   const [scheduled, setScheduled] = useState<number | null>(null);
-  const [note, setNote] = useState<string | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<SettingsOutcome>(null);
   const [busy, setBusy] = useState(false);
   // Bumped to re-read the platform, which is the only place this state lives.
   const [reads, setReads] = useState(0);
@@ -74,79 +81,106 @@ export function NotificationsSection() {
     ? statusCopy(state, { canOpenSystemSettings: CAN_OPEN_SYSTEM_SETTINGS })
     : null;
 
-  async function run(work: () => Promise<void>, after?: string) {
+  // Turning notifications on answers the "they are off" message; showing it
+  // still would contradict the toggle right above it.
+  const shownOutcome =
+    state === 'granted' && outcome?.kind === 'permission-off' ? null : outcome;
+
+  /** Runs an action, then shows how it went. The previous outcome stays up
+   *  until then, so the card does not shrink and grow back on every tap. */
+  async function run(work: () => Promise<void>, success?: string) {
     setBusy(true);
-    setProblem(null);
-    setNote(null);
     try {
       await work();
-      if (after) setNote(after);
+      if (success) setOutcome({ tone: 'note', text: success });
     } catch (err) {
-      setProblem(err instanceof Error ? err.message : 'That did not work');
+      setOutcome({
+        tone: 'problem',
+        text: err instanceof Error ? err.message : 'That did not work',
+      });
     } finally {
       setBusy(false);
       setReads((n) => n + 1);
     }
   }
 
+  /**
+   * Checks the permission at the moment of sending, not the snapshot on
+   * screen: a notification scheduled without it is accepted by the platform
+   * and then silently never shown, which would make "Sent" a lie.
+   */
+  async function sendTest() {
+    const fresh = await permissionSnapshot();
+    if (permissionState(fresh) !== 'granted') {
+      setSnapshot(fresh);
+      setOutcome({
+        tone: 'problem',
+        text: PERMISSION_OFF,
+        kind: 'permission-off',
+      });
+      return;
+    }
+    await run(sendTestNotification, TEST_SENT);
+  }
+
   return (
     <SettingsSection title="Notifications" testID="settings-notifications">
       <SettingsValue
         label="Permission"
-        value={copy?.label ?? 'Checking…'}
+        value={
+          copy && state !== 'unsupported' ? (
+            <SettingsToggle
+              on={state === 'granted'}
+              label={copy.label}
+              disabled={
+                busy ||
+                // Only the prompt can be shown from here where there are no
+                // system settings to open (web).
+                (!CAN_OPEN_SYSTEM_SETTINGS && copy.action !== 'enable')
+              }
+              onPress={() =>
+                run(() =>
+                  // Off and never asked: the system prompt. Anything else —
+                  // blocked, or on (an app cannot revoke its own permission) —
+                  // is changed in the system's settings for this app; the
+                  // section re-reads when the app comes back to the front.
+                  copy.action === 'enable'
+                    ? requestPermissionIfNeeded()
+                    : Linking.openSettings()
+                )
+              }
+              testID="settings-permission-toggle"
+            />
+          ) : (
+            (copy?.label ?? 'Checking…')
+          )
+        }
         testID="settings-permission"
       />
-      {copy && <SettingsNote>{copy.detail}</SettingsNote>}
 
       <SettingsValue
-        label="Scheduled"
+        label="Reminders"
         value={scheduledLabel(scheduled)}
         testID="settings-scheduled"
       />
-      <SettingsNote>
-        Channel {CHANNEL_ID} · {Platform.OS}
-      </SettingsNote>
 
-      {problem && (
-        <SettingsProblem testID="settings-notifications-problem">
-          {problem}
-        </SettingsProblem>
-      )}
-      {note && <SettingsNote>{note}</SettingsNote>}
-
-      <SettingsButtonRow>
-        {copy?.action === 'enable' && (
-          <SettingsButton
-            label="Enable notifications"
-            variant="filled"
-            disabled={busy}
-            onPress={() => run(() => requestPermissionIfNeeded())}
-            testID="settings-enable-notifications"
-          />
-        )}
-        {copy?.action === 'open-system-settings' && (
-          <SettingsButton
-            label="Open system settings"
-            variant="filled"
-            disabled={busy}
-            onPress={() => run(() => Linking.openSettings())}
-            testID="settings-open-system-settings"
-          />
-        )}
-        <SettingsButton
-          label="Send a test notification"
-          disabled={busy || state === 'unsupported' || state === 'blocked'}
-          onPress={() =>
-            run(
-              sendTestNotification,
-              TEST_DELAY_SECONDS > 0
-                ? `Sent — it should arrive in about ${TEST_DELAY_SECONDS} seconds. Leave the app to check it rings in the background.`
-                : 'Sent — it should have appeared just now.'
-            )
-          }
-          testID="settings-test-notification"
+      <SettingsBlock>
+        <SettingsOutcomeLine
+          outcome={shownOutcome}
+          testID="settings-notifications-problem"
         />
-      </SettingsButtonRow>
+
+        <SettingsButtonRow>
+          <SettingsButton
+            label="Send a test notification"
+            variant="filled"
+            busy={busy}
+            disabled={state === 'unsupported'}
+            onPress={sendTest}
+            testID="settings-test-notification"
+          />
+        </SettingsButtonRow>
+      </SettingsBlock>
     </SettingsSection>
   );
 }

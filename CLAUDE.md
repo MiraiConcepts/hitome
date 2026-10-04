@@ -8,7 +8,9 @@ Split out of a sibling notes app, which keeps the notes canvas and its
 Hocuspocus/blob backend. The two share a design language via
 `MiraiConcepts/tokens`; the primitives in `src/constants/theme.ts` and
 `src/components/` are currently a **verbatim copy** of that app's — keep them
-byte-identical until both move onto `MiraiConcepts/components`.
+byte-identical until both move onto `MiraiConcepts/components` (currently
+diverged on corner radius — see Invariants — and on three theme colours
+hitome added: `placeholder`, and `rule`/`ruleStrong` for the settings card).
 
 ## Layout
 
@@ -75,7 +77,10 @@ helper scripts.
     pointing the app at the injecting proxy means sending none.
   - Never reintroduce credential baking, and never store a credential anywhere
     a browser can read it.
-- Rounded UI is 4px (`Spacing.one`; literal `4` in the widget). Exception:
-  month-grid banners and chip bars are square and flush.
+- UI is square: no corner radius on cards, buttons, fields, chips, sheets or
+  the widget (changed from 4px on 2026-10-04). Only true circles stay round —
+  the 8pt calendar-colour dots and the month grid's tap ripple. This breaks
+  byte-identity with the notes app's `theme.ts`/`src/components/` until it
+  makes the same change.
 - Ports on this Mac: 8080 and 8880 belong to unrelated dev servers, 8881 is
   this repo's e2e proxy, 8882 is this repo's dev proxy.
