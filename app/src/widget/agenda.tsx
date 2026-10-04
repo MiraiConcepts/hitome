@@ -16,6 +16,8 @@ import {
 
 import {
   AddOutlineBody,
+  ArrowRightOutlineBody,
+  EyeOutlineBody,
   GiftOutlineBody,
   RefreshOutlineBody,
   SunOutlineBody,
@@ -60,6 +62,8 @@ const iconSvg = (color: string, body: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${body.replace(/currentColor/g, color)}</svg>`;
 const ADD_ICON = iconSvg(OnAccentColor, AddOutlineBody);
 const REFRESH_ICON = iconSvg(OnAccentColor, RefreshOutlineBody);
+const BRAND_ICON = iconSvg(OnAccentColor, EyeOutlineBody);
+const ARROW_ICON = iconSvg(OnAccentColor, ArrowRightOutlineBody);
 
 /** An event's source-calendar color, alpha stripped for SVG fills / ColorProp;
  *  uncolored / default-calendar events keep the theme accent. */
@@ -333,7 +337,7 @@ function Body({
   const message = !configured
     ? 'Open hitome to set up your calendar'
     : !cache
-      ? 'Calendar unreachable — tap ↻ on the tailnet'
+      ? 'Calendar unreachable — tap ↻ to try again'
       : cache.events.length === 0
         ? 'No events in the next 60 days'
         : null;
@@ -372,6 +376,50 @@ function Body({
   );
 }
 
+/**
+ * Before any server is set up: no date bar, no buttons that would do nothing
+ * — the whole widget one orange card asking to connect, and a tap anywhere
+ * opening hitome on its connect screen.
+ */
+function SignedOut() {
+  const ink = hex(OnAccentColor);
+  return (
+    <FlexWidget
+      clickAction="OPEN_APP"
+      style={{
+        width: 'match_parent',
+        height: 'match_parent',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        backgroundColor: hex(AccentColor),
+        padding: 16,
+      }}
+      accessibilityLabel="Connect your calendar — opens hitome"
+    >
+      <FlexWidget
+        style={{ flexDirection: 'row', alignItems: 'center', flexGap: 8 }}
+      >
+        <SvgWidget svg={BRAND_ICON} style={{ width: 20, height: 20 }} />
+        <TextWidget
+          text="hitome"
+          style={{ fontSize: 15, fontFamily: FontFamilyBold, color: ink }}
+        />
+      </FlexWidget>
+      <FlexWidget style={{ flexDirection: 'column', flexGap: 6 }}>
+        <TextWidget
+          text={'Connect your\ncalendar'}
+          style={{ fontSize: 26, fontFamily: FontFamilyBold, color: ink }}
+        />
+        <TextWidget
+          text="Tap to sign in to your server"
+          style={{ fontSize: 13, fontFamily: FontFamily, color: ink }}
+        />
+      </FlexWidget>
+      <SvgWidget svg={ARROW_ICON} style={{ width: 24, height: 24 }} />
+    </FlexWidget>
+  );
+}
+
 function Agenda({
   cache,
   now,
@@ -383,6 +431,7 @@ function Agenda({
   palette: Palette;
   configured: boolean;
 }) {
+  if (!configured) return <SignedOut />;
   const onAccent = hex(OnAccentColor);
   return (
     <FlexWidget

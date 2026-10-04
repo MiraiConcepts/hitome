@@ -17,11 +17,7 @@ import {
   ConnectionFields,
   useServerForm,
 } from '@/components/settings/server-form';
-import {
-  SettingsBlock,
-  SettingsButton,
-  SettingsSection,
-} from '@/components/settings/settings-parts';
+import { SettingsButton } from '@/components/settings/settings-parts';
 import { HEADER_TITLE_TYPE } from '@/components/calendar/month-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -75,17 +71,12 @@ export function SetupScreen() {
             </Animated.View>
           </Animated.View>
           <Animated.View layout={COLLAPSE}>
-            {/* The same card the Server section of settings sits in. */}
-            <SettingsSection title="Server">
-              <SettingsBlock>
-                <ConnectionFields
-                  form={form}
-                  onFieldFocus={onFieldFocus}
-                  onFieldBlur={onFieldBlur}
-                  help
-                />
-              </SettingsBlock>
-            </SettingsSection>
+            <ConnectionFields
+              form={form}
+              onFieldFocus={onFieldFocus}
+              onFieldBlur={onFieldBlur}
+              help
+            />
           </Animated.View>
         </ScrollView>
         <View

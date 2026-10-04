@@ -122,3 +122,7 @@ export const ShieldLockOutlineBody =
 // Connect screen: the expandable "what do I enter" help.
 export const HelpCircleOutlineBody =
   '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0-18 0m9 4v.01"/><path d="M12 13a2 2 0 0 0 .914-3.782a1.98 1.98 0 0 0-2.414.483"/></g>';
+
+// Widget: the signed-out widget's "tap to continue" arrow.
+export const ArrowRightOutlineBody =
+  '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-6 6l6-6m-6-6l6 6"/>';
