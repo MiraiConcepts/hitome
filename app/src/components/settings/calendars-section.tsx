@@ -189,12 +189,11 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     minHeight: CONTROL_HEIGHT - 2 * Card.padV,
   },
-  // The same 8pt dot the day popover and the chip row use for a calendar's
-  // colour; borderRadius 4 on an 8pt box is a circle — the one shape left round.
+  // The same 8pt square the day popover and the chip row use for a
+  // calendar's colour.
   swatch: {
     width: 8,
     height: 8,
-    borderRadius: 4,
   },
   name: {
     flex: 1,

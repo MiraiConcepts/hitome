@@ -132,7 +132,6 @@ const styles = StyleSheet.create({
   dot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
     marginTop: 4, // sit level with the first text line
   },
   time: {
