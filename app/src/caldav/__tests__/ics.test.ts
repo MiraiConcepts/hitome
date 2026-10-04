@@ -1,4 +1,13 @@
-import { buildEventICS, editPreserving, expandEvents } from '../ics';
+import {
+  buildEventICS,
+  editPreserving,
+  expandEvents,
+  setWriteZone,
+} from '../ics';
+
+// UTC whatever the machine's zone: zones.test.ts covers writing in one.
+beforeAll(() => setWriteZone('UTC'));
+afterAll(() => setWriteZone(undefined));
 
 // A realistic Apple-created event: carries VTIMEZONE, ORGANIZER, ATTENDEE and an
 // X-APPLE-* extension — all of which MUST survive an edit (the plan's #1 risk).
@@ -91,14 +100,15 @@ describe('editPreserving', () => {
     expect(removed).not.toContain('BEGIN:VALARM');
   });
 
-  it('rewrites times as UTC without leaving a stale TZID parameter', () => {
+  it('keeps a zoned event in its own zone, with one TZID', () => {
     const out = editPreserving(APPLE_EVENT, {
       start: new Date('2026-06-05T06:00:00Z'),
       end: new Date('2026-06-05T07:00:00Z'),
       allDay: false,
     });
-    expect(out).toContain('DTSTART:20260605T060000Z');
-    expect(out).not.toMatch(/DTSTART;TZID/);
+    // 06:00Z is 14:00 in Singapore.
+    expect(out).toContain('DTSTART;TZID=Asia/Singapore:20260605T140000');
+    expect(out.match(/BEGIN:VTIMEZONE/g)).toHaveLength(1);
   });
 
   it('keeps all-day events VALUE=DATE with a non-inclusive DTEND', () => {

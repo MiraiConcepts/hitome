@@ -36,6 +36,7 @@
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.8.3",
     "text-encoding": "^0.7.0",
+    "timezones-ical-library": "^2.3.2",
     "tsdav": "^2.3.0"
   },
   "devDependencies": {

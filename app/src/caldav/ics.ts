@@ -2,6 +2,7 @@
 // is unit-testable offline (the property-preservation test is the plan's #1 risk).
 import IcalExpander from 'ical-expander';
 import ICAL from 'ical.js';
+import { tzlib_get_ical_block } from 'timezones-ical-library';
 
 import { applyRecurrence, masterVevent } from './rrule';
 import type { CalEvent, EventChanges, EventInput, EventSource } from './types';
@@ -87,13 +88,108 @@ function toAllDayTime(d: Date) {
   );
 }
 
+/** Now, in UTC — what DTSTAMP and LAST-MODIFIED must be (RFC 5545 3.8.7);
+ *  ICAL.Time.now() is floating local time, written without the Z. */
+const utcNow = () => ICAL.Time.fromJSDate(new Date(), true);
+
+/** The zone new times are written in: the phone's, handed over at launch by
+ *  utils/region (the headless tasks get it too); the runtime's otherwise. */
+let writeZone: string | undefined;
+export function setWriteZone(zone: string | undefined): void {
+  writeZone = zone || undefined;
+}
+function deviceZone(): string | undefined {
+  try {
+    return writeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return writeZone;
+  }
+}
+
 /**
- * DTSTART/DTEND pair for an event. Timed events are written as UTC (`Z`) to avoid
- * needing a registered VTIMEZONE (first-cut decision); all-day events get a
- * VALUE=DATE pair with the non-inclusive DTEND (+1 day).
+ * The zone a timed write uses, and its VTIMEZONE in the calendar (added when
+ * missing). An event that already has a zone keeps it — like Google
+ * Calendar, an event stays pinned to the zone it was made in, so a 9:00
+ * Tokyo meeting is still 9:00 Tokyo after an edit from Singapore. Anything
+ * else (new, or written as UTC before zones existed) takes the phone's.
+ * Undefined means UTC: a zone with no definition to embed.
  */
-function toTimePair(start: Date, end: Date, allDay: boolean) {
+function writeTimezone(
+  vcalendar: ICAL.Component,
+  vevent?: ICAL.Component
+): ICAL.Timezone | undefined {
+  const own = vevent?.getFirstProperty('dtstart')?.getParameter('tzid');
+  if (typeof own === 'string') {
+    const embedded = vcalendar
+      .getAllSubcomponents('vtimezone')
+      .find((tz) => tz.getFirstPropertyValue('tzid') === own);
+    if (embedded) return new ICAL.Timezone(embedded);
+  }
+  const name = typeof own === 'string' ? own : deviceZone();
+  if (!name || name === 'UTC' || name === 'Etc/UTC') return undefined;
+  let block: string | undefined;
+  try {
+    const found = tzlib_get_ical_block(name) as unknown;
+    block = Array.isArray(found) ? found[0] : undefined;
+  } catch {
+    block = undefined;
+  }
+  if (!block || !block.startsWith('BEGIN:VTIMEZONE')) return undefined;
+  const component = new ICAL.Component(ICAL.parse(block));
+  if (
+    !vcalendar
+      .getAllSubcomponents('vtimezone')
+      .some((tz) => tz.getFirstPropertyValue('tzid') === name)
+  )
+    vcalendar.addSubcomponent(component);
+  return new ICAL.Timezone(component);
+}
+
+/** An instant as wall-clock time in a zone. */
+function zonedTime(d: Date, zone: ICAL.Timezone): ICAL.Time {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: zone.tzid,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+    })
+      .formatToParts(d)
+      .map((p) => [p.type, Number(p.value)])
+  );
+  return ICAL.Time.fromData(
+    {
+      year: parts.year,
+      month: parts.month,
+      day: parts.day,
+      hour: parts.hour,
+      minute: parts.minute,
+      second: parts.second,
+    },
+    zone
+  );
+}
+
+/**
+ * DTSTART/DTEND pair for an event. Timed events are written in a zone (see
+ * writeTimezone) so a repeating 9:00 stays 9:00 across daylight saving —
+ * UTC, the first cut, drifted an hour twice a year; UTC remains the fallback
+ * for a zone with no definition. All-day events get a VALUE=DATE pair with
+ * the non-inclusive DTEND (+1 day).
+ */
+function toTimePair(
+  start: Date,
+  end: Date,
+  allDay: boolean,
+  zone?: ICAL.Timezone
+) {
   if (!allDay) {
+    if (zone)
+      return { start: zonedTime(start, zone), end: zonedTime(end, zone) };
     return {
       start: ICAL.Time.fromJSDate(start, true), // useUTC
       end: ICAL.Time.fromJSDate(end, true),
@@ -119,7 +215,12 @@ export function buildEventICS(input: EventInput, uid: string): string {
   event.summary = input.summary;
 
   // ICAL.Event setters manage the TZID parameter / VALUE=DATE type correctly.
-  const { start, end } = toTimePair(input.start, input.end, input.allDay);
+  const { start, end } = toTimePair(
+    input.start,
+    input.end,
+    input.allDay,
+    input.allDay ? undefined : writeTimezone(vcalendar)
+  );
   event.startDate = start;
   event.endDate = end;
 
@@ -130,7 +231,7 @@ export function buildEventICS(input: EventInput, uid: string): string {
   // After the DTSTART write — the weekdays rotation and UNTIL type read it.
   if (input.recurrence) applyRecurrence(vevent, input.recurrence);
   if (input.alarm) applyAlarm(vevent, input.alarm);
-  vevent.updatePropertyWithValue('dtstamp', ICAL.Time.now());
+  vevent.updatePropertyWithValue('dtstamp', utcNow());
 
   vcalendar.addSubcomponent(vevent);
   return vcalendar.toString();
@@ -141,6 +242,7 @@ export type EditScope = 'this' | 'following' | 'all';
 
 /** Writes the field changes (not the repeat rule) onto one VEVENT. */
 function applyFieldChanges(
+  vcalendar: ICAL.Component,
   vevent: ICAL.Component,
   changes: EventChanges,
   times?: { start: Date; end: Date; allDay: boolean }
@@ -153,7 +255,12 @@ function applyFieldChanges(
   if (times) {
     // Event setters replace the TZID parameter / value type instead of leaving a
     // stale `;TZID=` next to a rewritten value (updatePropertyWithValue would).
-    const { start, end } = toTimePair(times.start, times.end, times.allDay);
+    const { start, end } = toTimePair(
+      times.start,
+      times.end,
+      times.allDay,
+      times.allDay ? undefined : writeTimezone(vcalendar, vevent)
+    );
     event.startDate = start;
     event.endDate = end;
   }
@@ -162,7 +269,7 @@ function applyFieldChanges(
 
 /** Bump revision metadata only — never X-APPLE-*, ATTENDEE, ORGANIZER. */
 function touch(vevent: ICAL.Component): void {
-  vevent.updatePropertyWithValue('last-modified', ICAL.Time.now());
+  vevent.updatePropertyWithValue('last-modified', utcNow());
   const seq = Number(vevent.getFirstPropertyValue('sequence') ?? 0);
   vevent.updatePropertyWithValue('sequence', seq + 1);
 }
@@ -204,7 +311,7 @@ export function editPreserving(
       allDay: changes.allDay ?? false,
     };
   }
-  applyFieldChanges(vevent, changes, times);
+  applyFieldChanges(vcalendar, vevent, changes, times);
   if (times) shiftExceptions(vcalendar, vevent, before);
   // After any DTSTART change — the weekdays rotation reads the new value.
   // The editor only emits these for rules/alarms it owns ('custom'/'foreign'
@@ -339,7 +446,7 @@ export function editOccurrence(
     const rid = new ICAL.Property('recurrence-id');
     setLikeDtstart(rid, master, occurrenceTime(master, recurrenceStart));
     override.addProperty(rid);
-    override.updatePropertyWithValue('dtstamp', ICAL.Time.now());
+    override.updatePropertyWithValue('dtstamp', utcNow());
     vcalendar.addSubcomponent(override);
   }
 
@@ -356,7 +463,7 @@ export function editOccurrence(
       : created
         ? occurrence
         : undefined;
-  applyFieldChanges(override, changes, times);
+  applyFieldChanges(vcalendar, override, changes, times);
   touch(override);
   return vcalendar.toString();
 }
@@ -475,7 +582,7 @@ export function splitSeries(
   const first = new ICAL.Component(structuredClone(master.jCal));
   first.updatePropertyWithValue('uid', uid);
   first.updatePropertyWithValue('sequence', 0);
-  first.updatePropertyWithValue('dtstamp', ICAL.Time.now());
+  first.updatePropertyWithValue('dtstamp', utcNow());
   first.removeAllProperties('rdate');
   for (const ex of first.getAllProperties('exdate'))
     if ((ex.getFirstValue() as ICAL.Time).toUnixTime() < recurrenceStart)
@@ -489,6 +596,7 @@ export function splitSeries(
     first.updatePropertyWithValue('rrule', ICAL.Recur.fromData(data));
   }
   applyFieldChanges(
+    tail,
     first,
     changes,
     changes.start && changes.end
