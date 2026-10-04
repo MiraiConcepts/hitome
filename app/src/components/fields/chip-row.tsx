@@ -175,9 +175,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 16,
   },
-  // Lifted 1pt: the glyphs sit low in their line box, below the square.
+  // Lifted 2pt: the glyphs sit low in their line box, below the square.
   labelBox: {
-    transform: [{ translateY: -1 }],
+    transform: [{ translateY: -2 }],
   },
   sizer: {
     opacity: 0,
