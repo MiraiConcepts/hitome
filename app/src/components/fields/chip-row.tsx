@@ -97,7 +97,7 @@ export function ChipRow<T extends string>({
         {own && <View style={[styles.dot, { backgroundColor: own }]} />}
         {/* Sized by an invisible bold copy, so selecting a chip (which
             bolds its label) never changes its width and shifts the row. */}
-        <View>
+        <View style={styles.labelBox}>
           <ThemedText
             type="small"
             style={[styles.label, styles.labelSelected, styles.sizer]}
@@ -174,6 +174,10 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     lineHeight: 16,
+  },
+  // Lifted 1pt: the glyphs sit low in their line box, below the square.
+  labelBox: {
+    transform: [{ translateY: -1 }],
   },
   sizer: {
     opacity: 0,
