@@ -1,6 +1,6 @@
 # After v0.4.1: trust, time zones, DAVx⁵ on Android, UI/UX audit
 
-Created: 2026-10-04 · Status: PLANNED (agreed with the user, not started; all questions settled)
+Created: 2026-10-04 · Status: §1–§4 DONE (2026-10-05) — not yet released; widget empty-space polish open
 
 Audience for the next few months: the user plus a few friends, each on their
 own server. Code cleanup (splitting the big files) is deliberately out.
@@ -82,3 +82,25 @@ in the server's config, online-only (as Google Calendar on the web).
 - Offline on web: out of scope (online-only, as Google Calendar on the
   web). A read-only cached view (service worker) would be the cheap step if
   ever wanted.
+
+## Build log (2026-10-05)
+
+- §1: the `?day=` bug was `useLocalSearchParams` in the root layout (only
+  the layout's own params) — `useGlobalSearchParams` fixed it and the whole
+  e2e suite runs. New `writes.spec.ts`: every write path checked on the grid
+  and in the throwaway Radicale, plus an offline save. Failed saves say why
+  in plain words (`writeFailureMessage`); All-day end-day rule extracted and
+  tested; Undo snackbar 8s. Found: chip labels were read twice on web.
+- §2: TZID + embedded VTIMEZONE via `timezones-ical-library`; DTSTAMP and
+  LAST-MODIFIED now UTC. Hermes formats zoned times correctly (checked on
+  the phone).
+- §3: `expo-calendar` rejected (update ignores this/following; "delete
+  following" deletes the series). Own bridge `app/modules/calendar-store`
+  + `src/store`. Android provider quirks found on the phone: NULL
+  eventStatus rows dropped by `!= 2`; a rule change must carry its time
+  fields or occurrences are not re-expanded; ids come back as numbers; a
+  null eventStatus crashes the provider. Every scope + undo + move verified
+  against live DAVx⁵ sync, then cleaned up.
+- §4: Lighthouse a11y 84 → 100 (month + settings); best practices 96, the
+  remaining point is tsdav's `/.well-known/caldav` probe 404ing (harmless;
+  a host-Caddy redirect to /dav/ would clear it). Android targets to 48dp.
