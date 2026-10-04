@@ -66,6 +66,7 @@ export function LocationField({
           {suggestions.map((label) => (
             <Pressable
               key={label}
+              accessibilityRole="button"
               style={({ pressed }) => [
                 styles.item,
                 {

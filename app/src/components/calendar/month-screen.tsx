@@ -397,6 +397,7 @@ export function MonthScreen() {
               </ThemedText>
               {/* A rejected login is not something retrying fixes. */}
               <Pressable
+                accessibilityRole="button"
                 onPress={
                   authFailed ? () => router.navigate('/settings') : refresh
                 }
@@ -467,7 +468,10 @@ export function MonthScreen() {
               {snack.message}
             </ThemedText>
             {snack.undo && (
-              <Pressable onPress={() => undoDelete(snack.undo!)}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => undoDelete(snack.undo!)}
+              >
                 <ThemedText type="smallBold" style={{ color: AccentColor }}>
                   Undo
                 </ThemedText>

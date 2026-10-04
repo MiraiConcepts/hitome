@@ -68,6 +68,7 @@ export function LoadingBar({ visible }: { visible: boolean }) {
       pointerEvents="none"
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       accessibilityRole="progressbar"
+      accessibilityLabel="Loading the calendar"
       accessibilityState={{ busy: visible }}
       accessibilityElementsHidden={!visible}
     >

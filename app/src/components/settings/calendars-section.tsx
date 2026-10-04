@@ -118,8 +118,11 @@ export function CalendarsSection() {
                   refreshAgendaWidget();
                 }}
                 hitSlop={10}
+                // Padded to a 28pt target (web ignores hitSlop), pulled
+                // back by the same so the row's layout does not move.
+                style={styles.eye}
                 accessibilityRole="switch"
-                accessibilityState={{ checked: !isHidden }}
+                aria-checked={!isHidden}
                 accessibilityLabel={`Show ${calendar.name} on the calendar`}
                 testID={`settings-calendar-visible-${calendar.name}`}
               >
@@ -181,6 +184,10 @@ const dayName = (day: number) =>
   });
 
 const styles = StyleSheet.create({
+  eye: {
+    padding: Spacing.one,
+    margin: -Spacing.one,
+  },
   // A control-height row once SettingsBlock's own padding is added.
   row: {
     flexDirection: 'row',

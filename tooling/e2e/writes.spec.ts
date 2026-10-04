@@ -99,7 +99,7 @@ async function remove(
 }
 
 const undo = (page: Page) =>
-  page.getByRole("button", { name: "Undo" }).or(page.getByText("Undo")).click();
+  page.getByRole("button", { name: "Undo" }).click();
 
 test.beforeAll(async ({ request }) => {
   // A second calendar, so moving has somewhere to go.

@@ -30,7 +30,12 @@ export function DayPopover({ day, events, onClose, onPressEvent }: Props) {
   const sorted = [...events].sort(compareEvents);
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable
+        style={styles.backdrop}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Close"
+      >
         {/* Nested pressable claims card taps so they don't close the modal. */}
         <Pressable style={styles.cardWrap} onPress={() => {}}>
           <ThemedView
@@ -44,7 +49,12 @@ export function DayPopover({ day, events, onClose, onPressEvent }: Props) {
             </ThemedText>
             <ScrollView contentContainerStyle={styles.list}>
               {sorted.map((event) => (
-                <Pressable key={event.id} onPress={() => onPressEvent(event)}>
+                <Pressable
+                  key={event.id}
+                  onPress={() => onPressEvent(event)}
+                  accessibilityRole="button"
+                  accessibilityLabel={event.summary}
+                >
                   {({ pressed }) => (
                     <ThemedView
                       type={

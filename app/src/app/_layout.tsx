@@ -3,6 +3,7 @@ import '@/polyfills';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import Head from 'expo-router/head';
 import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -67,6 +68,11 @@ export default function RootLayout() {
     // Required by react-native-gesture-handler (canvas pan/pinch) on every
     // platform, web included — gestures aren't recognized outside this view.
     <GestureHandlerRootView style={styles.root}>
+      {/* The page title (web): the router's head manager writes its own
+          <title> ahead of +html's, so it is set through it. */}
+      <Head>
+        <title>hitome</title>
+      </Head>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         {/* Bottom sheets (event editor on narrow layouts) portal here, above
             the router content. */}

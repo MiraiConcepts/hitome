@@ -254,6 +254,7 @@ export function MonthHeader({
           onPress={onAdd}
           hitSlop={8}
           style={styles.iconButton}
+          accessibilityRole="button"
           accessibilityLabel="Add event"
         >
           <AddIcon size={Bar.iconSize} color={AccentColor} />
@@ -262,6 +263,7 @@ export function MonthHeader({
           onPress={onRefresh}
           hitSlop={8}
           style={styles.iconButton}
+          accessibilityRole="button"
           accessibilityLabel="Refresh"
         >
           <Animated.View style={spinStyle}>
@@ -273,6 +275,7 @@ export function MonthHeader({
           onPress={onSettings}
           hitSlop={8}
           style={styles.iconButton}
+          accessibilityRole="button"
           accessibilityLabel="Settings"
         >
           <SettingsIcon size={Bar.iconSize} color={AccentColor} />

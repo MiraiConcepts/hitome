@@ -36,6 +36,8 @@ type Props<T extends string> = {
   testID?: string;
 };
 
+const CHIP_HIT_SLOP = { top: 10, bottom: 10, left: 3, right: 3 };
+
 /** 12% of a color, as #RRGGBBAA — the selected chip's fill. */
 const tint = (hex: string) => `${rgbHex(hex)}1F`;
 
@@ -78,6 +80,9 @@ export function ChipRow<T extends string>({
         accessibilityRole="button"
         accessibilityState={{ selected }}
         onPress={() => setPending(option.value)}
+        // 28pt chips, reached as 48pt: the margin is invisible and stops
+        // short of the 6pt gap's middle, so neighbours never overlap.
+        hitSlop={CHIP_HIT_SLOP}
         android_ripple={{
           color: `${rgbHex(own ?? AccentColor)}40`,
           foreground: true,

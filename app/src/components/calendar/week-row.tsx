@@ -437,6 +437,20 @@ export const WeekRow = memo(function WeekRow({
             <Pressable
               key={dateString}
               testID={`day-cell-${dateString}`}
+              // A screen reader names the whole date, and offers the hold
+              // (add an event) as an action of its own.
+              accessibilityRole="button"
+              accessibilityLabel={day.toLocaleDateString(undefined, {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+              })}
+              accessibilityActions={[
+                { name: 'longpress', label: 'Add an event' },
+              ]}
+              onAccessibilityAction={(e) => {
+                if (e.nativeEvent.actionName === 'longpress') createOn(col);
+              }}
               onPress={() => openDay(col)}
               onLongPress={() => createOn(col)}
               onPressIn={(e) =>

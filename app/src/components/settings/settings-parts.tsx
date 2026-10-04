@@ -80,6 +80,7 @@ export function SettingsHeader({ title, onBack }: HeaderProps) {
         onPress={onBack}
         hitSlop={8}
         style={styles.iconButton}
+        accessibilityRole="button"
         accessibilityLabel="Back"
         testID="settings-back"
       >
@@ -234,9 +235,13 @@ export function SettingsToggle({
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      hitSlop={8}
+      // A 22pt row reached as 48pt.
+      hitSlop={13}
       accessibilityRole="switch"
-      accessibilityState={{ checked: on, disabled }}
+      // aria-* rather than accessibilityState: the same on every platform,
+      // and the web's switch and radio require them.
+      aria-checked={on}
+      aria-disabled={disabled}
       accessibilityLabel={label}
       style={({ pressed }) => [
         styles.toggleRow,
@@ -290,7 +295,7 @@ export function SettingsBlock({
         <Pressable
           onPress={onPress}
           accessibilityRole="radio"
-          accessibilityState={{ selected }}
+          aria-checked={Boolean(selected)}
           style={({ pressed }) => [
             styles.block,
             pressed && { backgroundColor: theme.backgroundSelected },

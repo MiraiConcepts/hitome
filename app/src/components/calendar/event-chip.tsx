@@ -53,6 +53,8 @@ export function EventChip({ event, titleLines, style, ...press }: ChipProps) {
   return (
     <Pressable
       {...press}
+      accessibilityRole="button"
+      accessibilityLabel={event.summary}
       style={[styles.chip, style]}
       testID={`chip-${event.id}`}
     >
@@ -114,6 +116,8 @@ export function EventBanner({
   return (
     <Pressable
       {...press}
+      accessibilityRole="button"
+      accessibilityLabel={event.summary}
       style={[
         styles.banner,
         { backgroundColor: fill },
