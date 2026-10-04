@@ -11,7 +11,17 @@ import {
   getClient,
   getDefaultCalendar,
 } from './client';
-import { buildEventICS, editPreserving, expandEvents } from './ics';
+import {
+  buildEventICS,
+  editOccurrence,
+  editPreserving,
+  excludeOccurrence,
+  expandEvents,
+  isFirstOccurrence,
+  splitSeries,
+  truncateSeries,
+  type EditScope,
+} from './ics';
 import type { CalEvent, EventChanges, EventInput } from './types';
 
 /** A calendar the editor can create into: URL (write target) + display bits. */
@@ -129,23 +139,115 @@ export async function createEvent(
   ensureOk(res, 'create');
 }
 
-export async function updateEvent(
-  event: CalEvent,
-  changes: EventChanges
-): Promise<void> {
+export type { EditScope };
+
+/**
+ * The scope that actually applies: a one-off event, or "this and following"
+ * from the series' first occurrence, is simply the whole object.
+ */
+function effectiveScope(event: CalEvent, scope: EditScope): EditScope {
+  if (!event.recurring || event.recurrenceStart === undefined) return 'all';
+  if (
+    scope === 'following' &&
+    isFirstOccurrence(event.raw, event.recurrenceStart)
+  )
+    return 'all';
+  return scope;
+}
+
+/** PUT a new body for the event's object, guarded by its etag. */
+async function putObject(event: CalEvent, data: string, op: string) {
   const client = await getClient();
   const res = await client.updateCalendarObject({
     calendarObject: {
       url: event.url,
-      data: editPreserving(event.raw, changes), // preserves unknown props
+      data,
       etag: event.etag, // If-Match → 412 on concurrent change
     },
   });
-  ensureOk(res, 'update');
+  ensureOk(res, op);
 }
 
-/** Hard delete. For a recurring event this removes the whole series (first cut). */
-export async function deleteEvent(event: CalEvent): Promise<void> {
+/**
+ * Save edits. For a repeating event `scope` says which occurrences they
+ * reach (see ics.ts): the whole series, this occurrence only, or this and
+ * every later one — the last a split into two objects, written head first
+ * so a failure can be put back.
+ */
+export async function updateEvent(
+  event: CalEvent,
+  changes: EventChanges,
+  scope: EditScope = 'all'
+): Promise<void> {
+  const effective = effectiveScope(event, scope);
+  if (effective === 'all') {
+    // preserves unknown props; a time change shifts the series
+    await putObject(
+      event,
+      editPreserving(event.raw, changes, event.start),
+      'update'
+    );
+    return;
+  }
+  const recurrenceStart = event.recurrenceStart!;
+  if (effective === 'this') {
+    await putObject(
+      event,
+      editOccurrence(event.raw, recurrenceStart, event, changes),
+      'update'
+    );
+    return;
+  }
+  const uid = Crypto.randomUUID();
+  const { head, tail } = splitSeries(
+    event.raw,
+    recurrenceStart,
+    event,
+    changes,
+    uid
+  );
+  await putObject(event, head, 'update');
+  try {
+    const client = await getClient();
+    const res = await client.createCalendarObject({
+      calendar: await getCalendarFor(event.url),
+      filename: `${uid}.ics`,
+      iCalString: tail,
+    });
+    ensureOk(res, 'create');
+  } catch (err) {
+    // The head is already cut short; put the series back whole rather than
+    // leave the later occurrences gone.
+    await revertEvent(event).catch(() => {});
+    throw err;
+  }
+}
+
+/**
+ * Delete. For a repeating event: the whole object, this occurrence (an
+ * exclusion), or this and every later one (the rule cut short).
+ */
+export async function deleteEvent(
+  event: CalEvent,
+  scope: EditScope = 'all'
+): Promise<void> {
+  const effective = effectiveScope(event, scope);
+  if (effective === 'this') {
+    await putObject(
+      event,
+      excludeOccurrence(event.raw, event.recurrenceStart!),
+      'delete'
+    );
+    return;
+  }
+  if (effective === 'following') {
+    await putObject(
+      event,
+      truncateSeries(event.raw, event.recurrenceStart!),
+      'delete'
+    );
+    return;
+  }
   const client = await getClient();
   const res = await client.deleteCalendarObject({
     calendarObject: { url: event.url, etag: event.etag },
@@ -164,4 +266,24 @@ export async function restoreEvent(event: CalEvent): Promise<void> {
     iCalString: event.raw,
   });
   ensureOk(res, 'restore');
+}
+
+/** Undo for a partial delete (an occurrence, or the rest of a series): put
+ *  the object's original ICS back over the edited one. No If-Match — the
+ *  object's etag changed with the delete being undone. */
+export async function revertEvent(event: CalEvent): Promise<void> {
+  const client = await getClient();
+  const res = await client.updateCalendarObject({
+    calendarObject: { url: event.url, data: event.raw },
+  });
+  ensureOk(res, 'restore');
+}
+
+/** Undo for any delete made with `scope`. */
+export async function undoDelete(
+  event: CalEvent,
+  scope: EditScope
+): Promise<void> {
+  if (effectiveScope(event, scope) === 'all') await restoreEvent(event);
+  else await revertEvent(event);
 }

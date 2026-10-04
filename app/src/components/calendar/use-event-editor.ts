@@ -14,6 +14,7 @@ import {
   createEvent,
   defaultCalendarUrl,
   deleteEvent,
+  type EditScope,
   listCalendars,
   updateEvent,
 } from '@/caldav/events';
@@ -41,7 +42,7 @@ import {
 export type EditorResult =
   | 'created'
   | 'updated'
-  | { deleted: CalEvent }
+  | { deleted: CalEvent; scope: EditScope }
   | 'conflict';
 
 type Options = {
@@ -58,6 +59,11 @@ export type EditorField = 'title' | 'times' | 'repeat';
 /** What the last Save or Delete came to, when it went wrong — tied to a
  *  field when it is that field's to fix, so it can show beside it. */
 type EditorProblem = { field?: EditorField; text: string } | null;
+
+/** The pending question for a repeating event: which action it is for, and
+ *  whether "this event" is on offer (not when the repeat rule itself changed —
+ *  one occurrence has no rule of its own). */
+type ScopeAsk = { action: 'save' | 'delete'; allowThis: boolean };
 
 export function useEventEditor({ event, defaultDay, onDone }: Options) {
   const [initial] = useState(() => initialFormState(event, defaultDay));
@@ -76,6 +82,8 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
   const [alarm, setAlarmState] = useState<AlarmState>(initial.alarm);
   const [lastValidDay, setLastValidDay] = useState(initial.startDay);
   const [problem, setProblem] = useState<EditorProblem>(null);
+  // A repeating event's Save or Delete waiting on "which occurrences?".
+  const [scopeAsk, setScopeAsk] = useState<ScopeAsk | null>(null);
   const [busy, setBusy] = useState(false);
   const [alarmHint, setAlarmHint] = useState<string | null>(null);
   // Create-only: the calendars to choose from and the selected write target.
@@ -223,7 +231,7 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
     return input;
   }
 
-  async function save() {
+  async function save(scope?: EditScope) {
     const trimmed = summary.trim();
     if (!trimmed) {
       setProblem({ field: 'title', text: 'Add a title' });
@@ -247,29 +255,12 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
     const alarmInput: AlarmInput | null =
       alarm.kind === 'set' ? { offsetMinutes: alarm.offsetMinutes } : null;
 
-    setBusy(true);
-    setProblem(null);
-    try {
-      if (!event) {
-        await createEvent(
-          {
-            summary: trimmed,
-            ...times,
-            allDay,
-            location: location.trim() || undefined,
-            description: description.trim() || undefined,
-            ...(rec ? { recurrence: rec } : {}),
-            ...(alarmInput ? { alarm: alarmInput } : {}),
-          },
-          calendarUrl
-        );
-        onDone('created');
-        return;
-      }
-
-      // Diff-based changes: untouched fields stay byte-identical in the ICS
-      // (keeps Apple TZID DTSTARTs — and foreign RRULEs/VALARMs — intact).
-      const changes: EventChanges = {};
+    // An edit's changes, worked out before anything is written — a repeating
+    // event asks which occurrences they reach first.
+    // Diff-based: untouched fields stay byte-identical in the ICS (keeps
+    // Apple TZID DTSTARTs — and foreign RRULEs/VALARMs — intact).
+    const changes: EventChanges = {};
+    if (event) {
       if (trimmed !== event.summary) changes.summary = trimmed;
       if (location.trim() !== (event.location ?? ''))
         changes.location = location.trim();
@@ -298,8 +289,40 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
       ) {
         changes.alarm = alarmInput;
       }
+      if (Object.keys(changes).length === 0) {
+        onDone('updated');
+        return;
+      }
+      if (event.recurring && !scope) {
+        setScopeAsk({
+          action: 'save',
+          allowThis: changes.recurrence === undefined,
+        });
+        return;
+      }
+    }
 
-      if (Object.keys(changes).length > 0) await updateEvent(event, changes);
+    setBusy(true);
+    setProblem(null);
+    try {
+      if (!event) {
+        await createEvent(
+          {
+            summary: trimmed,
+            ...times,
+            allDay,
+            location: location.trim() || undefined,
+            description: description.trim() || undefined,
+            ...(rec ? { recurrence: rec } : {}),
+            ...(alarmInput ? { alarm: alarmInput } : {}),
+          },
+          calendarUrl
+        );
+        onDone('created');
+        return;
+      }
+
+      await updateEvent(event, changes, scope);
       onDone('updated');
     } catch (err) {
       if (err instanceof ConflictError) {
@@ -311,13 +334,17 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
     }
   }
 
-  async function remove() {
+  async function remove(scope?: EditScope) {
     if (!event) return;
+    if (event.recurring && !scope) {
+      setScopeAsk({ action: 'delete', allowThis: true });
+      return;
+    }
     setBusy(true);
     setProblem(null);
     try {
-      await deleteEvent(event);
-      onDone({ deleted: event });
+      await deleteEvent(event, scope ?? 'all');
+      onDone({ deleted: event, scope: scope ?? 'all' });
     } catch (err) {
       if (err instanceof ConflictError) {
         onDone('conflict');
@@ -366,7 +393,17 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
     problemFor: (field: EditorField) =>
       problem?.field === field ? problem.text : null,
     busy,
-    save,
-    remove,
+    save: () => save(),
+    remove: () => remove(),
+    /** The open "which occurrences?" question, if any. */
+    scopeAsk,
+    /** Answer it: run the pending Save or Delete for that scope. */
+    chooseScope: (scope: EditScope) => {
+      const ask = scopeAsk;
+      setScopeAsk(null);
+      if (ask?.action === 'save') save(scope);
+      else if (ask?.action === 'delete') remove(scope);
+    },
+    cancelScope: () => setScopeAsk(null),
   };
 }

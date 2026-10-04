@@ -7,6 +7,7 @@ import { LocationField } from '@/components/calendar/location-field';
 import { HEADER_GROUND } from '@/components/calendar/month-header';
 import { RecurrenceField } from '@/components/calendar/recurrence-field';
 import type { EventEditorController } from '@/components/calendar/use-event-editor';
+import type { EditScope } from '@/caldav/events';
 import { DateField } from '@/components/fields/date-field';
 import { FieldStack } from '@/components/fields/field-stack';
 import { TextField } from '@/components/fields/text-field';
@@ -18,6 +19,7 @@ import {
   MapPinIcon,
   NotesIcon,
   PencilIcon,
+  RepeatIcon,
 } from '@/components/icons';
 import {
   SettingsButton,
@@ -300,7 +302,7 @@ export function EventEditorActions({
   bottomInset = 0,
 }: ActionsProps) {
   const theme = useTheme();
-  const { event, busy, problem, save, remove } = editor;
+  const { event, busy, problem, save, remove, scopeAsk } = editor;
   return (
     <View
       style={[
@@ -317,31 +319,94 @@ export function EventEditorActions({
           {problem}
         </SettingsMessage>
       )}
-      <View style={styles.actionRow}>
-        {event && (
+      {scopeAsk ? (
+        <ScopeChoice
+          ask={scopeAsk}
+          onChoose={editor.chooseScope}
+          onCancel={editor.cancelScope}
+        />
+      ) : (
+        <View style={styles.actionRow}>
+          {event && (
+            <SettingsButton
+              label="Delete"
+              variant="danger"
+              disabled={busy}
+              onPress={remove}
+              testID="editor-delete"
+            />
+          )}
+          <View style={styles.actionsRight}>
+            <SettingsButton
+              label="Cancel"
+              disabled={busy}
+              onPress={onClose}
+              testID="editor-cancel"
+            />
+            <SettingsButton
+              label="Save"
+              variant="filled"
+              busy={busy}
+              onPress={save}
+              testID="editor-save"
+            />
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
+ * "Which occurrences?" for a repeating event's Save or Delete, in place of
+ * the action row — the question and its answers where the button was just
+ * pressed, rather than a dialog over the form.
+ */
+function ScopeChoice({
+  ask,
+  onChoose,
+  onCancel,
+}: {
+  ask: NonNullable<EventEditorController['scopeAsk']>;
+  onChoose: (scope: EditScope) => void;
+  onCancel: () => void;
+}) {
+  const variant = ask.action === 'delete' ? 'danger' : 'text';
+  return (
+    <View style={styles.scope}>
+      <SettingsMessage icon={RepeatIcon}>
+        {ask.action === 'delete'
+          ? 'This is a repeating event. Delete:'
+          : 'This is a repeating event. Save the changes to:'}
+      </SettingsMessage>
+      <View style={styles.scopeOptions}>
+        {ask.allowThis && (
           <SettingsButton
-            label={event.recurring ? 'Delete series' : 'Delete'}
-            variant="danger"
-            disabled={busy}
-            onPress={remove}
-            testID="editor-delete"
+            label="This event"
+            variant={variant}
+            onPress={() => onChoose('this')}
+            testID="editor-scope-this"
           />
         )}
-        <View style={styles.actionsRight}>
-          <SettingsButton
-            label="Cancel"
-            disabled={busy}
-            onPress={onClose}
-            testID="editor-cancel"
-          />
-          <SettingsButton
-            label="Save"
-            variant="filled"
-            busy={busy}
-            onPress={save}
-            testID="editor-save"
-          />
-        </View>
+        <SettingsButton
+          label="This and following"
+          variant={variant}
+          onPress={() => onChoose('following')}
+          testID="editor-scope-following"
+        />
+        <SettingsButton
+          label="All events"
+          variant={variant}
+          onPress={() => onChoose('all')}
+          testID="editor-scope-all"
+        />
+      </View>
+      <View style={styles.actionsRight}>
+        <SettingsButton
+          label="Back"
+          onPress={onCancel}
+          testID="editor-scope-cancel"
+        />
       </View>
     </View>
   );
@@ -403,6 +468,14 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     gap: Spacing.two,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  scope: {
+    gap: Spacing.two,
+  },
+  scopeOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
   },
   actionRow: {
     flexDirection: 'row',

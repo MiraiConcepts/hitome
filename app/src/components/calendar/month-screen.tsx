@@ -13,7 +13,10 @@ import {
 } from 'react-native-safe-area-context';
 
 import { runAlarmReconcile } from '@/alarms/runner';
-import { restoreEvent } from '@/caldav/events';
+import {
+  undoDelete as undoDeleteOnServer,
+  type EditScope,
+} from '@/caldav/events';
 import type { CalEvent } from '@/caldav/types';
 import { DayPopover } from '@/components/calendar/day-popover';
 import {
@@ -39,7 +42,10 @@ type EditorState =
   | { mode: 'create'; day: string }
   | { mode: 'edit'; event: CalEvent };
 
-type Snack = { message: string; undo?: CalEvent } | null;
+type Snack = {
+  message: string;
+  undo?: { event: CalEvent; scope: EditScope };
+} | null;
 
 /** A widget row tapped and not yet resolved: the id to look for, the day to
  *  fall back to, and the freshness stamp that was current when the tap landed.
@@ -277,13 +283,28 @@ export function MonthScreen() {
     else if (result === 'updated') setSnack({ message: 'Saved' });
     else if (result === 'conflict') {
       setSnack({ message: 'Event changed elsewhere — list refreshed' });
-    } else setSnack({ message: 'Event deleted', undo: result.deleted });
+    } else
+      setSnack({
+        message:
+          result.scope === 'this'
+            ? 'Occurrence deleted'
+            : result.scope === 'following'
+              ? 'Following occurrences deleted'
+              : 'Event deleted',
+        undo: { event: result.deleted, scope: result.scope },
+      });
   }
 
-  async function undoDelete(event: CalEvent) {
+  async function undoDelete({
+    event,
+    scope,
+  }: {
+    event: CalEvent;
+    scope: EditScope;
+  }) {
     setSnack(null);
     try {
-      await restoreEvent(event);
+      await undoDeleteOnServer(event, scope);
       refresh();
       refreshAgendaWidget();
       runAlarmReconcile();

@@ -9,8 +9,9 @@ import { expect, test, type Page } from "@playwright/test";
 const pad = (n: number) => `${n}`.padStart(2, "0");
 const dateString = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+// The header abbreviates: 'Sept 2026'.
 const monthTitle = (d: Date) =>
-  d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 
 const now = new Date();
 const target = (day: number) =>
@@ -277,7 +278,7 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
     await cancelEditor(page);
   });
 
-  await test.step("recurring create → daily ×3 → chips on three days → delete series", async () => {
+  await test.step("recurring create → daily ×3 → delete one occurrence → delete the rest", async () => {
     await grid(page)
       .getByTestId(`day-cell-${dateString(target(15))}`)
       .click(HOLD);
@@ -294,10 +295,18 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
     });
     await shot(page, "06b-recurring-chips");
 
-    // Whole-series delete from any occurrence.
+    // One occurrence: the middle day goes, the other two stay.
     await grid(page).getByText("🧪 E2E Recurring").nth(1).click();
-    await expect(page.getByTestId("editor-delete")).toHaveText("Delete series");
     await page.getByTestId("editor-delete").click();
+    await page.getByTestId("editor-scope-this").click();
+    await expect(grid(page).getByText("🧪 E2E Recurring")).toHaveCount(2, {
+      timeout: 30_000,
+    });
+
+    // Then the whole series, from any occurrence.
+    await grid(page).getByText("🧪 E2E Recurring").nth(1).click();
+    await page.getByTestId("editor-delete").click();
+    await page.getByTestId("editor-scope-all").click();
     await expect(grid(page).getByText("🧪 E2E Recurring")).toHaveCount(0, {
       timeout: 30_000,
     });

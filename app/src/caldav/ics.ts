@@ -3,7 +3,7 @@
 import IcalExpander from 'ical-expander';
 import ICAL from 'ical.js';
 
-import { applyRecurrence } from './rrule';
+import { applyRecurrence, masterVevent } from './rrule';
 import type { CalEvent, EventChanges, EventInput, EventSource } from './types';
 import { applyAlarm } from './valarm';
 
@@ -24,7 +24,12 @@ export function expandEvents(
   const expander = new IcalExpander({ ics, maxIterations: 1000 });
   const { events, occurrences } = expander.between(rangeStart, rangeEnd);
 
-  const map = (event: any, startTime: any, endTime: any): CalEvent => {
+  const map = (
+    event: any,
+    startTime: any,
+    endTime: any,
+    recurrenceId?: any
+  ): CalEvent => {
     const vevent = event.component; // the VEVENT ICAL.Component
     const uid: string = event.uid;
     const link = vevent.getFirstPropertyValue('url');
@@ -45,7 +50,12 @@ export function expandEvents(
       ...(link ? { link: String(link) } : {}),
       ...(conference ? { conference: String(conference) } : {}),
       ...(vevent.hasProperty('rrule') || vevent.hasProperty('recurrence-id')
-        ? { recurring: true }
+        ? {
+            recurring: true,
+            // Which occurrence this is, independent of where it now sits —
+            // the key scoped edits and deletes address it by.
+            recurrenceStart: (recurrenceId ?? startTime).toUnixTime(),
+          }
         : {}),
       ...(vevent.getFirstSubcomponent('valarm') ? { alarm: true } : {}),
       ...(source.color ? { color: source.color } : {}),
@@ -55,8 +65,12 @@ export function expandEvents(
   };
 
   return [
-    ...events.map((e: any) => map(e, e.startDate, e.endDate)),
-    ...occurrences.map((o: any) => map(o.item, o.startDate, o.endDate)),
+    ...events.map((e: any) =>
+      map(e, e.startDate, e.endDate, e.recurrenceId ?? undefined)
+    ),
+    ...occurrences.map((o: any) =>
+      map(o.item, o.startDate, o.endDate, o.recurrenceId)
+    ),
   ];
 }
 
@@ -122,45 +136,382 @@ export function buildEventICS(input: EventInput, uid: string): string {
   return vcalendar.toString();
 }
 
+/** Which occurrences of a repeating event an edit or delete applies to. */
+export type EditScope = 'this' | 'following' | 'all';
+
+/** Writes the field changes (not the repeat rule) onto one VEVENT. */
+function applyFieldChanges(
+  vevent: ICAL.Component,
+  changes: EventChanges,
+  times?: { start: Date; end: Date; allDay: boolean }
+): void {
+  const event = new ICAL.Event(vevent);
+  if (changes.summary !== undefined) event.summary = changes.summary;
+  if (changes.location !== undefined) event.location = changes.location;
+  if (changes.description !== undefined)
+    event.description = changes.description;
+  if (times) {
+    // Event setters replace the TZID parameter / value type instead of leaving a
+    // stale `;TZID=` next to a rewritten value (updatePropertyWithValue would).
+    const { start, end } = toTimePair(times.start, times.end, times.allDay);
+    event.startDate = start;
+    event.endDate = end;
+  }
+  if (changes.alarm !== undefined) applyAlarm(vevent, changes.alarm);
+}
+
+/** Bump revision metadata only — never X-APPLE-*, ATTENDEE, ORGANIZER. */
+function touch(vevent: ICAL.Component): void {
+  vevent.updatePropertyWithValue('last-modified', ICAL.Time.now());
+  const seq = Number(vevent.getFirstPropertyValue('sequence') ?? 0);
+  vevent.updatePropertyWithValue('sequence', seq + 1);
+}
+
 /**
  * Edit an existing event while PRESERVING unknown properties (X-APPLE-*, ATTENDEE,
  * ORGANIZER, …). Parse the original tree and mutate ONLY the provided fields — never
  * rebuild a VEVENT from scratch (that is what drops data). Plan's #1 correctness risk.
  *
- * Whole-series semantics: for a recurring event this rewrites the series DTSTART/DTEND.
+ * Whole-series semantics: edits the series master (never an override that
+ * happens to come first in the file). A time change is a SHIFT: `from` is the
+ * start the edit was made against (the occurrence on screen), and the master
+ * moves by the same amount — so moving one Tuesday's 10:00 to 11:00 moves
+ * every Tuesday, rather than restarting the series on that Tuesday (which
+ * silently deleted every occurrence before it). Without `from`, the master's
+ * own start is the base, which is the same thing for a one-off event.
  */
-export function editPreserving(ics: string, changes: EventChanges): string {
+export function editPreserving(
+  ics: string,
+  changes: EventChanges,
+  from?: Date
+): string {
   const vcalendar = new ICAL.Component(ICAL.parse(ics));
-  const vevent = vcalendar.getFirstSubcomponent('vevent');
+  const vevent = masterVevent(vcalendar);
   if (!vevent) return ics;
-  const event = new ICAL.Event(vevent);
 
-  if (changes.summary !== undefined) event.summary = changes.summary;
-  if (changes.location !== undefined) event.location = changes.location;
-  if (changes.description !== undefined)
-    event.description = changes.description;
+  const before = new ICAL.Event(vevent).startDate.clone();
+  let times: { start: Date; end: Date; allDay: boolean } | undefined;
   if (changes.start && changes.end) {
-    // Event setters replace the TZID parameter / value type instead of leaving a
-    // stale `;TZID=` next to a rewritten value (updatePropertyWithValue would).
-    const { start, end } = toTimePair(
-      changes.start,
-      changes.end,
-      changes.allDay ?? false
-    );
-    event.startDate = start;
-    event.endDate = end;
+    const masterStart = before.toJSDate();
+    const base = from ?? masterStart;
+    const shift = changes.start.getTime() - base.getTime();
+    const start = new Date(masterStart.getTime() + shift);
+    times = {
+      start,
+      end: new Date(
+        start.getTime() + (changes.end.getTime() - changes.start.getTime())
+      ),
+      allDay: changes.allDay ?? false,
+    };
   }
+  applyFieldChanges(vevent, changes, times);
+  if (times) shiftExceptions(vcalendar, vevent, before);
   // After any DTSTART change — the weekdays rotation reads the new value.
   // The editor only emits these for rules/alarms it owns ('custom'/'foreign'
   // prefills never produce a change), so foreign data is never rewritten.
   if (changes.recurrence !== undefined)
     applyRecurrence(vevent, changes.recurrence);
-  if (changes.alarm !== undefined) applyAlarm(vevent, changes.alarm);
-
-  // Bump revision metadata only — do NOT touch X-APPLE-*, ATTENDEE, ORGANIZER.
-  vevent.updatePropertyWithValue('last-modified', ICAL.Time.now());
-  const seq = Number(vevent.getFirstPropertyValue('sequence') ?? 0);
-  vevent.updatePropertyWithValue('sequence', seq + 1);
-
+  touch(vevent);
   return vcalendar.toString();
+}
+
+/**
+ * After the whole series moves, its exclusions and overrides move with it.
+ * They name occurrences by their old start; left as they were, a deleted
+ * occurrence would come back and a moved one would lose its changes, since
+ * neither would match an occurrence any more. Only when the series keeps its
+ * value type — toggling all-day changes what an occurrence is, and they are
+ * left alone.
+ */
+function shiftExceptions(
+  vcalendar: ICAL.Component,
+  master: ICAL.Component,
+  before: ICAL.Time
+): void {
+  const after = new ICAL.Event(master).startDate;
+  if (after.isDate !== before.isDate) return;
+  const shiftMs = after.toJSDate().getTime() - before.toJSDate().getTime();
+  if (shiftMs === 0) return;
+  const shifted = (value: ICAL.Time): ICAL.Time => {
+    if (value.isDate) {
+      const day = value.clone();
+      day.day += Math.round(shiftMs / 86_400_000);
+      return day;
+    }
+    return ICAL.Time.fromJSDate(
+      new Date(value.toJSDate().getTime() + shiftMs),
+      true
+    );
+  };
+  const moved = (prop: ICAL.Property) => {
+    prop.setValue(shifted(prop.getFirstValue() as ICAL.Time));
+    // Rewritten in UTC, like the master's own new start.
+    if (!(prop.getFirstValue() as ICAL.Time).isDate)
+      prop.removeParameter('tzid');
+  };
+  for (const ex of master.getAllProperties('exdate')) moved(ex);
+  for (const v of vcalendar.getAllSubcomponents('vevent')) {
+    const rid = v.getFirstProperty('recurrence-id');
+    if (!rid) continue;
+    moved(rid);
+    // The override's own times follow too, so one renamed (or moved by an
+    // hour) keeps the same place relative to the series it belongs to.
+    for (const name of ['dtstart', 'dtend']) {
+      const prop = v.getFirstProperty(name);
+      if (prop) moved(prop);
+    }
+  }
+}
+
+/** The override VEVENT for one occurrence, if the object has one. */
+function overrideFor(
+  vcalendar: ICAL.Component,
+  recurrenceStart: number
+): ICAL.Component | undefined {
+  return vcalendar
+    .getAllSubcomponents('vevent')
+    .find(
+      (v) =>
+        v.hasProperty('recurrence-id') &&
+        (v.getFirstPropertyValue('recurrence-id') as ICAL.Time).toUnixTime() ===
+          recurrenceStart
+    );
+}
+
+/**
+ * The occurrence's RECURRENCE-ID as the master's rule produces it — same value
+ * type and zone as DTSTART, which RFC 5545 requires of RECURRENCE-ID, EXDATE
+ * and UNTIL alike.
+ */
+function occurrenceTime(
+  master: ICAL.Component,
+  recurrenceStart: number
+): ICAL.Time {
+  const iterator = new ICAL.Event(master).iterator();
+  for (let i = 0, next = iterator.next(); next && i < 5000; i++) {
+    const at = next.toUnixTime();
+    if (at === recurrenceStart) return next;
+    if (at > recurrenceStart) break;
+    next = iterator.next();
+  }
+  // Not on the rule (an RDATE, or a rule edited since): the instant itself.
+  const dtstart = new ICAL.Event(master).startDate;
+  const time = ICAL.Time.fromJSDate(new Date(recurrenceStart * 1000), true);
+  if (dtstart.isDate) time.isDate = true;
+  return time;
+}
+
+/** A date-time property value carrying DTSTART's TZID parameter, if any. */
+function setLikeDtstart(
+  prop: ICAL.Property,
+  master: ICAL.Component,
+  value: ICAL.Time
+): void {
+  const tzid = master.getFirstProperty('dtstart')?.getParameter('tzid');
+  prop.setValue(value);
+  if (tzid && !value.isDate && value.zone !== ICAL.Timezone.utcTimezone)
+    prop.setParameter('tzid', tzid);
+}
+
+/**
+ * Edit ONE occurrence: its override VEVENT (RECURRENCE-ID = the occurrence),
+ * created from the master when it does not exist yet — a copy minus the rule
+ * (RRULE/RDATE/EXDATE belong to the series only), so attendees, X-* and the
+ * rest carry over. `occurrence` is where it currently sits; a time change in
+ * `changes` replaces that.
+ */
+export function editOccurrence(
+  ics: string,
+  recurrenceStart: number,
+  occurrence: { start: Date; end: Date; allDay: boolean },
+  changes: EventChanges
+): string {
+  const vcalendar = new ICAL.Component(ICAL.parse(ics));
+  const master = masterVevent(vcalendar);
+  if (!master) return ics;
+
+  let override = overrideFor(vcalendar, recurrenceStart);
+  const created = !override;
+  if (!override) {
+    override = new ICAL.Component(structuredClone(master.jCal));
+    for (const name of ['rrule', 'rdate', 'exdate', 'recurrence-id'])
+      override.removeAllProperties(name);
+    const rid = new ICAL.Property('recurrence-id');
+    setLikeDtstart(rid, master, occurrenceTime(master, recurrenceStart));
+    override.addProperty(rid);
+    override.updatePropertyWithValue('dtstamp', ICAL.Time.now());
+    vcalendar.addSubcomponent(override);
+  }
+
+  // A time change replaces where the occurrence sits; with none, a fresh
+  // override (still carrying the master's first dates) is placed where the
+  // occurrence is, and an existing one keeps its own.
+  const times =
+    changes.start && changes.end
+      ? {
+          start: changes.start,
+          end: changes.end,
+          allDay: changes.allDay ?? occurrence.allDay,
+        }
+      : created
+        ? occurrence
+        : undefined;
+  applyFieldChanges(override, changes, times);
+  touch(override);
+  return vcalendar.toString();
+}
+
+/** Delete ONE occurrence: an EXDATE on the master, and its override if any. */
+export function excludeOccurrence(
+  ics: string,
+  recurrenceStart: number
+): string {
+  const vcalendar = new ICAL.Component(ICAL.parse(ics));
+  const master = masterVevent(vcalendar);
+  if (!master) return ics;
+  const override = overrideFor(vcalendar, recurrenceStart);
+  if (override) vcalendar.removeSubcomponent(override);
+  const exdate = new ICAL.Property('exdate');
+  setLikeDtstart(exdate, master, occurrenceTime(master, recurrenceStart));
+  master.addProperty(exdate);
+  touch(master);
+  return vcalendar.toString();
+}
+
+/** UNTIL for "stop before this occurrence": the day before (all-day), or one
+ *  second before in UTC (timed) — UNTIL is inclusive. */
+function untilBefore(occurrence: ICAL.Time): ICAL.Time {
+  if (occurrence.isDate) {
+    const day = occurrence.clone();
+    day.day -= 1;
+    return day;
+  }
+  return ICAL.Time.fromJSDate(
+    new Date((occurrence.toUnixTime() - 1) * 1000),
+    true
+  );
+}
+
+/** True when the occurrence is the series' first — "this and following"
+ *  then means the whole series. */
+export function isFirstOccurrence(
+  ics: string,
+  recurrenceStart: number
+): boolean {
+  const master = masterVevent(new ICAL.Component(ICAL.parse(ics)));
+  if (!master) return true;
+  return new ICAL.Event(master).startDate.toUnixTime() === recurrenceStart;
+}
+
+/** The series cut off before the occurrence: RRULE ends there (COUNT
+ *  dropped for an UNTIL), and overrides from it on are removed. */
+function cutAt(
+  vcalendar: ICAL.Component,
+  master: ICAL.Component,
+  recurrenceStart: number
+): void {
+  const rule = master.getFirstPropertyValue('rrule') as ICAL.Recur | null;
+  if (rule) {
+    const until = untilBefore(occurrenceTime(master, recurrenceStart));
+    const data = { ...rule.toJSON(), until, count: undefined };
+    master.updatePropertyWithValue('rrule', ICAL.Recur.fromData(data));
+  }
+  for (const v of vcalendar.getAllSubcomponents('vevent')) {
+    const rid = v.getFirstPropertyValue('recurrence-id') as ICAL.Time | null;
+    if (rid && rid.toUnixTime() >= recurrenceStart)
+      vcalendar.removeSubcomponent(v);
+  }
+}
+
+/** Delete this occurrence and every later one. */
+export function truncateSeries(ics: string, recurrenceStart: number): string {
+  const vcalendar = new ICAL.Component(ICAL.parse(ics));
+  const master = masterVevent(vcalendar);
+  if (!master) return ics;
+  cutAt(vcalendar, master, recurrenceStart);
+  touch(master);
+  return vcalendar.toString();
+}
+
+/** How many times the rule fires before the occurrence — what a COUNT has
+ *  already used up by the time the series is split there. */
+function firedBefore(master: ICAL.Component, recurrenceStart: number): number {
+  const rule = master.getFirstPropertyValue('rrule') as ICAL.Recur;
+  const iterator = rule.iterator(new ICAL.Event(master).startDate);
+  let n = 0;
+  for (let next = iterator.next(); next && n < 5000; next = iterator.next()) {
+    if (next.toUnixTime() >= recurrenceStart) break;
+    n++;
+  }
+  return n;
+}
+
+/**
+ * Edit "this and following": the series is split at the occurrence. The
+ * original object keeps everything before it (`head`); a new object with
+ * `uid` takes the occurrence and everything after (`tail`) — the master's
+ * properties with the changes applied, the old rule (a COUNT reduced by the
+ * occurrences already past) unless the edit set a new one, and the overrides
+ * that fall after the split, moved across.
+ */
+export function splitSeries(
+  ics: string,
+  recurrenceStart: number,
+  occurrence: { start: Date; end: Date; allDay: boolean },
+  changes: EventChanges,
+  uid: string
+): { head: string; tail: string } {
+  const original = new ICAL.Component(ICAL.parse(ics));
+  const master = masterVevent(original);
+  if (!master) return { head: ics, tail: ics };
+
+  // The tail first, while the original still has its overrides.
+  const tail = new ICAL.Component(['vcalendar', [], []]);
+  for (const prop of original.getAllProperties())
+    tail.addProperty(new ICAL.Property(structuredClone(prop.jCal)));
+  for (const tz of original.getAllSubcomponents('vtimezone'))
+    tail.addSubcomponent(new ICAL.Component(structuredClone(tz.jCal)));
+
+  const first = new ICAL.Component(structuredClone(master.jCal));
+  first.updatePropertyWithValue('uid', uid);
+  first.updatePropertyWithValue('sequence', 0);
+  first.updatePropertyWithValue('dtstamp', ICAL.Time.now());
+  first.removeAllProperties('rdate');
+  for (const ex of first.getAllProperties('exdate'))
+    if ((ex.getFirstValue() as ICAL.Time).toUnixTime() < recurrenceStart)
+      first.removeProperty(ex);
+  const rule = master.getFirstPropertyValue('rrule') as ICAL.Recur | null;
+  if (rule?.count) {
+    const data = {
+      ...rule.toJSON(),
+      count: rule.count - firedBefore(master, recurrenceStart),
+    };
+    first.updatePropertyWithValue('rrule', ICAL.Recur.fromData(data));
+  }
+  applyFieldChanges(
+    first,
+    changes,
+    changes.start && changes.end
+      ? {
+          start: changes.start,
+          end: changes.end,
+          allDay: changes.allDay ?? occurrence.allDay,
+        }
+      : occurrence
+  );
+  if (changes.recurrence !== undefined)
+    applyRecurrence(first, changes.recurrence);
+  tail.addSubcomponent(first);
+  for (const v of original.getAllSubcomponents('vevent')) {
+    const rid = v.getFirstPropertyValue('recurrence-id') as ICAL.Time | null;
+    if (rid && rid.toUnixTime() >= recurrenceStart) {
+      const moved = new ICAL.Component(structuredClone(v.jCal));
+      moved.updatePropertyWithValue('uid', uid);
+      tail.addSubcomponent(moved);
+    }
+  }
+
+  cutAt(original, master, recurrenceStart);
+  touch(master);
+  return { head: original.toString(), tail: tail.toString() };
 }

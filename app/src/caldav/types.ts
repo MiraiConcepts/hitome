@@ -26,6 +26,10 @@ export type CalEvent = {
   conference?: string;
   /** True for occurrences of a recurring series (RRULE / RECURRENCE-ID). */
   recurring?: boolean;
+  /** For a recurring occurrence: its original start (the RECURRENCE-ID it has
+   *  or would have), unix seconds — how a scoped edit or delete addresses it,
+   *  wherever an override has since moved it. */
+  recurrenceStart?: number;
   /** True when a reminder is armed (the VEVENT carries a VALARM). */
   alarm?: boolean;
   /** Source calendar's CalDAV color (#RRGGBBAA), or undefined for the accent. */
