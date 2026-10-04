@@ -21,6 +21,7 @@ import {
   updateEvent,
 } from '@/caldav/events';
 import { getDefaultAlert } from '@/config/alert-pref';
+import { writeFailureMessage } from '@/config/dav-config';
 import type {
   AlarmInput,
   CalEvent,
@@ -330,9 +331,7 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
             return;
           }
           setBusy(false);
-          setProblem({
-            text: err instanceof Error ? err.message : 'Move failed',
-          });
+          setProblem({ text: writeFailureMessage(err, 'move') });
         }
         return;
       }
@@ -377,7 +376,7 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
         return;
       }
       setBusy(false);
-      setProblem({ text: err instanceof Error ? err.message : 'Save failed' });
+      setProblem({ text: writeFailureMessage(err, 'save') });
     }
   }
 
@@ -398,9 +397,7 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
         return;
       }
       setBusy(false);
-      setProblem({
-        text: err instanceof Error ? err.message : 'Delete failed',
-      });
+      setProblem({ text: writeFailureMessage(err, 'delete') });
     }
   }
 

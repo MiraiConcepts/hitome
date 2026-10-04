@@ -195,6 +195,39 @@ export function connectFailureMessage(
 }
 
 /**
+ * What the editor says when a save, move or delete fails. The editor stays
+ * open with everything typed, so the message says so — and names the cause
+ * in a person's words rather than fetch's ("Network request failed").
+ */
+export function writeFailureMessage(
+  err: unknown,
+  verb: 'save' | 'move' | 'delete'
+): string {
+  const not = { save: 'Not saved', move: 'Not moved', delete: 'Not deleted' }[
+    verb
+  ];
+  // events.ts's AuthError (401/403 on the write itself); named rather than
+  // imported, so this file stays free of the CalDAV client.
+  if (err instanceof Error && err.name === 'AuthError')
+    return `${not} — the server rejected the login. Check it in Settings.`;
+  const message = err instanceof Error ? err.message : String(err);
+  switch (classifyConnectError(err, { hadLogin: true })) {
+    case 'unreachable':
+    case 'no-such-host':
+    case 'timeout':
+    case 'blocked-by-browser':
+      return `${not} — can’t reach your calendar server. Your changes are still here; try again when you’re connected.`;
+    case 'unauthorized':
+    case 'forbidden':
+      return `${not} — the server rejected the login. Check it in Settings.`;
+    case 'insecure':
+      return `${not} — couldn’t make a secure connection to the server.`;
+    default:
+      return `${not} — ${plainReason(message)}`;
+  }
+}
+
+/**
  * The readable end of a runtime error: Android's fetch wraps the cause as
  * `fetch failed: java.net.SomeException: what happened`, and only the last
  * part means anything to a person.

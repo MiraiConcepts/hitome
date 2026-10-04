@@ -5,6 +5,7 @@ import {
   connectFailureMessage,
   normalizeDavUrl,
   type ConnectFailure,
+  writeFailureMessage,
 } from './dav-config';
 
 describe('normalizeDavUrl', () => {
@@ -253,5 +254,30 @@ describe('connectFailureMessage', () => {
     expect(connectFailureMessage('unknown', 'kaboom')).toBe(
       'Couldn’t connect: kaboom'
     );
+  });
+});
+
+describe('writeFailureMessage', () => {
+  it('says an offline save was not saved, and that the draft is kept', () => {
+    const message = writeFailureMessage(
+      new TypeError('Network request failed'),
+      'save'
+    );
+    expect(message).toMatch(/^Not saved — can’t reach/);
+    expect(message).toContain('still here');
+  });
+
+  it('names the login for a rejected write', () => {
+    const err = new Error('The server rejected the saved login');
+    err.name = 'AuthError';
+    expect(writeFailureMessage(err, 'delete')).toMatch(
+      /^Not deleted — the server rejected the login/
+    );
+  });
+
+  it('keeps the server’s own words for anything else', () => {
+    expect(
+      writeFailureMessage(new Error('CalDAV update failed (HTTP 500)'), 'move')
+    ).toBe('Not moved — CalDAV update failed (HTTP 500)');
   });
 });

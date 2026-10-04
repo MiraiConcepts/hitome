@@ -257,4 +257,29 @@ test("writes reach the server: create, edit, delete, undo, move, conflict", asyn
     expect(await countOnServer(page, "🧪 W Mine")).toBe(0);
     expect(await countOnServer(page, "🧪 W Changed elsewhere")).toBe(1);
   });
+
+  await test.step("offline: a failed save keeps the draft and says why", async () => {
+    await grid(page)
+      .getByTestId(`day-cell-${dateString(day(20))}`)
+      .click(HOLD);
+    await page.getByTestId("editor-summary").fill("🧪 W Offline");
+    // The server vanishes for writes.
+    await page.route("**/dav/**", (route) =>
+      route.request().method() === "PUT" ? route.abort("internetdisconnected") : route.continue(),
+    );
+    await page.getByTestId("editor-save").click();
+    await expect(page.getByText(/^Not saved — can’t reach/)).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId("event-editor")).toBeVisible();
+    await expect(page.getByTestId("editor-summary")).toHaveValue("🧪 W Offline");
+
+    // Back online: the same editor saves.
+    await page.unrouteAll();
+    await page.getByTestId("editor-save").click();
+    await expect(page.getByTestId("event-editor")).toHaveCount(0);
+    await expect
+      .poll(() => countOnServer(page, "🧪 W Offline"), { timeout: 30_000 })
+      .toBe(1);
+  });
 });
