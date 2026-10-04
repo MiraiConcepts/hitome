@@ -1,9 +1,6 @@
-<img src="app/assets/images/icon.png" alt="hitome" width="80" height="80" align="left">
-
-# hitome
+# <img src="app/assets/images/icon.png" alt="" width="40" height="40" align="absmiddle"> hitome
 
 hitome is a calendar for me.
-<br clear="left">
 
 # Capabilities
 
