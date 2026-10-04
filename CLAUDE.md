@@ -78,7 +78,7 @@ helper scripts.
   - Never reintroduce credential baking, and never store a credential anywhere
     a browser can read it.
 - UI is square: no corner radius on cards, buttons, fields, chips, sheets or
-  the widget (changed from 4px on 2026-10-04), nor on the 8pt calendar-colour
+  the widget (changed from 4px on 2026-10-04), nor on the 6pt calendar-colour
   marks (squares, not dots). Only the month grid's tap ripple stays round. This breaks
   byte-identity with the notes app's `theme.ts`/`src/components/` until it
   makes the same change.

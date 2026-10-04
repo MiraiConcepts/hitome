@@ -130,9 +130,9 @@ const styles = StyleSheet.create({
     padding: Spacing.two,
   },
   dot: {
-    width: 8,
-    height: 8,
-    marginTop: 4, // sit level with the first text line
+    width: 6,
+    height: 6,
+    marginTop: 5, // sit level with the first text line
   },
   time: {
     width: 52,

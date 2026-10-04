@@ -168,11 +168,8 @@ const styles = StyleSheet.create({
     backgroundColor: AccentColor,
   },
   dot: {
-    width: 8,
-    height: 8,
-    // Centred on the lowercase letters, not the line box: a calendar name
-    // is lowercase-heavy, and centred on the line it read as sitting above.
-    transform: [{ translateY: 2 }],
+    width: 6,
+    height: 6,
   },
   label: {
     fontSize: 13,

@@ -189,11 +189,11 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     minHeight: CONTROL_HEIGHT - 2 * Card.padV,
   },
-  // The same 8pt square the day popover and the chip row use for a
+  // The same 6pt square the day popover and the chip row use for a
   // calendar's colour.
   swatch: {
-    width: 8,
-    height: 8,
+    width: 6,
+    height: 6,
   },
   name: {
     flex: 1,
