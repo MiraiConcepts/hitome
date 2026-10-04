@@ -176,11 +176,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 16,
   },
-  // The glyphs sit low in their line box: the label rises 1pt and the
-  // square drops half a point, meeting where the word and the chip both
-  // read as centred.
+  // The glyphs sit low in their line box: the label rises 1.5pt and the
+  // square drops half a point, so the lowercase letters and the square
+  // share a centre line.
   labelBox: {
-    transform: [{ translateY: -1 }],
+    transform: [{ translateY: -1.5 }],
   },
   sizer: {
     opacity: 0,
