@@ -1,6 +1,6 @@
 # After v0.4.1: trust, time zones, DAVx⁵ on Android, UI/UX audit
 
-Created: 2026-10-04 · Status: PLANNED (agreed with the user, not started)
+Created: 2026-10-04 · Status: PLANNED (agreed with the user, not started; all questions settled)
 
 Audience for the next few months: the user plus a few friends, each on their
 own server. Code cleanup (splitting the big files) is deliberately out.
@@ -72,11 +72,12 @@ in the server's config, online-only (as Google Calendar on the web).
   optionally Google's Accessibility Scanner on the phone.
 - Then polish from the findings, plus the signed-out widget's empty space.
 
-## Open questions
+## Decided
 
-- Refresh on Android: rely on DAVx⁵'s own schedule (local edits go up at
-  once; server changes come down on its interval, 15 min at the shortest),
-  or add a small native module so ↻ asks DAVx⁵ to sync now?
-  `expo-calendar` has no sync trigger.
-- Offline on web: out of scope. A read-only cached view (service worker)
-  would be the cheap step if ever wanted.
+- Refresh (↻) stays as "sync now": on Android it asks DAVx⁵ to sync
+  immediately (`ContentResolver.requestSync` on the calendar authority, as
+  Etar's Refresh does — a small native module, since `expo-calendar` has no
+  sync trigger); on web it re-fetches from the server as today.
+- Offline on web: out of scope (online-only, as Google Calendar on the
+  web). A read-only cached view (service worker) would be the cheap step if
+  ever wanted.
