@@ -223,6 +223,51 @@ export async function updateEvent(
   }
 }
 
+/** The calendar an event's object lives in (its URL is the calendar's plus
+ *  the object name). */
+export async function calendarUrlOf(event: CalEvent): Promise<string> {
+  return (await getCalendarFor(event.url)).url;
+}
+
+/**
+ * Move an event (the whole object — every occurrence of a series) to another
+ * calendar, with any edits made at the same time. CalDAV has no atomic move:
+ * the copy is created in the target first, then the original deleted under
+ * its etag; if that delete is refused (changed elsewhere, or a failure), the
+ * copy is removed again so the event is never left in both calendars.
+ */
+export async function moveEvent(
+  event: CalEvent,
+  toCalendarUrl: string,
+  changes: EventChanges
+): Promise<void> {
+  const client = await getClient();
+  const data =
+    Object.keys(changes).length > 0
+      ? editPreserving(event.raw, changes, event.start)
+      : event.raw;
+  const calendar = await getCalendarFor(toCalendarUrl);
+  const filename = `${event.uid}.ics`;
+  const created = await client.createCalendarObject({
+    calendar,
+    filename,
+    iCalString: data,
+  });
+  ensureOk(created, 'move');
+  const del = await client.deleteCalendarObject({
+    calendarObject: { url: event.url, etag: event.etag },
+  });
+  try {
+    ensureOk(del, 'move');
+  } catch (err) {
+    const copyUrl = new URL(filename, calendar.url).href;
+    await client
+      .deleteCalendarObject({ calendarObject: { url: copyUrl, etag: '' } })
+      .catch(() => {});
+    throw err;
+  }
+}
+
 /**
  * Delete. For a repeating event: the whole object, this occurrence (an
  * exclusion), or this and every later one (the rule cut short).

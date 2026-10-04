@@ -132,7 +132,6 @@ export function EventEditorFields({
   onFocusTail,
 }: FieldsProps) {
   const {
-    event,
     summary,
     setSummary,
     allDay,
@@ -168,7 +167,7 @@ export function EventEditorFields({
           />
           <FieldProblem text={editor.problemFor('title')} />
         </FieldStack>
-        {!event && calendars.length > 1 && calendarUrl && (
+        {calendars.length > 1 && calendarUrl && (
           <FieldStack label="Calendar" icon={CalendarIcon}>
             <CalendarField
               calendars={calendars}
@@ -176,6 +175,13 @@ export function EventEditorFields({
               onChange={setCalendarUrl}
               testID="editor-calendar"
             />
+            {editor.event?.recurring &&
+              editor.originalCalendarUrl !== undefined &&
+              calendarUrl !== editor.originalCalendarUrl && (
+                <SettingsMessage>
+                  Moves every occurrence of this repeating event.
+                </SettingsMessage>
+              )}
           </FieldStack>
         )}
       </View>

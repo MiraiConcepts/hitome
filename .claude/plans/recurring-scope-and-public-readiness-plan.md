@@ -45,7 +45,12 @@ the pre-existing `?day=` deep-link bug (see settings-and-runtime-config-plan),
 so its updated recurring step has not run; `history.scrollRestoration` was
 tried as the cause and ruled out.
 
-## 2. Move an event to another calendar
+## 2. Move an event to another calendar — DONE
+
+The Calendar row shows for existing events too, selecting the event's own
+calendar. Choosing another moves the whole object (create in the target, then
+delete the original under its etag; the copy is removed again if that delete
+is refused). A repeating event moves with every occurrence, and says so.
 ## 3. Notifications: preview, open the event, Snooze/Join, default reminder
 ## 4. Hide calendars; Sign out and erase; connect help; About links
 ## 5. Follow the phone: week start, 12/24h, widget language

@@ -10,12 +10,14 @@ import {
 } from '@/alarms/scheduler';
 import {
   type CalendarChoice,
+  calendarUrlOf,
   ConflictError,
   createEvent,
   defaultCalendarUrl,
   deleteEvent,
   type EditScope,
   listCalendars,
+  moveEvent,
   updateEvent,
 } from '@/caldav/events';
 import type {
@@ -86,21 +88,31 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
   const [scopeAsk, setScopeAsk] = useState<ScopeAsk | null>(null);
   const [busy, setBusy] = useState(false);
   const [alarmHint, setAlarmHint] = useState<string | null>(null);
-  // Create-only: the calendars to choose from and the selected write target.
+  // The calendars to choose from and the selected one: where a new event is
+  // created, or where an existing one lives (choosing another moves it).
   const [calendars, setCalendars] = useState<CalendarChoice[]>([]);
   const [calendarUrl, setCalendarUrl] = useState<string | undefined>(undefined);
 
+  // Where the event started out, to tell a move from a stay.
+  const [originalCalendarUrl, setOriginalCalendarUrl] = useState<
+    string | undefined
+  >(undefined);
+
   useEffect(() => {
-    // Load the calendar list for the create picker, defaulting the selection to
-    // the primary calendar. On failure the picker just doesn't show and the
-    // create falls back to the default calendar (createEvent handles undefined).
-    if (event) return;
+    // Load the calendar list for the picker, selecting the primary calendar for
+    // a new event or the event's own for an edit. On failure the picker just
+    // doesn't show: a create falls back to the default calendar
+    // (createEvent handles undefined) and an edit stays where it is.
     let alive = true;
-    Promise.all([listCalendars(), defaultCalendarUrl()])
+    Promise.all([
+      listCalendars(),
+      event ? calendarUrlOf(event) : defaultCalendarUrl(),
+    ])
       .then(([list, url]) => {
         if (!alive) return;
         setCalendars(list);
         setCalendarUrl(url);
+        if (event) setOriginalCalendarUrl(url);
       })
       .catch(() => {});
     return () => {
@@ -289,6 +301,30 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
       ) {
         changes.alarm = alarmInput;
       }
+      const moving =
+        calendarUrl !== undefined &&
+        originalCalendarUrl !== undefined &&
+        calendarUrl !== originalCalendarUrl;
+      if (moving) {
+        // A move takes the whole object — every occurrence of a series goes
+        // with it, so there is no "which occurrences?" to ask.
+        setBusy(true);
+        setProblem(null);
+        try {
+          await moveEvent(event, calendarUrl, changes);
+          onDone('updated');
+        } catch (err) {
+          if (err instanceof ConflictError) {
+            onDone('conflict');
+            return;
+          }
+          setBusy(false);
+          setProblem({
+            text: err instanceof Error ? err.message : 'Move failed',
+          });
+        }
+        return;
+      }
       if (Object.keys(changes).length === 0) {
         onDone('updated');
         return;
@@ -386,6 +422,8 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
     calendars,
     calendarUrl,
     setCalendarUrl,
+    /** The event's calendar when the editor opened (edits only). */
+    originalCalendarUrl,
     headerDay,
     // Not about one field (a failed write) — shown above the action bar.
     problem: problem && !problem.field ? problem.text : null,
