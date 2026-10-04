@@ -96,7 +96,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.one + Spacing.half,
-    borderRadius: Spacing.one,
     borderWidth: 1,
     paddingHorizontal: Spacing.two + Spacing.half,
     height: 28,

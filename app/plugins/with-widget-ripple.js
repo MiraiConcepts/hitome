@@ -14,14 +14,13 @@ const path = require('path');
 
 const RIPPLE_DRAWABLE = `<?xml version="1.0" encoding="utf-8"?>
 <!-- Press feedback for widget tap targets: brand accent (#FFBD4F) at 12% alpha,
-     masked to the house 4dp corner radius. Written by
+     masked to a square, like every other surface in the app. Written by
      plugins/with-widget-ripple.js — edit there, not here. -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
     android:color="#1FFFBD4F">
     <item android:id="@android:id/mask">
         <shape android:shape="rectangle">
             <solid android:color="@android:color/white" />
-            <corners android:radius="4dp" />
         </shape>
     </item>
 </ripple>

@@ -146,7 +146,6 @@ function Chip({
         paddingHorizontal: 6,
         paddingVertical: 2,
         backgroundColor: hex(background),
-        borderRadius: 4,
       }}
     >
       <TextWidget
@@ -392,7 +391,6 @@ function Agenda({
         width: 'match_parent',
         height: 'match_parent',
         flexDirection: 'column',
-        borderRadius: 4,
         backgroundColor: hex(palette.background),
       }}
     >

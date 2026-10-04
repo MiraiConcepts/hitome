@@ -114,7 +114,6 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
   },
   card: {
-    borderRadius: Spacing.one,
     padding: Spacing.three,
     gap: Spacing.two,
     maxHeight: '100%',
@@ -129,7 +128,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.three,
     padding: Spacing.two,
-    borderRadius: Spacing.one,
   },
   dot: {
     width: 8,

@@ -105,6 +105,5 @@ const styles = StyleSheet.create({
   item: {
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.one,
   },
 });

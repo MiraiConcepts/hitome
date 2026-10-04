@@ -456,13 +456,11 @@ const styles = StyleSheet.create({
     minHeight: BUTTON_HEIGHT,
     justifyContent: 'center',
     paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.one,
   },
   saveButton: {
     minHeight: BUTTON_HEIGHT,
     justifyContent: 'center',
     backgroundColor: AccentColor,
-    borderRadius: Spacing.one,
     paddingHorizontal: Spacing.four - Spacing.half,
   },
   saveButtonPressed: {

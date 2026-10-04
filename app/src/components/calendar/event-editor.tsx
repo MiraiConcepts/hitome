@@ -83,7 +83,6 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
   },
   card: {
-    borderRadius: Spacing.one,
     overflow: 'hidden',
     width: '100%',
     maxWidth: 480,

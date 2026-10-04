@@ -648,7 +648,6 @@ const styles = StyleSheet.create({
   dayNumberWrap: {
     minWidth: DAY_NUMBER_HEIGHT - 4,
     paddingHorizontal: Spacing.one,
-    borderRadius: Spacing.one,
     marginLeft: 2,
     alignItems: 'center',
   },

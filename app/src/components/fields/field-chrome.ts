@@ -29,7 +29,9 @@ export type TimeFieldProps = {
  * boxes keep a new event on one screen without scrolling.
  */
 export const FieldChrome = {
-  borderRadius: Spacing.one,
+  // Explicit, not left to the default: the web date and time inputs spread
+  // this onto native <input>s, which browsers round on their own.
+  borderRadius: 0,
   borderWidth: 1,
   paddingHorizontal: Spacing.three - Spacing.one,
   paddingVertical: Spacing.one + Spacing.half,

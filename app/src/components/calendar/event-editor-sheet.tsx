@@ -241,7 +241,8 @@ export function EventEditorSheet({
       android_keyboardInputMode="adjustPan"
       backgroundStyle={{
         backgroundColor: theme.background,
-        borderRadius: Spacing.one,
+        // The library rounds the sheet by default; the app is square.
+        borderRadius: 0,
       }}
       // The grab handle sits on the header's black ground, so handle and
       // header read as one bar — the month header and weekday row's trick.
