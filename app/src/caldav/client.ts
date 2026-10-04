@@ -1,7 +1,12 @@
 import { DAVClient, type DAVCalendar } from 'tsdav';
 
 import { ensureDefaultCalendar } from '@/config/calendar-pref';
-import type { DavConfig } from '@/config/dav-config';
+import {
+  CONNECT_TIMEOUT_MS,
+  ConnectTimeoutError,
+  NoCalendarsError,
+  type DavConfig,
+} from '@/config/dav-config';
 import { ensureDavConfig, subscribeDavConfig } from '@/config/dav-store';
 
 import type { EventIcon } from './types';
@@ -13,9 +18,8 @@ let clientPromise: Promise<DAVClient> | null = null;
 let calendarsPromise: Promise<DAVCalendar[]> | null = null;
 
 // A calendar whose name says birthdays draws a gift instead of the generic
-// sun. Previously a map keyed on one person's calendar name
-// ('carrein-birthday'), which meant the glyph existed for exactly one server;
-// a name check works for anyone who named the calendar what it holds.
+// sun — a name check, so it works for anyone who named the calendar what it
+// holds.
 const BIRTHDAY_NAME = /birthday/i;
 
 /**
@@ -64,10 +68,31 @@ export async function probeConnection(
   config: DavConfig
 ): Promise<DAVCalendar[]> {
   const client = clientFor(config);
-  await client.login();
-  const calendars = await client.fetchCalendars();
-  if (!calendars.length) throw new Error('No CalDAV calendars found');
-  return calendars;
+  const check = (async () => {
+    await client.login();
+    const calendars = await client.fetchCalendars();
+    if (!calendars.length) throw new NoCalendarsError();
+    return calendars;
+  })();
+  // If the timeout wins, this settles later with nobody waiting on it; the
+  // empty catch keeps that from surfacing as an unhandled rejection.
+  check.catch(() => {});
+  // An address that never answers (a host off the VPN, a firewall that drops
+  // rather than refuses) would otherwise leave the form busy for
+  // good: React Native's fetch has no timeout of its own. The request itself
+  // is left to finish or fail unobserved; nothing waits on it any more.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new ConnectTimeoutError()),
+      CONNECT_TIMEOUT_MS
+    );
+  });
+  try {
+    return await Promise.race([check, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function getClient(): Promise<DAVClient> {
@@ -86,7 +111,7 @@ export function getCalendars(): Promise<DAVCalendar[]> {
     calendarsPromise = getClient()
       .then(async (client) => {
         const calendars = await client.fetchCalendars();
-        if (!calendars.length) throw new Error('No CalDAV calendars found');
+        if (!calendars.length) throw new NoCalendarsError();
         return calendars;
       })
       .catch((err) => {

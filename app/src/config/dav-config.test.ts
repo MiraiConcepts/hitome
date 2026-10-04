@@ -1,10 +1,27 @@
-import { classifyConnectError, normalizeDavUrl } from './dav-config';
+import {
+  ConnectTimeoutError,
+  NoCalendarsError,
+  classifyConnectError,
+  connectFailureMessage,
+  normalizeDavUrl,
+  type ConnectFailure,
+} from './dav-config';
 
 describe('normalizeDavUrl', () => {
   it('rejects nothing usable', () => {
     expect(normalizeDavUrl('')).toBeNull();
     expect(normalizeDavUrl('   ')).toBeNull();
     expect(normalizeDavUrl('https://')).toBeNull();
+  });
+
+  it('rejects text that is not an address', () => {
+    expect(normalizeDavUrl('hello world')).toBeNull();
+    expect(normalizeDavUrl('https://exa mple.com')).toBeNull();
+  });
+
+  it('rejects other schemes instead of putting https in front of them', () => {
+    expect(normalizeDavUrl('ftp://host/dav/')).toBeNull();
+    expect(normalizeDavUrl('webcal://host/cal.ics')).toBeNull();
   });
 
   it('assumes https for a bare host', () => {
@@ -35,27 +52,134 @@ describe('normalizeDavUrl', () => {
   });
 });
 
+// Every message below is one tsdav or a runtime actually produced, collected by
+// pointing the connection check at a throwaway Radicale and at deliberately
+// wrong addresses.
 describe('classifyConnectError', () => {
-  it("reads tsdav's 401 message", () => {
-    expect(
-      classifyConnectError(
-        new Error(
-          'Invalid credentials: PROPFIND https://host/dav/ returned 401 Unauthorized'
-        )
-      )
-    ).toBe('unauthorized');
+  const tsdav401 =
+    'Invalid credentials: PROPFIND https://host/dav/ returned 401 Unauthorized';
+
+  it('asks for a login when none was given and the server wants one', () => {
+    expect(classifyConnectError(new Error(tsdav401))).toBe('needs-login');
+    expect(classifyConnectError(new Error(tsdav401), { hadLogin: false })).toBe(
+      'needs-login'
+    );
   });
 
-  it('treats a forbidden response as a login problem too', () => {
-    expect(classifyConnectError(new Error('HTTP 403 Forbidden'))).toBe(
+  it('calls a refused login wrong when one was given', () => {
+    expect(classifyConnectError(new Error(tsdav401), { hadLogin: true })).toBe(
       'unauthorized'
     );
   });
 
-  it('recognises an account with no calendars', () => {
+  it('keeps a forbidden response apart from a wrong password', () => {
+    expect(
+      classifyConnectError(new Error('HTTP 403 Forbidden'), { hadLogin: true })
+    ).toBe('forbidden');
+  });
+
+  it('recognises an address that answers but is not CalDAV', () => {
+    // A website, or a JSON API: tsdav finds no principal in the reply.
+    expect(classifyConnectError(new Error('cannot find principalUrl'))).toBe(
+      'not-caldav'
+    );
+    expect(classifyConnectError(new Error('cannot find homeUrl'))).toBe(
+      'not-caldav'
+    );
+    expect(
+      classifyConnectError(
+        new Error('Collection query failed: 404 Not Found. ')
+      )
+    ).toBe('not-caldav');
+  });
+
+  it('recognises a login with no calendars behind it', () => {
+    expect(classifyConnectError(new NoCalendarsError())).toBe('no-calendars');
+    // Still recognised by message, should one arrive as a plain Error.
     expect(classifyConnectError(new Error('No CalDAV calendars found'))).toBe(
       'no-calendars'
     );
+  });
+
+  it('recognises a host name that does not resolve', () => {
+    // Android, as seen on the phone for an address of just "sing".
+    expect(
+      classifyConnectError(
+        new TypeError(
+          'fetch failed: java.net.UnknownHostException: Unable to resolve host "sing": No address associated with hostname'
+        )
+      )
+    ).toBe('no-such-host');
+    // Bun / Node.
+    expect(
+      classifyConnectError(new TypeError('getaddrinfo ENOTFOUND nope.invalid'))
+    ).toBe('no-such-host');
+  });
+
+  it('reads every runtime’s way of not reaching a host', () => {
+    expect(
+      classifyConnectError(
+        new TypeError(
+          'fetch failed: java.net.ConnectException: Failed to connect to /192.168.0.250:1'
+        )
+      )
+    ).toBe('unreachable');
+    expect(
+      classifyConnectError(
+        new TypeError(
+          'fetch failed: java.net.NoRouteToHostException: No route to host'
+        )
+      )
+    ).toBe('unreachable');
+    expect(classifyConnectError(new TypeError('Network request failed'))).toBe(
+      'unreachable'
+    );
+    expect(
+      classifyConnectError(
+        new TypeError(
+          'Unable to connect. Is the computer able to access the url?'
+        )
+      )
+    ).toBe('unreachable');
+    expect(
+      classifyConnectError(new Error('connect ECONNREFUSED 127.0.0.1:1'))
+    ).toBe('unreachable');
+  });
+
+  it('recognises Android refusing plain http', () => {
+    expect(
+      classifyConnectError(
+        new TypeError(
+          'fetch failed: java.net.UnknownServiceException: CLEARTEXT communication to cal.example not permitted by network security policy'
+        )
+      )
+    ).toBe('cleartext-blocked');
+  });
+
+  it('separates a certificate failure', () => {
+    expect(
+      classifyConnectError(
+        new TypeError('unknown certificate verification error')
+      )
+    ).toBe('insecure');
+    expect(
+      classifyConnectError(
+        new TypeError(
+          'fetch failed: javax.net.ssl.SSLHandshakeException: java.security.cert.CertPathValidatorException: Trust anchor for certification path not found.'
+        )
+      )
+    ).toBe('insecure');
+    expect(
+      classifyConnectError(
+        new TypeError(
+          'fetch failed: javax.net.ssl.SSLHandshakeException: Chain validation failed'
+        )
+      )
+    ).toBe('insecure');
+  });
+
+  it('recognises the connection check’s own timeout', () => {
+    expect(classifyConnectError(new ConnectTimeoutError())).toBe('timeout');
   });
 
   it("reads the browser's opaque preflight refusal", () => {
@@ -64,14 +188,70 @@ describe('classifyConnectError', () => {
     );
   });
 
-  it('separates unreachable from rejected', () => {
-    expect(classifyConnectError(new Error('Network request failed'))).toBe(
-      'unreachable'
+  it('does not mistake a number inside other text for a status', () => {
+    expect(classifyConnectError(new Error('event 14012 failed'))).toBe(
+      'unknown'
     );
   });
 
   it('does not guess at what it does not recognise', () => {
     expect(classifyConnectError(new Error('kaboom'))).toBe('unknown');
     expect(classifyConnectError('kaboom')).toBe('unknown');
+  });
+});
+
+describe('connectFailureMessage', () => {
+  const all: ConnectFailure[] = [
+    'bad-url',
+    'needs-login',
+    'unauthorized',
+    'forbidden',
+    'not-caldav',
+    'no-such-host',
+    'cleartext-blocked',
+    'unreachable',
+    'insecure',
+    'timeout',
+    'no-calendars',
+    'blocked-by-browser',
+    'unknown',
+  ];
+
+  it('never shows the library’s own wording for a recognised failure', () => {
+    for (const failure of all.filter((f) => f !== 'unknown')) {
+      const message = connectFailureMessage(
+        failure,
+        'cannot find principalUrl'
+      );
+      expect(message).not.toContain('principalUrl');
+      expect(message).not.toContain('PROPFIND');
+      expect(message.length).toBeGreaterThan(20);
+    }
+  });
+
+  it('says what to do, not only what went wrong', () => {
+    expect(connectFailureMessage('needs-login', '')).toMatch(/username/i);
+    expect(connectFailureMessage('cleartext-blocked', '')).toContain(
+      'https://'
+    );
+    expect(connectFailureMessage('timeout', '')).toContain('15 seconds');
+    expect(connectFailureMessage('bad-url', '')).toContain(
+      'https://your-server/dav/'
+    );
+  });
+
+  it('strips the runtime’s wrapping from an unrecognised failure', () => {
+    expect(
+      connectFailureMessage(
+        'unknown',
+        'fetch failed: java.io.IOException: unexpected end of stream'
+      )
+    ).toBe('Couldn’t connect: unexpected end of stream');
+  });
+
+  it('frames an unrecognised failure instead of showing it bare', () => {
+    expect(connectFailureMessage('unknown', 'kaboom')).toBe(
+      'Couldn’t connect: kaboom'
+    );
   });
 });
