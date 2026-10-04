@@ -15,8 +15,8 @@ import { rgbHex } from '@/utils/color';
 export type ChipOption<T extends string> = {
   value: T;
   label: string;
-  /** Tint the chip in this color (a calendar's own) instead of the accent:
-   *  a dot at rest, colored outline + text + faint fill when selected. */
+  /** Tint the selected chip in this color (a calendar's own) instead of the
+   *  accent: colored outline + text + faint fill. */
   color?: string;
 };
 
@@ -94,10 +94,9 @@ export function ChipRow<T extends string>({
               },
         ]}
       >
-        {own && <View style={[styles.dot, { backgroundColor: own }]} />}
         {/* Sized by an invisible bold copy, so selecting a chip (which
             bolds its label) never changes its width and shifts the row. */}
-        <View style={styles.labelBox}>
+        <View>
           <ThemedText
             type="small"
             style={[styles.label, styles.labelSelected, styles.sizer]}
@@ -167,20 +166,9 @@ const styles = StyleSheet.create({
     borderColor: AccentColor,
     backgroundColor: AccentColor,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    transform: [{ translateY: 0.5 }],
-  },
   label: {
     fontSize: 13,
     lineHeight: 16,
-  },
-  // The glyphs sit low in their line box: the label rises 1.5pt and the
-  // square drops half a point, so the lowercase letters and the square
-  // share a centre line.
-  labelBox: {
-    transform: [{ translateY: -1.5 }],
   },
   sizer: {
     opacity: 0,
