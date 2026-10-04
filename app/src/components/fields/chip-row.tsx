@@ -170,14 +170,17 @@ const styles = StyleSheet.create({
   dot: {
     width: 6,
     height: 6,
+    transform: [{ translateY: 0.5 }],
   },
   label: {
     fontSize: 13,
     lineHeight: 16,
   },
-  // Lifted 2pt: the glyphs sit low in their line box, below the square.
+  // The glyphs sit low in their line box: the label rises 1pt and the
+  // square drops half a point, meeting where the word and the chip both
+  // read as centred.
   labelBox: {
-    transform: [{ translateY: -2 }],
+    transform: [{ translateY: -1 }],
   },
   sizer: {
     opacity: 0,
