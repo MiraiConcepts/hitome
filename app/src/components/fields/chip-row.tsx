@@ -106,8 +106,10 @@ export function ChipRow<T extends string>({
           <ThemedText
             type="small"
             style={[styles.label, styles.labelSelected, styles.sizer]}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
+            // Hidden from screen readers on every platform (the older
+            // accessibilityElementsHidden props are native-only, so web
+            // read each chip's name twice).
+            aria-hidden
           >
             {option.label}
           </ThemedText>
