@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useGlobalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 
 import type { DeepLink } from '@/hooks/use-deep-link';
@@ -19,7 +19,10 @@ export function openInApp(target: { day: string; event?: string }): void {
  * around (see the native file). Ready immediately — the params are synchronous.
  */
 export function useDeepLinkSource(): { link: DeepLink; ready: boolean } {
-  const params = useLocalSearchParams<{
+  // Global, not local: this runs in the root layout, whose own (local) params
+  // never include the page's query — `?day=` read as nothing, and the grid
+  // opened on today whatever the link said.
+  const params = useGlobalSearchParams<{
     day?: string;
     event?: string;
     new?: string;
