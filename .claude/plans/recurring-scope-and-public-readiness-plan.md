@@ -1,6 +1,6 @@
 # Recurring-event scope + public-readiness fixes
 
-Created: 2026-10-04 · Status: IN PROGRESS
+Created: 2026-10-04 · Status: COMPLETE (items 1–5)
 
 Follows the feature-gap review (connect / settings / month view). Order agreed
 with the user: event sheet redesign first (done, 435a13d), then this list,
@@ -86,6 +86,14 @@ is refused). A repeating event moves with every occurrence, and says so.
 - Grid weeks start on the phone's first day; the weekend split moves with it.
   Displayed times (editor fields and header, day popover, widget, reminder
   text) go through `formatTime`; the fields' 'HH:MM' values are unchanged.
-- Open question for the user: the test phone (en-SG, no explicit week-start
-  preference) defaults to Sunday, while Monday weeks were a deliberate earlier
-  choice (v0.6.0).
+- Week start became a setting (user's call): Settings → Calendars → Week
+  starts on Monday / Sunday / Match phone, default Monday — the en-SG test
+  phone's locale says Sunday, and Monday weeks were a deliberate earlier
+  choice. Stored per device (`config/device-prefs`: keystore / localStorage,
+  read synchronously at launch, not wiped by a server change).
+
+Verified on the phone: Snooze on a real notification (dismissed, a new
+alarm 10 min out — with the app in the background, not yet with it closed);
+the dev client rebuilt twice for the two native deps. ColorOS gives even
+"exact" alarms a ~7 min delivery window (alarm batching), for reminders as
+much as snoozes — an OEM battery behaviour, not ours.

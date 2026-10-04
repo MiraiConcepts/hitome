@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { listCalendars, type CalendarChoice } from '@/caldav/events';
-import { CheckIcon, EyeIcon, EyeOffIcon } from '@/components/icons';
+import { ChipRow } from '@/components/fields/chip-row';
+import { FieldStack } from '@/components/fields/field-stack';
+import {
+  CalendarIcon,
+  CheckIcon,
+  EyeIcon,
+  EyeOffIcon,
+} from '@/components/icons';
 import {
   Card,
   CONTROL_HEIGHT,
@@ -21,6 +28,11 @@ import {
   setCalendarHidden,
   useHiddenCalendars,
 } from '@/config/calendar-visibility';
+import {
+  getPhoneFirstDay,
+  setWeekStart,
+  useWeekStart,
+} from '@/config/week-start';
 import { AccentColor, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -33,6 +45,7 @@ export function CalendarsSection() {
   const theme = useTheme();
   const preferred = useDefaultCalendar();
   const hidden = useHiddenCalendars();
+  const weekStart = useWeekStart();
   const [calendars, setCalendars] = useState<CalendarChoice[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -134,11 +147,39 @@ export function CalendarsSection() {
           </SettingsMessage>
         </SettingsBlock>
       )}
+      <SettingsBlock>
+        <FieldStack label="Week starts on" icon={CalendarIcon}>
+          <ChipRow
+            options={[
+              { value: 'monday', label: 'Monday' },
+              { value: 'sunday', label: 'Sunday' },
+              {
+                value: 'phone',
+                label: `Match phone (${dayName(getPhoneFirstDay())})`,
+              },
+            ]}
+            value={weekStart}
+            onChange={(next) => {
+              setWeekStart(next);
+              refreshAgendaWidget();
+            }}
+            singleLine
+            testID="settings-week-start"
+          />
+        </FieldStack>
+      </SettingsBlock>
     </SettingsSection>
   );
 }
 
 const CHECK_SIZE = 20;
+
+/** A weekday's name in the phone's language, from Date#getDay's numbering
+ *  (2024-01-07 was a Sunday). */
+const dayName = (day: number) =>
+  new Date(2024, 0, 7 + day).toLocaleDateString(undefined, {
+    weekday: 'long',
+  });
 
 const styles = StyleSheet.create({
   // A control-height row once SettingsBlock's own padding is added.

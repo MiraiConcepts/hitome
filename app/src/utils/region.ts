@@ -5,18 +5,20 @@
 // the widget's day and month names are written in.
 import { getCalendars, getLocales } from 'expo-localization';
 
-import { setFirstDayOfWeek } from '@/utils/calendar-grid';
+import { initWeekStart } from '@/config/week-start';
 import { setClock24 } from '@/utils/date';
 import { setNameLocale } from '@/widget/format';
 
 try {
   const [calendar] = getCalendars();
   // expo-localization counts 1 = Sunday … 7 = Saturday; Date#getDay from 0.
-  if (calendar?.firstWeekday) setFirstDayOfWeek(calendar.firstWeekday - 1);
+  // Settings decides whether the grid uses it (Monday unless chosen).
+  initWeekStart(calendar?.firstWeekday ? calendar.firstWeekday - 1 : 1);
   if (typeof calendar?.uses24hourClock === 'boolean')
     setClock24(calendar.uses24hourClock);
   // The widget writes its own date lines; give it the phone's language.
   setNameLocale(getLocales()[0]?.languageTag);
 } catch {
   // Unknown: Monday weeks, a 24-hour clock and English names, as before.
+  initWeekStart(1);
 }
