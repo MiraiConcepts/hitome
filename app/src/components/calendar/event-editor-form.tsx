@@ -1,13 +1,5 @@
 import type { ComponentType, Ref } from 'react';
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  Switch,
-  TextInput,
-  View,
-  type TextInputProps,
-} from 'react-native';
+import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { AlarmField } from '@/components/calendar/alarm-field';
 import { CalendarField } from '@/components/calendar/calendar-field';
@@ -16,17 +8,24 @@ import { HEADER_GROUND } from '@/components/calendar/month-header';
 import { RecurrenceField } from '@/components/calendar/recurrence-field';
 import type { EventEditorController } from '@/components/calendar/use-event-editor';
 import { DateField } from '@/components/fields/date-field';
-import { FieldRow } from '@/components/fields/field-row';
+import { FieldStack } from '@/components/fields/field-stack';
 import { TextField } from '@/components/fields/text-field';
 import { TimeField } from '@/components/fields/time-field';
-import { ThemedText } from '@/components/themed-text';
 import {
-  AccentColor,
-  DangerColor,
-  FontFamilyBold,
-  OnAccentColor,
-  Spacing,
-} from '@/constants/theme';
+  CalendarIcon,
+  ClockPlayIcon,
+  ClockStopIcon,
+  MapPinIcon,
+  NotesIcon,
+  PencilIcon,
+} from '@/components/icons';
+import {
+  SettingsButton,
+  SettingsMessage,
+  SettingsToggle,
+} from '@/components/settings/settings-parts';
+import { ThemedText } from '@/components/themed-text';
+import { AccentColor, FontFamilyBold, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, parseDay } from '@/utils/date';
 
@@ -38,9 +37,7 @@ export type { EditorResult } from '@/components/calendar/use-event-editor';
  * keyboard in the sheet) — so Save is reachable from any field without
  * scrolling the form or dismissing the keyboard first.
  *
- * Density is the point: 36pt fields, 28pt chips, labels beside controls
- * and a 10pt rhythm put a new event on one phone screen. A long form (many
- * calendars, a repeat with an end date) still scrolls.
+ * The fields scroll; the header and the actions stay put around them.
  */
 
 /** The header's measurements — the month header's bar, scaled to a sheet. */
@@ -48,9 +45,11 @@ const Bar = {
   paddingHorizontal: Spacing.four - Spacing.one,
   paddingTop: Spacing.two,
   paddingBottom: Spacing.three - Spacing.one,
-  titleSize: 20,
+  // The settings screen's title size, so a sheet's day reads as a screen
+  // title rather than a caption.
+  titleSize: 28,
   titleLineRatio: 1.3,
-  subtitleSize: 12,
+  subtitleSize: 14,
   labelGap: Spacing.half,
 } as const;
 
@@ -117,7 +116,12 @@ type FieldsProps = {
   onFocusTail?: () => void;
 };
 
-/** Every field, in order. The scrolling part of the editor. */
+/**
+ * Every field, in order — the scrolling part of the editor. Captions stacked
+ * above the fields with their glyphs, as in settings and the connect screen,
+ * but no cards: the groups (what, when, details) are told apart by spacing,
+ * which keeps the form short enough to fill in without much scrolling.
+ */
 export function EventEditorFields({
   editor,
   TextInputComponent,
@@ -125,7 +129,6 @@ export function EventEditorFields({
   autoFocusTitle = false,
   onFocusTail,
 }: FieldsProps) {
-  const theme = useTheme();
   const {
     event,
     summary,
@@ -147,132 +150,134 @@ export function EventEditorFields({
 
   return (
     <View style={styles.fields}>
-      <TextField
-        ref={titleRef}
-        TextInputComponent={TextInputComponent}
-        style={styles.titleInput}
-        value={summary}
-        onChangeText={setSummary}
-        placeholder="Title"
-        autoFocus={autoFocusTitle}
-        returnKeyType="done"
-        submitBehavior="blurAndSubmit"
-        testID="editor-summary"
-      />
-
-      {!event && calendars.length > 1 && calendarUrl && (
-        <CalendarField
-          calendars={calendars}
-          value={calendarUrl}
-          onChange={setCalendarUrl}
-          testID="editor-calendar"
-        />
-      )}
-
-      <FieldRow label="Starts">
-        <View style={styles.row}>
-          <View style={styles.dateCell}>
-            <DateField
-              value={startDay}
-              onChange={(d) => moveStart(d, startTime)}
-              testID="editor-start-date"
+      <View style={styles.group}>
+        <FieldStack label="Title" icon={PencilIcon}>
+          <TextField
+            ref={titleRef}
+            TextInputComponent={TextInputComponent}
+            style={styles.titleInput}
+            value={summary}
+            onChangeText={setSummary}
+            placeholder="Add a title"
+            autoFocus={autoFocusTitle}
+            returnKeyType="done"
+            submitBehavior="blurAndSubmit"
+            testID="editor-summary"
+          />
+          <FieldProblem text={editor.problemFor('title')} />
+        </FieldStack>
+        {!event && calendars.length > 1 && calendarUrl && (
+          <FieldStack label="Calendar" icon={CalendarIcon}>
+            <CalendarField
+              calendars={calendars}
+              value={calendarUrl}
+              onChange={setCalendarUrl}
+              testID="editor-calendar"
             />
-          </View>
-          {!allDay && (
-            <View style={styles.timeCell}>
-              <TimeField
-                value={startTime}
-                onChange={(t) => moveStart(startDay, t)}
-                testID="editor-start-time"
+          </FieldStack>
+        )}
+      </View>
+
+      <View style={styles.group}>
+        <FieldStack label="Starts" icon={ClockPlayIcon}>
+          <View style={styles.row}>
+            <View style={styles.dateCell}>
+              <DateField
+                value={startDay}
+                onChange={(d) => moveStart(d, startTime)}
+                testID="editor-start-date"
               />
             </View>
-          )}
-        </View>
-      </FieldRow>
-
-      <FieldRow label="Ends">
-        <View style={styles.row}>
-          <View style={styles.dateCell}>
-            <DateField
-              value={endDay}
-              min={startDay}
-              onChange={setEndDay}
-              testID="editor-end-date"
-            />
+            {!allDay && (
+              <View style={styles.timeCell}>
+                <TimeField
+                  value={startTime}
+                  onChange={(t) => moveStart(startDay, t)}
+                  testID="editor-start-time"
+                />
+              </View>
+            )}
           </View>
-          {!allDay && (
-            <View style={styles.timeCell}>
-              <TimeField
-                value={endTime}
-                onChange={setEndTime}
-                testID="editor-end-time"
+        </FieldStack>
+        <FieldStack label="Ends" icon={ClockStopIcon}>
+          <View style={styles.row}>
+            <View style={styles.dateCell}>
+              <DateField
+                value={endDay}
+                min={startDay}
+                onChange={setEndDay}
+                testID="editor-end-date"
               />
             </View>
-          )}
-        </View>
-      </FieldRow>
-
-      {/* A small right-aligned toggle under the times — the label is the
-          target too, so the row is easy to hit without being a bar. */}
-      <Pressable
-        accessibilityRole="switch"
-        accessibilityState={{ checked: allDay }}
-        onPress={() => setAllDay(!allDay)}
-        hitSlop={6}
-        style={styles.switchRow}
-      >
-        <ThemedText type="small" style={styles.switchLabel}>
-          All-day
-        </ThemedText>
-        <Switch
-          value={allDay}
-          onValueChange={setAllDay}
-          trackColor={{ true: AccentColor, false: theme.backgroundSelected }}
-          thumbColor={allDay ? OnAccentColor : theme.textSecondary}
-          {...Platform.select({
-            web: { activeThumbColor: OnAccentColor },
-            default: {},
-          })}
-          style={styles.switch}
+            {!allDay && (
+              <View style={styles.timeCell}>
+                <TimeField
+                  value={endTime}
+                  onChange={setEndTime}
+                  testID="editor-end-time"
+                />
+              </View>
+            )}
+          </View>
+          <FieldProblem text={editor.problemFor('times')} />
+        </FieldStack>
+        <SettingsToggle
+          on={allDay}
+          label="All-day"
+          onPress={() => setAllDay(!allDay)}
           testID="editor-all-day"
         />
-      </Pressable>
+        <RecurrenceField
+          value={editor.recurrence}
+          onChange={editor.setRecurrence}
+          startDay={headerDay}
+          TextInputComponent={TextInputComponent}
+          testID="editor-repeat"
+        />
+        <FieldProblem text={editor.problemFor('repeat')} />
+        <AlarmField
+          value={editor.alarm}
+          onChange={editor.setAlarm}
+          allDay={allDay}
+          hint={editor.alarmHint}
+          testID="editor-alert"
+        />
+      </View>
 
-      <RecurrenceField
-        value={editor.recurrence}
-        onChange={editor.setRecurrence}
-        startDay={headerDay}
-        TextInputComponent={TextInputComponent}
-        testID="editor-repeat"
-      />
-
-      <AlarmField
-        value={editor.alarm}
-        onChange={editor.setAlarm}
-        allDay={allDay}
-        hint={editor.alarmHint}
-        testID="editor-alert"
-      />
-
-      <LocationField
-        value={editor.location}
-        onChange={editor.setLocation}
-        TextInputComponent={TextInputComponent}
-        onFocus={onFocusTail}
-        testID="editor-location"
-      />
-
-      <TextField
-        TextInputComponent={TextInputComponent}
-        style={styles.notes}
-        value={editor.description}
-        onChangeText={editor.setDescription}
-        placeholder="Notes"
-        onFocus={onFocusTail}
-        multiline
-        testID="editor-notes"
-      />
+      <View style={styles.group}>
+        <FieldStack label="Location" icon={MapPinIcon}>
+          <LocationField
+            value={editor.location}
+            onChange={editor.setLocation}
+            TextInputComponent={TextInputComponent}
+            onFocus={onFocusTail}
+            testID="editor-location"
+          />
+        </FieldStack>
+        <FieldStack label="Notes" icon={NotesIcon}>
+          <TextField
+            TextInputComponent={TextInputComponent}
+            style={styles.notes}
+            value={editor.description}
+            onChangeText={editor.setDescription}
+            placeholder="Add notes"
+            onFocus={onFocusTail}
+            multiline
+            testID="editor-notes"
+          />
+        </FieldStack>
+      </View>
     </View>
+  );
+}
+
+/** A validation problem, under the field it is about. */
+function FieldProblem({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <SettingsMessage tone="problem" testID="editor-field-problem">
+      {text}
+    </SettingsMessage>
   );
 }
 
@@ -285,8 +290,9 @@ type ActionsProps = {
 
 /**
  * The action bar: Delete on the left (edit only), Cancel and Save on the
- * right. A validation problem shows here, above the buttons, so it is in
- * view at the moment Save is pressed rather than somewhere up the form.
+ * right — settings' buttons, Save spinning while it writes. A failed write
+ * shows here, above the buttons; a problem with one field shows under that
+ * field instead (FieldProblem).
  */
 export function EventEditorActions({
   editor,
@@ -307,57 +313,34 @@ export function EventEditorActions({
       ]}
     >
       {problem && (
-        <ThemedText type="small" style={styles.problem} testID="editor-problem">
+        <SettingsMessage tone="problem" testID="editor-problem">
           {problem}
-        </ThemedText>
+        </SettingsMessage>
       )}
       <View style={styles.actionRow}>
         {event && (
-          <Pressable
-            onPress={remove}
+          <SettingsButton
+            label={event.recurring ? 'Delete series' : 'Delete'}
+            variant="danger"
             disabled={busy}
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.textButton,
-              pressed && { backgroundColor: theme.backgroundSelected },
-              busy && styles.disabled,
-            ]}
+            onPress={remove}
             testID="editor-delete"
-          >
-            <ThemedText type="smallBold" style={{ color: DangerColor }}>
-              {event.recurring ? 'Delete series' : 'Delete'}
-            </ThemedText>
-          </Pressable>
+          />
         )}
         <View style={styles.actionsRight}>
-          <Pressable
+          <SettingsButton
+            label="Cancel"
+            disabled={busy}
             onPress={onClose}
-            disabled={busy}
-            style={({ pressed }) => [
-              styles.textButton,
-              pressed && { backgroundColor: theme.backgroundSelected },
-              busy && styles.disabled,
-            ]}
             testID="editor-cancel"
-          >
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              Cancel
-            </ThemedText>
-          </Pressable>
-          <Pressable
+          />
+          <SettingsButton
+            label="Save"
+            variant="filled"
+            busy={busy}
             onPress={save}
-            disabled={busy}
-            style={({ pressed }) => [
-              styles.saveButton,
-              pressed && styles.saveButtonPressed,
-              busy && styles.disabled,
-            ]}
             testID="editor-save"
-          >
-            <ThemedText type="smallBold" style={styles.saveLabel}>
-              {busy ? 'Saving…' : 'Save'}
-            </ThemedText>
-          </Pressable>
+          />
         </View>
       </View>
     </View>
@@ -367,9 +350,6 @@ export function EventEditorActions({
 /** The rule above the action bar — the grid's and the widget's divider grey,
  *  which reads on either scheme. */
 const DIVIDER = '#60646C';
-
-/** Every button in the action bar is this tall. */
-const BUTTON_HEIGHT = 36;
 
 const styles = StyleSheet.create({
   header: {
@@ -392,15 +372,19 @@ const styles = StyleSheet.create({
   },
   fields: {
     paddingHorizontal: Bar.paddingHorizontal,
-    paddingTop: Spacing.three - Spacing.half,
-    paddingBottom: Spacing.two,
-    gap: Spacing.two + Spacing.half,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.three,
+    // Between groups: a clear step more than between the fields in one.
+    gap: Spacing.four + Spacing.one,
+  },
+  group: {
+    gap: Spacing.three,
   },
   titleInput: {
-    minHeight: 40,
     fontSize: 17,
   },
   notes: {
+    minHeight: 88,
     textAlignVertical: 'top',
   },
   row: {
@@ -414,31 +398,11 @@ const styles = StyleSheet.create({
   timeCell: {
     flex: 2,
   },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: Spacing.two,
-    marginTop: -Spacing.one,
-  },
-  switchLabel: {
-    fontSize: 13,
-    lineHeight: 16,
-  },
-  switch: {
-    // The native track is a generous 48×24 on Android; 3/4 of that sits
-    // level with the 13pt label without changing its hit area.
-    transform: [{ scale: Platform.OS === 'web' ? 1 : 0.8 }],
-    marginVertical: -4,
-  },
   actions: {
     paddingHorizontal: Bar.paddingHorizontal,
     paddingVertical: Spacing.two,
     gap: Spacing.two,
     borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  problem: {
-    color: DangerColor,
   },
   actionRow: {
     flexDirection: 'row',
@@ -451,26 +415,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.one + Spacing.half,
     marginLeft: 'auto',
-  },
-  textButton: {
-    minHeight: BUTTON_HEIGHT,
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.three,
-  },
-  saveButton: {
-    minHeight: BUTTON_HEIGHT,
-    justifyContent: 'center',
-    backgroundColor: AccentColor,
-    paddingHorizontal: Spacing.four - Spacing.half,
-  },
-  saveButtonPressed: {
-    opacity: 0.85,
-  },
-  saveLabel: {
-    color: OnAccentColor,
-    fontFamily: FontFamilyBold,
-  },
-  disabled: {
-    opacity: 0.5,
   },
 });

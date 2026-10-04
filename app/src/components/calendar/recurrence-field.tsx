@@ -4,7 +4,9 @@ import { StyleSheet, View, type TextInputProps } from 'react-native';
 import type { RecurrencePreset } from '@/caldav/types';
 import { ChipRow } from '@/components/fields/chip-row';
 import { DateField } from '@/components/fields/date-field';
-import { FieldRow } from '@/components/fields/field-row';
+import { FieldStack } from '@/components/fields/field-stack';
+import { FlagIcon, RepeatIcon } from '@/components/icons';
+import { SettingsMessage } from '@/components/settings/settings-parts';
 import { TextField } from '@/components/fields/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
@@ -55,11 +57,11 @@ export function RecurrenceField({
 }: Props) {
   if (value.kind === 'custom') {
     return (
-      <FieldRow label="Repeat" testID={testID}>
-        <ThemedText type="small" themeColor="textSecondary">
+      <FieldStack label="Repeat" icon={RepeatIcon} testID={testID}>
+        <SettingsMessage>
           Custom rule (set in another app) — kept as is.
-        </ThemedText>
-      </FieldRow>
+        </SettingsMessage>
+      </FieldStack>
     );
   }
 
@@ -88,16 +90,17 @@ export function RecurrenceField({
 
   return (
     <View style={styles.column} testID={testID}>
-      <FieldRow label="Repeat">
+      <FieldStack label="Repeat" icon={RepeatIcon}>
         <ChipRow
           options={PRESET_OPTIONS}
+          singleLine
           value={preset ?? 'none'}
           onChange={selectPreset}
           testID={testID ? `${testID}-preset` : undefined}
         />
-      </FieldRow>
+      </FieldStack>
       {preset && (
-        <FieldRow label="Ends">
+        <FieldStack label="Repeat ends" icon={FlagIcon}>
           <ChipRow
             options={END_OPTIONS}
             value={end.type}
@@ -143,7 +146,7 @@ export function RecurrenceField({
               </ThemedText>
             </View>
           )}
-        </FieldRow>
+        </FieldStack>
       )}
     </View>
   );

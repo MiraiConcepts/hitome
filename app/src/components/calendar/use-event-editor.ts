@@ -52,23 +52,30 @@ type Options = {
 
 export type EventEditorController = ReturnType<typeof useEventEditor>;
 
+/** The parts of the form a validation problem can point at. */
+export type EditorField = 'title' | 'times' | 'repeat';
+
+/** What the last Save or Delete came to, when it went wrong — tied to a
+ *  field when it is that field's to fix, so it can show beside it. */
+type EditorProblem = { field?: EditorField; text: string } | null;
+
 export function useEventEditor({ event, defaultDay, onDone }: Options) {
   const [initial] = useState(() => initialFormState(event, defaultDay));
 
-  const [summary, setSummary] = useState(initial.summary);
+  const [summary, setSummaryState] = useState(initial.summary);
   const [allDay, setAllDayState] = useState(initial.allDay);
   const [startDay, setStartDay] = useState(initial.startDay);
   const [startTime, setStartTime] = useState(initial.startTime);
-  const [endDay, setEndDay] = useState(initial.endDay);
-  const [endTime, setEndTime] = useState(initial.endTime);
+  const [endDay, setEndDayState] = useState(initial.endDay);
+  const [endTime, setEndTimeState] = useState(initial.endTime);
   const [location, setLocation] = useState(initial.location);
   const [description, setDescription] = useState(initial.description);
-  const [recurrence, setRecurrence] = useState<RecurrenceState>(
+  const [recurrence, setRecurrenceState] = useState<RecurrenceState>(
     initial.recurrence
   );
   const [alarm, setAlarmState] = useState<AlarmState>(initial.alarm);
   const [lastValidDay, setLastValidDay] = useState(initial.startDay);
-  const [problem, setProblem] = useState<string | null>(null);
+  const [problem, setProblem] = useState<EditorProblem>(null);
   const [busy, setBusy] = useState(false);
   const [alarmHint, setAlarmHint] = useState<string | null>(null);
   // Create-only: the calendars to choose from and the selected write target.
@@ -111,8 +118,35 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
     if (prefilledAlarm) refreshAlarmHint();
   }, [prefilledAlarm]);
 
+  /** Drops a field's validation problem once that field is edited — the
+   *  message answered, it should not linger until the next Save. */
+  function clearProblem(field: EditorField) {
+    setProblem((last) => (last?.field === field ? null : last));
+  }
+
+  function setSummary(next: string) {
+    setSummaryState(next);
+    clearProblem('title');
+  }
+
+  function setEndDay(next: string) {
+    setEndDayState(next);
+    clearProblem('times');
+  }
+
+  function setEndTime(next: string) {
+    setEndTimeState(next);
+    clearProblem('times');
+  }
+
+  function setRecurrence(next: RecurrenceState) {
+    setRecurrenceState(next);
+    clearProblem('repeat');
+  }
+
   /** Start moved — keep the event's duration by shifting the end with it. */
   function moveStart(nextDay: string, nextTime: string) {
+    clearProblem('times');
     if (parseDay(nextDay)) setLastValidDay(nextDay);
     if (allDay) {
       const oldStart = parseDay(startDay);
@@ -121,7 +155,7 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
         const days = Math.round(
           (oldEnd.getTime() - oldStart.getTime()) / 86_400_000
         );
-        setEndDay(addDays(nextDay, Math.max(0, days)));
+        setEndDayState(addDays(nextDay, Math.max(0, days)));
       }
       setStartDay(nextDay);
       return;
@@ -133,18 +167,19 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
       const newEnd = new Date(
         newStart.getTime() + (oldEnd.getTime() - oldStart.getTime())
       );
-      setEndDay(toDateString(newEnd));
-      setEndTime(toTimeString(newEnd));
+      setEndDayState(toDateString(newEnd));
+      setEndTimeState(toTimeString(newEnd));
     }
     setStartDay(nextDay);
     setStartTime(nextTime);
   }
 
   function setAllDay(next: boolean) {
+    clearProblem('times');
     setAllDayState(next);
     // The alarm preset sets differ; an incompatible pick is cleared.
     if (alarm.kind === 'set') setAlarmState({ kind: 'none' });
-    if (parseDay(startDay) && endDay < startDay) setEndDay(startDay);
+    if (parseDay(startDay) && endDay < startDay) setEndDayState(startDay);
   }
 
   function setAlarm(next: AlarmState) {
@@ -191,19 +226,22 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
   async function save() {
     const trimmed = summary.trim();
     if (!trimmed) {
-      setProblem('Title is required');
+      setProblem({ field: 'title', text: 'Add a title' });
       return;
     }
     const times = resolveTimes();
     if (!times) {
-      setProblem(
-        allDay ? 'End date is before the start' : 'End must be after the start'
-      );
+      setProblem({
+        field: 'times',
+        text: allDay
+          ? 'End date is before the start'
+          : 'End must be after the start',
+      });
       return;
     }
     const rec = resolveRecurrence();
     if (rec && 'error' in rec) {
-      setProblem(rec.error);
+      setProblem({ field: 'repeat', text: rec.error });
       return;
     }
     const alarmInput: AlarmInput | null =
@@ -269,7 +307,7 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
         return;
       }
       setBusy(false);
-      setProblem(err instanceof Error ? err.message : 'Save failed');
+      setProblem({ text: err instanceof Error ? err.message : 'Save failed' });
     }
   }
 
@@ -286,7 +324,9 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
         return;
       }
       setBusy(false);
-      setProblem(err instanceof Error ? err.message : 'Delete failed');
+      setProblem({
+        text: err instanceof Error ? err.message : 'Delete failed',
+      });
     }
   }
 
@@ -320,7 +360,11 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
     calendarUrl,
     setCalendarUrl,
     headerDay,
-    problem,
+    // Not about one field (a failed write) — shown above the action bar.
+    problem: problem && !problem.field ? problem.text : null,
+    /** A validation problem with this field, shown under it. */
+    problemFor: (field: EditorField) =>
+      problem?.field === field ? problem.text : null,
     busy,
     save,
     remove,

@@ -31,7 +31,7 @@ import {
   useEventEditor,
   type EventEditorController,
 } from '@/components/calendar/use-event-editor';
-import { AccentColor, Spacing } from '@/constants/theme';
+import { AccentColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
@@ -219,7 +219,10 @@ export function EventEditorSheet({
         titleRef.current?.focus();
       }}
       enableDynamicSizing
-      maxDynamicContentSize={height * 0.9}
+      // Room for the whole screen below the status bar. The form fills most
+      // of it anyway; capped lower, the sheet opened short of the top and
+      // then jumped up the rest of the way when the title's keyboard rose.
+      maxDynamicContentSize={height - insets.top}
       // Lifted for the keyboard, the sheet stops under the status bar rather
       // than behind it (edge-to-edge gives it the whole screen otherwise).
       topInset={insets.top}
@@ -281,8 +284,6 @@ export function EventEditorSheet({
 const styles = StyleSheet.create({
   handle: {
     backgroundColor: HEADER_GROUND,
-    borderTopLeftRadius: Spacing.one,
-    borderTopRightRadius: Spacing.one,
   },
   handleIndicator: {
     backgroundColor: AccentColor,

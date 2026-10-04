@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 
 import { ThemedText } from '@/components/themed-text';
 import {
@@ -22,6 +23,10 @@ type Props<T extends string> = {
   options: readonly ChipOption<T>[];
   value: T;
   onChange: (next: T) => void;
+  /** One line, never wrapping: compact chips that scroll sideways if they
+   *  still do not fit (narrow screen, large text). For short option sets
+   *  that read best as a single strip — repeat preset, alert offset. */
+  singleLine?: boolean;
   testID?: string;
 };
 
@@ -29,59 +34,75 @@ type Props<T extends string> = {
 const tint = (hex: string) => `${rgbHex(hex)}1F`;
 
 /**
- * Wrapping row of selectable pills — the editor's dependency-free stand-in
- * for a dropdown (repeat preset, repeat end, alert offset, calendar). Every
- * option stays visible: rows wrap rather than scroll. Outlined at rest,
- * filled when selected — accent, or the option's own color.
+ * Row of selectable pills — the editor's dependency-free stand-in for a
+ * dropdown (repeat preset, repeat end, alert offset, calendar). Wraps by
+ * default so every option stays visible; `singleLine` keeps it to one strip.
+ * Outlined at rest, filled when selected — accent, or the option's own color.
  */
 export function ChipRow<T extends string>({
   options,
   value,
   onChange,
+  singleLine = false,
   testID,
 }: Props<T>) {
   const theme = useTheme();
+  const chips = options.map((option) => {
+    const selected = option.value === value;
+    const own = option.color ? rgbHex(option.color) : null;
+    return (
+      <Pressable
+        key={option.value}
+        testID={testID ? `${testID}-${option.value}` : undefined}
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        onPress={() => onChange(option.value)}
+        style={({ pressed }) => [
+          styles.chip,
+          singleLine && styles.chipCompact,
+          selected
+            ? own
+              ? { borderColor: own, backgroundColor: tint(own) }
+              : styles.chipAccent
+            : {
+                borderColor: theme.backgroundSelected,
+                backgroundColor: pressed
+                  ? theme.backgroundSelected
+                  : 'transparent',
+              },
+        ]}
+      >
+        {own && <View style={[styles.dot, { backgroundColor: own }]} />}
+        <ThemedText
+          type="small"
+          style={[
+            styles.label,
+            selected && styles.labelSelected,
+            selected && { color: own ?? OnAccentColor },
+            !selected && own ? { color: theme.textSecondary } : null,
+          ]}
+        >
+          {option.label}
+        </ThemedText>
+      </Pressable>
+    );
+  });
+  if (singleLine)
+    return (
+      // Gesture-handler's ScrollView, so a sideways drag here is not taken
+      // for the bottom sheet's own vertical pan.
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={[styles.row, styles.rowSingle]}
+        testID={testID}
+      >
+        {chips}
+      </ScrollView>
+    );
   return (
     <View style={styles.row} testID={testID}>
-      {options.map((option) => {
-        const selected = option.value === value;
-        const own = option.color ? rgbHex(option.color) : null;
-        return (
-          <Pressable
-            key={option.value}
-            testID={testID ? `${testID}-${option.value}` : undefined}
-            accessibilityRole="button"
-            accessibilityState={{ selected }}
-            onPress={() => onChange(option.value)}
-            style={({ pressed }) => [
-              styles.chip,
-              selected
-                ? own
-                  ? { borderColor: own, backgroundColor: tint(own) }
-                  : styles.chipAccent
-                : {
-                    borderColor: theme.backgroundSelected,
-                    backgroundColor: pressed
-                      ? theme.backgroundSelected
-                      : 'transparent',
-                  },
-            ]}
-          >
-            {own && <View style={[styles.dot, { backgroundColor: own }]} />}
-            <ThemedText
-              type="small"
-              style={[
-                styles.label,
-                selected && styles.labelSelected,
-                selected && { color: own ?? OnAccentColor },
-                !selected && own ? { color: theme.textSecondary } : null,
-              ]}
-            >
-              {option.label}
-            </ThemedText>
-          </Pressable>
-        );
-      })}
+      {chips}
     </View>
   );
 }
@@ -99,6 +120,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: Spacing.two + Spacing.half,
     height: 28,
+  },
+  rowSingle: {
+    flexWrap: 'nowrap',
+    gap: Spacing.one,
+  },
+  chipCompact: {
+    paddingHorizontal: Spacing.two,
   },
   chipAccent: {
     borderColor: AccentColor,

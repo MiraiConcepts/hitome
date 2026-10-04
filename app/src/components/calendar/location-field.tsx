@@ -53,7 +53,7 @@ export function LocationField({
           onFocus?.();
         }}
         onBlur={() => setFocused(false)}
-        placeholder="Location"
+        placeholder="Add a place"
         returnKeyType="done"
         submitBehavior="blurAndSubmit"
         testID={testID}

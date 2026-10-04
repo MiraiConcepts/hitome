@@ -1,6 +1,7 @@
 import { ChipRow } from '@/components/fields/chip-row';
-import { FieldRow } from '@/components/fields/field-row';
-import { ThemedText } from '@/components/themed-text';
+import { FieldStack } from '@/components/fields/field-stack';
+import { BellIcon } from '@/components/icons';
+import { SettingsMessage } from '@/components/settings/settings-parts';
 
 /**
  * Editor-side alarm state. 'set' covers any duration offset (foreign
@@ -51,11 +52,11 @@ type Props = {
 export function AlarmField({ value, onChange, allDay, hint, testID }: Props) {
   if (value.kind === 'foreign') {
     return (
-      <FieldRow label="Alert" testID={testID}>
-        <ThemedText type="small" themeColor="textSecondary">
+      <FieldStack label="Alert" icon={BellIcon} testID={testID}>
+        <SettingsMessage>
           Custom alert (set in another app) — kept as is.
-        </ThemedText>
-      </FieldRow>
+        </SettingsMessage>
+      </FieldStack>
     );
   }
 
@@ -70,9 +71,10 @@ export function AlarmField({ value, onChange, allDay, hint, testID }: Props) {
       : [...presets];
 
   return (
-    <FieldRow label="Alert" testID={testID}>
+    <FieldStack label="Alert" icon={BellIcon} testID={testID}>
       <ChipRow
         options={options}
+        singleLine
         value={selected}
         onChange={(next) =>
           onChange(
@@ -83,11 +85,7 @@ export function AlarmField({ value, onChange, allDay, hint, testID }: Props) {
         }
         testID={testID ? `${testID}-offset` : undefined}
       />
-      {hint && (
-        <ThemedText type="small" themeColor="textSecondary">
-          {hint}
-        </ThemedText>
-      )}
-    </FieldRow>
+      {hint && <SettingsMessage tone="problem">{hint}</SettingsMessage>}
+    </FieldStack>
   );
 }

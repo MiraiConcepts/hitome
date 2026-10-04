@@ -17,6 +17,15 @@ import {
   ServerOutlineBody,
   SettingsOutlineBody,
   UserOutlineBody,
+  PencilOutlineBody,
+  CalendarOutlineBody,
+  ClockPlayOutlineBody,
+  ClockStopOutlineBody,
+  RepeatOutlineBody,
+  BellOutlineBody,
+  MapPinOutlineBody,
+  NotesOutlineBody,
+  FlagOutlineBody,
 } from '@/constants/icon-paths';
 
 export type IconProps = { size?: number; color: string };
@@ -73,4 +82,40 @@ export function AlertCircleIcon({ size = 24, color }: IconProps) {
 
 export function InfoCircleIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(InfoCircleOutlineBody, size, color)} />;
+}
+
+export function PencilIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(PencilOutlineBody, size, color)} />;
+}
+
+export function CalendarIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(CalendarOutlineBody, size, color)} />;
+}
+
+export function ClockPlayIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(ClockPlayOutlineBody, size, color)} />;
+}
+
+export function ClockStopIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(ClockStopOutlineBody, size, color)} />;
+}
+
+export function RepeatIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(RepeatOutlineBody, size, color)} />;
+}
+
+export function BellIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(BellOutlineBody, size, color)} />;
+}
+
+export function MapPinIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(MapPinOutlineBody, size, color)} />;
+}
+
+export function NotesIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(NotesOutlineBody, size, color)} />;
+}
+
+export function FlagIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(FlagOutlineBody, size, color)} />;
 }

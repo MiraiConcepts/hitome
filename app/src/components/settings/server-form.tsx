@@ -7,7 +7,6 @@ import { TextField } from '@/components/fields/text-field';
 import { LockIcon, ServerIcon, UserIcon } from '@/components/icons';
 import {
   SettingsButton,
-  CONTROL_HEIGHT,
   SettingsButtonRow,
   SettingsOutcomeLine,
   type SettingsOutcome,
@@ -142,7 +141,6 @@ export function ConnectionFields({
     autoCapitalize: 'none',
     autoCorrect: false,
     editable: !form.busy,
-    style: styles.input,
     onFocus: onFieldFocus,
     onBlur: onFieldBlur,
   };
@@ -214,11 +212,6 @@ export function ServerForm() {
 }
 
 const styles = StyleSheet.create({
-  // Taller than the editor's 36pt fields: three full-width inputs are the
-  // whole screen here, and they are typed into on a phone.
-  input: {
-    minHeight: CONTROL_HEIGHT,
-  },
   fields: {
     gap: Spacing.three - Spacing.one,
   },

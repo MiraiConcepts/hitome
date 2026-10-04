@@ -25,8 +25,9 @@ export type TimeFieldProps = {
  * count share it, so every box in the form is the same height and radius.
  * Outlined, not filled: a 1px rule in the raised surface color
  * (`backgroundSelected`, applied by each field from `useTheme`) on the
- * sheet's own ground, turning accent on focus. Compact on purpose — 36pt
- * boxes keep a new event on one screen without scrolling.
+ * sheet's own ground, turning accent on focus. 44pt, the height every
+ * control in the app shares (buttons included), so fields read the same in
+ * the editor, settings and the connect screen.
  */
 export const FieldChrome = {
   // Explicit, not left to the default: the web date and time inputs spread
@@ -35,7 +36,7 @@ export const FieldChrome = {
   borderWidth: 1,
   paddingHorizontal: Spacing.three - Spacing.one,
   paddingVertical: Spacing.one + Spacing.half,
-  minHeight: 36,
+  minHeight: 44,
   fontSize: 15,
 } as const;
 
