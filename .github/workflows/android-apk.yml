@@ -9,10 +9,8 @@ name: Android APK
 # tooling/android-builder/sign-release.sh remains a working fallback for a run
 # whose signing step failed or a release that needs re-cutting by hand.
 #
-# No server URL is baked in any more: the app asks for one on first run and
-# keeps it (with the login) in the device keystore. `HITOME_DAV_URL` is still
-# passed through if the repo variable is set, but only to prefill that field —
-# the APK is fully usable without it.
+# No server URL is baked in: the app asks for one on first run and keeps it
+# (with the login) in the device keystore.
 
 on:
   workflow_dispatch:
@@ -61,8 +59,6 @@ jobs:
       # `android:dev` builds should keep reading unchanged.
       - name: Build release APK (unsigned, arm64-v8a)
         working-directory: app/android
-        env:
-          EXPO_PUBLIC_DAV_URL: ${{ vars.HITOME_DAV_URL }}
         run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a
 
       - name: Zipalign + stage signing tool

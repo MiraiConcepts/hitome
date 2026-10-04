@@ -7,10 +7,6 @@ import { subscribeDavConfig } from './dav-store';
 /**
  * Which discovered calendar new events are created into.
  *
- * This replaced a hardcoded display name — `DEFAULT_CALENDAR_NAME =
- * 'carrein-calendar'` — which worked for exactly one person's server and
- * silently degraded to "whatever discovery returned first" for everybody else.
- *
  * Kept in the ordinary snapshot cache rather than the keystore: it is a
  * preference, not a secret, and it is the one store that works on both
  * platforms (web derives its connection and so cannot write to the keystore at

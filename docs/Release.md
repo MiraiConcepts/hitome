@@ -35,9 +35,8 @@
     repo, images or bundles**, ever.
 - **No baked server URL** (since v0.4): the app asks on first run and keeps the
   address and login in the device keystore, so a URL or port change no longer
-  needs a release. The repo Actions variable `HITOME_DAV_URL`, if still set, is
-  passed through only to prefill that field — the APK works without it, and the
-  release no longer checks for a URL inside the binary.
+  needs a release. Builds don't prefill the address either: a fresh install
+  starts with an empty form.
 - **Signing keystore**: `~/.hitome-keys/` (`release.keystore` + `keystore.properties`),
   NEVER in git. ⚠️ **Back it up** — Android only installs updates signed by the same
   key; losing it means uninstall/reinstall + Obtainium re-add.
@@ -102,9 +101,7 @@ known failure layers but not yet proven end-to-end — prefer the CI path.
 
 ## Notes
 
-- One-time repo setup already done: Actions variable `HITOME_DAV_URL` (now only
-  a setup-screen prefill, and optional); keystore
-  generated 2026-07-06.
+- One-time repo setup already done: keystore generated 2026-07-06.
 - `dist-apk/`, `app/android/`, and the builder `.env` are gitignored/disposable.
 - Superseded in v0.4: the baked-URL decision. Its own revisit triggers were
   Funnel being enabled, the tailnet gaining users, or URL churn — "switch to
