@@ -129,6 +129,19 @@ export async function clearDavConfig(): Promise<void> {
 }
 
 /**
+ * Sign out and erase: the connection, the remembered copy of it, and every
+ * cached calendar, preference and widget snapshot on this device. What is
+ * left is a fresh install's state.
+ */
+export async function eraseDavConfig(): Promise<void> {
+  await clearStoredConfig();
+  await clearLastConfig();
+  last = null;
+  await clearSnapshots();
+  publish(null);
+}
+
+/**
  * Notified when the connection actually changes — saved, or disconnected —
  * and never for the initial load. caldav/client subscribes to drop its cached
  * connection, and calendar-pref to drop a choice that belonged to the old

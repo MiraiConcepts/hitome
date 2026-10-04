@@ -33,6 +33,10 @@ import { ThemedView } from '@/components/themed-view';
 import { AccentColor, Colors, Spacing } from '@/constants/theme';
 import { useDeepLink } from '@/hooks/use-deep-link';
 import { useMonthEvents } from '@/hooks/use-month-events';
+import {
+  inHiddenCalendar,
+  useHiddenCalendars,
+} from '@/config/calendar-visibility';
 import type { MonthAnchor } from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
 import { refreshAgendaWidget } from '@/widget/app-refresh';
@@ -178,8 +182,23 @@ export function MonthScreen() {
     () => new Date(settledMonth.year, settledMonth.month0, 1),
     [settledMonth]
   );
-  const { events, loading, error, authFailed, refresh, fetchedAt } =
-    useMonthEvents(settledDate);
+  const {
+    events: allEvents,
+    loading,
+    error,
+    authFailed,
+    refresh,
+    fetchedAt,
+  } = useMonthEvents(settledDate);
+  // Calendars hidden in settings stay fetched and cached — only drawn less.
+  const hiddenCalendars = useHiddenCalendars();
+  const events = useMemo(
+    () =>
+      hiddenCalendars.length === 0
+        ? allEvents
+        : allEvents.filter((e) => !inHiddenCalendar(e.url, hiddenCalendars)),
+    [allEvents, hiddenCalendars]
+  );
 
   // A widget row's id, resolved against the month's events — reconciled during
   // render like the other deep links above, not in an effect.

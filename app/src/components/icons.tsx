@@ -27,6 +27,13 @@ import {
   NotesOutlineBody,
   FlagOutlineBody,
   EyeOutlineBody,
+  EyeOffOutlineBody,
+  LogoutOutlineBody,
+  GithubOutlineBody,
+  FileTextOutlineBody,
+  BugOutlineBody,
+  ShieldLockOutlineBody,
+  HelpCircleOutlineBody,
 } from '@/constants/icon-paths';
 
 export type IconProps = { size?: number; color: string };
@@ -123,4 +130,32 @@ export function FlagIcon({ size = 24, color }: IconProps) {
 
 export function EyeIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(EyeOutlineBody, size, color)} />;
+}
+
+export function EyeOffIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(EyeOffOutlineBody, size, color)} />;
+}
+
+export function LogoutIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(LogoutOutlineBody, size, color)} />;
+}
+
+export function GithubIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(GithubOutlineBody, size, color)} />;
+}
+
+export function FileTextIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(FileTextOutlineBody, size, color)} />;
+}
+
+export function BugIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(BugOutlineBody, size, color)} />;
+}
+
+export function ShieldLockIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(ShieldLockOutlineBody, size, color)} />;
+}
+
+export function HelpCircleIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(HelpCircleOutlineBody, size, color)} />;
 }

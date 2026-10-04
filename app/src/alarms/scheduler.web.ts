@@ -99,6 +99,10 @@ export async function scheduleAlarm(alarm: DesiredAlarm): Promise<void> {
   scheduled.set(alarm.id, alarm);
 }
 
+export async function cancelAllReminders(): Promise<void> {
+  scheduled.clear();
+}
+
 export async function cancelAlarm(id: string): Promise<void> {
   scheduled.delete(id);
 }

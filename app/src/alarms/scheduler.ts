@@ -6,6 +6,8 @@
 import * as Notifications from 'expo-notifications';
 import { Linking } from 'react-native';
 
+import { toDateString } from '@/utils/date';
+
 import {
   JOIN_ACTION,
   REMINDER_CATEGORY,
@@ -109,6 +111,10 @@ export async function sendTestNotification(): Promise<void> {
     content: {
       title: 'hitome',
       body: 'Test notification — event reminders can ring on this device.',
+      // A real reminder's buttons, so the test shows (and Snooze proves)
+      // exactly what one will.
+      categoryIdentifier: REMINDER_CATEGORY,
+      data: { day: toDateString(new Date()) } satisfies ReminderData,
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -151,6 +157,11 @@ export async function scheduleAlarm(alarm: DesiredAlarm): Promise<void> {
     // Android caps concurrent alarms (~500/app); a miss self-heals on the
     // next reconcile once the horizon rolls.
   }
+}
+
+/** Every scheduled reminder and snooze — the account they came from is gone. */
+export async function cancelAllReminders(): Promise<void> {
+  await Notifications.cancelAllScheduledNotificationsAsync();
 }
 
 export async function cancelAlarm(id: string): Promise<void> {

@@ -1,5 +1,9 @@
 // Fetches the widget's event window and reduces it to the next-10 snapshot.
 import { fetchMonth } from '@/caldav/events';
+import {
+  ensureHiddenCalendars,
+  inHiddenCalendar,
+} from '@/config/calendar-visibility';
 
 import { selectUpcoming, toWidgetEvent } from './select-upcoming';
 import type { WidgetEvent } from './types';
@@ -11,6 +15,10 @@ export const HORIZON_DAYS = 60;
 export async function fetchUpcoming(now: Date): Promise<WidgetEvent[]> {
   const horizon = new Date(now);
   horizon.setDate(horizon.getDate() + HORIZON_DAYS);
-  const events = await fetchMonth(now, horizon);
-  return selectUpcoming(events, now).map(toWidgetEvent);
+  const [events, hidden] = await Promise.all([
+    fetchMonth(now, horizon),
+    ensureHiddenCalendars(),
+  ]);
+  const shown = events.filter((e) => !inHiddenCalendar(e.url, hidden));
+  return selectUpcoming(shown, now).map(toWidgetEvent);
 }

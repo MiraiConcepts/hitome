@@ -82,6 +82,7 @@ export function SetupScreen() {
                   form={form}
                   onFieldFocus={onFieldFocus}
                   onFieldBlur={onFieldBlur}
+                  help
                 />
               </SettingsBlock>
             </SettingsSection>

@@ -64,5 +64,17 @@ is refused). A repeating event moves with every occurrence, and says so.
 - Settings → Notifications: default alert for new timed events (prefills the
   editor), and a sample reminder drawn as an Android notification.
 - Not yet watched on the device: the phone was asleep after the rebuild.
-## 4. Hide calendars; Sign out and erase; connect help; About links
+## 4. Hide calendars; Sign out and erase; connect help; About links — DONE
+
+- Calendars: an eye per calendar hides it from the grid and the widget
+  (display only: still fetched, cached, and its reminders still ring).
+- Server: Disconnect (remembers the login) and a separate Sign out and erase
+  (connection, remembered copy, every snapshot). Both now cancel scheduled
+  reminders and refresh the widget — nothing from a left account rings.
+- Connect screen: a folded "What do I enter here?" with example addresses and
+  what the login is (the user had asked for no permanent hint text).
+- About: source, MIT licence, report a problem, and a no-tracking line;
+  app/README.md was still the Expo template and now points at the real docs.
+- Found on web: label/value rows grew to the vertical rule's 150px default —
+  the rule is now out of flow. Calendars' load error uses the friendly copy.
 ## 5. Follow the phone: week start, 12/24h, widget language

@@ -1,5 +1,4 @@
 import {
-  SettingsBlock,
   SettingsSection,
   SettingsValue,
 } from '@/components/settings/settings-parts';
@@ -32,9 +31,7 @@ export function ConnectionSection() {
 
   return (
     <SettingsSection title="Server" testID="settings-connection">
-      <SettingsBlock>
-        <ServerForm />
-      </SettingsBlock>
+      <ServerForm />
     </SettingsSection>
   );
 }

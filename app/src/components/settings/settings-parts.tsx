@@ -173,7 +173,14 @@ export function SettingsValue({
             {label}
           </ThemedText>
         </View>
-        <DashedLine vertical />
+        {/* Out of flow: a percentage-tall SVG has no height of its own to
+            give, and in a browser it would set the row's height instead of
+            filling it. */}
+        <View style={styles.columnRule}>
+          <View style={StyleSheet.absoluteFill}>
+            <DashedLine vertical />
+          </View>
+        </View>
         <View style={styles.valueCell}>
           {typeof value === 'string' ? (
             <ThemedText type="small">{value}</ThemedText>
@@ -523,6 +530,9 @@ const styles = StyleSheet.create({
   valueRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
+  },
+  columnRule: {
+    width: 1,
   },
   valueLabelCell: {
     width: Card.labelColumn,

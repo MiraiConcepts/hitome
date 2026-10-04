@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { listCalendars, type CalendarChoice } from '@/caldav/events';
-import { CheckIcon } from '@/components/icons';
+import { CheckIcon, EyeIcon, EyeOffIcon } from '@/components/icons';
 import {
   Card,
   CONTROL_HEIGHT,
@@ -11,7 +11,16 @@ import {
   SettingsSection,
 } from '@/components/settings/settings-parts';
 import { ThemedText } from '@/components/themed-text';
+import { refreshAgendaWidget } from '@/widget/app-refresh';
 import { setDefaultCalendar, useDefaultCalendar } from '@/config/calendar-pref';
+import {
+  classifyConnectError,
+  connectFailureMessage,
+} from '@/config/dav-config';
+import {
+  setCalendarHidden,
+  useHiddenCalendars,
+} from '@/config/calendar-visibility';
 import { AccentColor, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -23,6 +32,7 @@ import { useTheme } from '@/hooks/use-theme';
 export function CalendarsSection() {
   const theme = useTheme();
   const preferred = useDefaultCalendar();
+  const hidden = useHiddenCalendars();
   const [calendars, setCalendars] = useState<CalendarChoice[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -35,7 +45,10 @@ export function CalendarsSection() {
       .catch((err) => {
         if (alive)
           setProblem(
-            err instanceof Error ? err.message : 'Could not list calendars'
+            connectFailureMessage(
+              classifyConnectError(err, { hadLogin: true }),
+              err instanceof Error ? err.message : String(err)
+            )
           );
       });
     return () => {
@@ -62,6 +75,7 @@ export function CalendarsSection() {
       )}
       {calendars?.map((calendar) => {
         const selected = calendar.url === selectedUrl;
+        const isHidden = hidden.includes(calendar.url);
         return (
           <SettingsBlock
             key={calendar.url}
@@ -78,10 +92,32 @@ export function CalendarsSection() {
                   },
                 ]}
               />
-              <ThemedText type="small" style={styles.name}>
+              <ThemedText
+                type="small"
+                themeColor={isHidden ? 'placeholder' : undefined}
+                style={styles.name}
+              >
                 {calendar.name}
               </ThemedText>
               {selected && <CheckIcon size={CHECK_SIZE} color={AccentColor} />}
+              <Pressable
+                onPress={() => {
+                  setCalendarHidden(calendar.url, !isHidden);
+                  // The widget redraws from its own fetch; tell it now.
+                  refreshAgendaWidget();
+                }}
+                hitSlop={10}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: !isHidden }}
+                accessibilityLabel={`Show ${calendar.name} on the calendar`}
+                testID={`settings-calendar-visible-${calendar.name}`}
+              >
+                {isHidden ? (
+                  <EyeOffIcon size={CHECK_SIZE} color={theme.placeholder} />
+                ) : (
+                  <EyeIcon size={CHECK_SIZE} color={theme.textSecondary} />
+                )}
+              </Pressable>
             </View>
           </SettingsBlock>
         );
@@ -92,6 +128,9 @@ export function CalendarsSection() {
         <SettingsBlock>
           <SettingsMessage icon={CheckIcon}>
             Where new events go. Tap a calendar to change.
+          </SettingsMessage>
+          <SettingsMessage icon={EyeIcon}>
+            Shown on the calendar and widget. Tap the eye to hide one.
           </SettingsMessage>
         </SettingsBlock>
       )}

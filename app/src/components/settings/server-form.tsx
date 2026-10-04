@@ -1,13 +1,22 @@
 import { useState } from 'react';
-import { StyleSheet, View, type TextInputProps } from 'react-native';
+import { Pressable, StyleSheet, View, type TextInputProps } from 'react-native';
 
+import { cancelAllReminders } from '@/alarms/scheduler';
 import { probeConnection } from '@/caldav/client';
 import { FieldStack } from '@/components/fields/field-stack';
 import { TextField } from '@/components/fields/text-field';
-import { LockIcon, ServerIcon, UserIcon } from '@/components/icons';
+import {
+  HelpCircleIcon,
+  LockIcon,
+  LogoutIcon,
+  ServerIcon,
+  UserIcon,
+} from '@/components/icons';
 import {
   SettingsButton,
+  SettingsBlock,
   SettingsButtonRow,
+  SettingsMessage,
   SettingsOutcomeLine,
   type SettingsOutcome,
 } from '@/components/settings/settings-parts';
@@ -18,11 +27,13 @@ import {
 } from '@/config/dav-config';
 import {
   clearDavConfig,
+  eraseDavConfig,
   getLastDavConfig,
   saveDavConfig,
   useDavConfig,
 } from '@/config/dav-store';
 import { Spacing } from '@/constants/theme';
+import { refreshAgendaWidget } from '@/widget/app-refresh';
 
 /**
  * State and actions for the CalDAV connection form, shared by the first-run
@@ -93,12 +104,31 @@ export function useServerForm(onSaved?: () => void) {
     }
   }
 
+  /** What both ways out share: nothing from this account should ring or
+   *  sit on the home screen afterwards. */
+  async function leaveAccount() {
+    await cancelAllReminders().catch(() => {});
+    refreshAgendaWidget();
+  }
+
   async function disconnect() {
     setBusy(true);
     try {
       // The fields keep their values: the store remembers this connection to
       // prefill the setup screen, which replaces this one once it is cleared.
       await clearDavConfig();
+      await leaveAccount();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Disconnect and forget: no remembered login, nothing cached. */
+  async function signOutAndErase() {
+    setBusy(true);
+    try {
+      await eraseDavConfig();
+      await leaveAccount();
     } finally {
       setBusy(false);
     }
@@ -116,6 +146,7 @@ export function useServerForm(onSaved?: () => void) {
     busy,
     save,
     disconnect,
+    signOutAndErase,
   };
 }
 
@@ -131,10 +162,13 @@ export function ConnectionFields({
   form,
   onFieldFocus,
   onFieldBlur,
+  help = false,
 }: {
   form: ServerFormState;
   onFieldFocus?: () => void;
   onFieldBlur?: () => void;
+  /** Offer the "what do I enter" help (first run, where it is needed). */
+  help?: boolean;
 }) {
   // What every one of the three inputs shares.
   const common: TextInputProps = {
@@ -178,40 +212,106 @@ export function ConnectionFields({
       </FieldStack>
 
       <SettingsOutcomeLine outcome={form.outcome} testID="settings-problem" />
+      {help && <ConnectionHelp />}
     </View>
   );
 }
 
-/** The settings arrangement: the fields, then Disconnect and Save under them,
- *  right-aligned with Save last. */
+/**
+ * Folded until asked for: one quiet line, which opens to what the fields want
+ * — the server's CalDAV address with examples, and what the login is. Kept
+ * short on purpose; the error messages carry the rest.
+ */
+function ConnectionHelp() {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={styles.help}>
+      <Pressable
+        onPress={() => setOpen(!open)}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        testID="setup-help"
+      >
+        <SettingsMessage icon={HelpCircleIcon}>
+          What do I enter here?
+        </SettingsMessage>
+      </Pressable>
+      {open && (
+        <>
+          <SettingsMessage>
+            Your calendar server’s CalDAV address. For Radicale it is usually
+            https://your-server:5232/, for Nextcloud
+            https://your-server/remote.php/dav/.
+          </SettingsMessage>
+          <SettingsMessage>
+            Username and password are the ones that server knows you by. Leave
+            them empty if a proxy in front of it signs you in. Accounts that
+            need Google or Microsoft sign-in can’t connect.
+          </SettingsMessage>
+        </>
+      )}
+    </View>
+  );
+}
+
+/** The settings arrangement, as two card rows: the fields with Disconnect
+ *  and Save under them (Save last, at the right), then the erase row. */
 export function ServerForm() {
   const form = useServerForm();
   return (
     <>
-      <ConnectionFields form={form} />
-      <SettingsButtonRow>
-        {form.config && (
+      <SettingsBlock>
+        <ConnectionFields form={form} />
+        <SettingsButtonRow>
+          {form.config && (
+            <SettingsButton
+              label="Disconnect"
+              variant="danger"
+              disabled={form.busy}
+              onPress={form.disconnect}
+              testID="settings-disconnect"
+            />
+          )}
           <SettingsButton
-            label="Disconnect"
-            variant="danger"
-            disabled={form.busy}
-            onPress={form.disconnect}
-            testID="settings-disconnect"
+            label="Save"
+            variant="filled"
+            busy={form.busy}
+            onPress={form.save}
+            testID="settings-save"
           />
-        )}
-        <SettingsButton
-          label="Save"
-          variant="filled"
-          busy={form.busy}
-          onPress={form.save}
-          testID="settings-save"
-        />
-      </SettingsButtonRow>
+        </SettingsButtonRow>
+      </SettingsBlock>
+      {form.config && <EraseRow form={form} />}
     </>
   );
 }
 
+/** The way out that keeps nothing — its own row, away from Save. */
+function EraseRow({ form }: { form: ServerFormState }) {
+  return (
+    <SettingsBlock>
+      <SettingsMessage icon={LogoutIcon}>
+        Disconnect remembers your login for next time. Sign out and erase
+        removes it and everything hitome keeps on this phone.
+      </SettingsMessage>
+      <SettingsButtonRow>
+        <SettingsButton
+          label="Sign out and erase"
+          variant="danger"
+          disabled={form.busy}
+          onPress={form.signOutAndErase}
+          testID="settings-erase"
+        />
+      </SettingsButtonRow>
+    </SettingsBlock>
+  );
+}
+
 const styles = StyleSheet.create({
+  help: {
+    gap: Spacing.two,
+  },
   fields: {
     gap: Spacing.three - Spacing.one,
   },
