@@ -55,9 +55,10 @@ login of their own — and it brings offline edits + sync for free.
 - Verify on the phone: recurring this / following / all through the store
   round-trips correctly to Radicale via DAVx⁵; reminders (VALARM ↔
   Reminders table); moving between calendars (copy + delete).
-- Rollout: one release with the old direct-Radicale login still available
-  but hidden; remove it (and the Android keystore login) the release after,
-  once DAVx⁵ has been trusted for a week.
+- Rollout: no transition release (user's call — single user, no backwards
+  compatibility needed). The direct-Radicale login on Android and its
+  keystore storage (`config/dav-storage.ts`) are removed in the same
+  release that adds the calendar store.
 - The "no CalDAV credentials" invariant gets stronger on Android: hitome
   holds no login at all; DAVx⁵ does.
 
