@@ -50,10 +50,16 @@ async function create(
   title: string,
   repeat?: { daily: number },
 ) {
-  await grid(page)
-    .getByTestId(`day-cell-${dateString(day(onDay))}`)
-    .click(HOLD);
-  await expect(page.getByTestId("event-editor")).toBeVisible();
+  // Retried: right after load the grid can still sit under its loading
+  // cover, which swallows the hold.
+  await expect(async () => {
+    await grid(page)
+      .getByTestId(`day-cell-${dateString(day(onDay))}`)
+      .click(HOLD);
+    await expect(page.getByTestId("event-editor")).toBeVisible({
+      timeout: 2_000,
+    });
+  }).toPass({ timeout: 20_000 });
   await page.getByTestId("editor-summary").fill(title);
   await page.getByRole("button", { name: "test/e2e", exact: true }).click();
   if (repeat) {

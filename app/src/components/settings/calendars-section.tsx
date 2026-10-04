@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { listCalendars, type CalendarChoice } from '@/caldav/events';
+import { listCalendars, type CalendarChoice } from '@/data/events';
 import { CalendarMark } from '@/components/calendar/calendar-mark';
 import { ChipRow } from '@/components/fields/chip-row';
 import { FieldStack } from '@/components/fields/field-stack';

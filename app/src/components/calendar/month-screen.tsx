@@ -16,7 +16,8 @@ import { runAlarmReconcile } from '@/alarms/runner';
 import {
   undoDelete as undoDeleteOnServer,
   type EditScope,
-} from '@/caldav/events';
+  requestSync,
+} from '@/data/events';
 import type { CalEvent } from '@/caldav/types';
 import { DayPopover } from '@/components/calendar/day-popover';
 import {
@@ -287,6 +288,9 @@ export function MonthScreen() {
 
   function onManualRefresh() {
     setManualRefreshing(true);
+    // Android: ask DAVx⁵ to sync now (what lands then redraws the grid by
+    // itself); web: nothing to ask. Either way, read what is there now.
+    requestSync().catch(() => {});
     refresh().finally(() => setManualRefreshing(false));
   }
 

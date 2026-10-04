@@ -377,7 +377,7 @@ function Body({
 }
 
 /**
- * Before any server is set up: no date bar, no buttons that would do nothing
+ * Before calendar access is granted: no date bar, no buttons that would do nothing
  * — the whole widget one orange card asking to connect, and a tap anywhere
  * opening hitome on its connect screen.
  */
@@ -411,7 +411,7 @@ function SignedOut() {
           style={{ fontSize: 26, fontFamily: FontFamilyBold, color: ink }}
         />
         <TextWidget
-          text="Tap to sign in to your server"
+          text="Tap to allow calendar access"
           style={{ fontSize: 13, fontFamily: FontFamily, color: ink }}
         />
       </FlexWidget>

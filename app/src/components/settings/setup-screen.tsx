@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import { useEffect, useRef, useState } from 'react';
 import {
   Keyboard,
@@ -17,11 +16,10 @@ import {
   ConnectionFields,
   useServerForm,
 } from '@/components/settings/server-form';
+import { AppName } from '@/components/settings/app-name';
 import { SettingsButton } from '@/components/settings/settings-parts';
-import { HEADER_TITLE_TYPE } from '@/components/calendar/month-header';
-import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { AccentColor, FontFamilyBold, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 
 const ICON_SIZE = 72;
 /** Collapsed while typing: the icon sits beside the name as a header. */
@@ -150,36 +148,6 @@ function useCollapsedWhileTyping() {
   return { collapsed, keyboardInset, onFieldFocus, onFieldBlur };
 }
 
-/**
- * "hitome" with the build's version set small on its baseline, as a
- * subscript. Centred under the icon, a transparent copy of the version leads
- * the row so the name itself stays dead centre; as a header it is dropped.
- */
-function AppName({ centred }: { centred: boolean }) {
-  const version = `v${Constants.expoConfig?.version ?? '?'}${__DEV__ ? ' dev' : ''}`;
-  return (
-    <View style={styles.nameRow}>
-      {centred && (
-        <ThemedText
-          style={[styles.version, styles.hidden]}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-        >
-          {version}
-        </ThemedText>
-      )}
-      <ThemedText style={styles.title}>hitome</ThemedText>
-      <ThemedText
-        themeColor="textSecondary"
-        style={styles.version}
-        testID="setup-version"
-      >
-        {version}
-      </ThemedText>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   fill: {
     flex: 1,
@@ -213,24 +181,6 @@ const styles = StyleSheet.create({
   iconCollapsed: {
     width: ICON_SIZE_COLLAPSED,
     height: ICON_SIZE_COLLAPSED,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: Spacing.one,
-  },
-  title: {
-    fontFamily: FontFamilyBold,
-    color: AccentColor,
-    // Set exactly as the month title is once you are through.
-    ...HEADER_TITLE_TYPE,
-  },
-  version: {
-    fontSize: 11,
-    lineHeight: 14,
-  },
-  hidden: {
-    opacity: 0,
   },
   footer: {
     flexDirection: 'row',

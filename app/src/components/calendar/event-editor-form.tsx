@@ -7,7 +7,7 @@ import { LocationField } from '@/components/calendar/location-field';
 import { HEADER_GROUND } from '@/components/calendar/month-header';
 import { RecurrenceField } from '@/components/calendar/recurrence-field';
 import type { EventEditorController } from '@/components/calendar/use-event-editor';
-import type { EditScope } from '@/caldav/events';
+import type { EditScope } from '@/data/events';
 import { DateField } from '@/components/fields/date-field';
 import { FieldStack } from '@/components/fields/field-stack';
 import { TextField } from '@/components/fields/text-field';

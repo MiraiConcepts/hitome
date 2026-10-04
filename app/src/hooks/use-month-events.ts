@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
-import { fetchMonth, isAuthFailure } from '@/caldav/events';
+import { fetchMonth, isAuthFailure, subscribeStore } from '@/data/events';
 import type { CalEvent } from '@/caldav/types';
-import { getDavStatus, useDavStatus } from '@/config/dav-store';
+import { getSourceStatus, useSourceStatus } from '@/config/source';
 import { gridFetchRange } from '@/utils/calendar-grid';
 import { reviveEvents, serializeEvents } from '@/utils/event-snapshot';
 import {
@@ -62,7 +62,7 @@ export function useMonthEvents(visibleMonth: Date) {
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
   // 'loading' until the stored config lands, so the first paint is a spinner
   // rather than a claim either way.
-  const status = useDavStatus();
+  const status = useSourceStatus();
   const [loading, setLoading] = useState(status !== 'unconfigured');
   const [error, setError] = useState<string | null>(null);
   /** The last failure was the server refusing the login, not the network being
@@ -98,7 +98,7 @@ export function useMonthEvents(visibleMonth: Date) {
     async (y: number, m0: number, primary: boolean) => {
       // Read through the store rather than closing over the hook's value:
       // this callback is memoized and the config can land after it is made.
-      if (getDavStatus() !== 'configured') return;
+      if (getSourceStatus() !== 'configured') return;
       const monthKey = monthKeyOf(y, m0);
       if (!primary) {
         if (inflight.current.has(monthKey)) return;
@@ -223,6 +223,27 @@ export function useMonthEvents(visibleMonth: Date) {
       if (typeof window !== 'undefined' && typeof document !== 'undefined') {
         window.removeEventListener('focus', onWindowFocus);
       }
+    };
+  }, [refresh, status]);
+
+  useEffect(() => {
+    // Android: the phone's calendar store says when it changed — a sync
+    // landing, or another app's edit — so the grid and the widget follow
+    // at once rather than at the next poll. Debounced: a
+    // sync writes many rows in a burst. (The web has no store; a no-op.)
+    // Reminders follow the store in useAlarmReconcile.
+    if (status !== 'configured') return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = subscribeStore(() => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        refresh();
+        refreshAgendaWidget();
+      }, 600);
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe();
     };
   }, [refresh, status]);
 

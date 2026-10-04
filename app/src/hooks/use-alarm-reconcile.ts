@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 
 import { runAlarmReconcile } from '@/alarms/runner';
 import { onAlarmTap } from '@/alarms/scheduler';
+import { subscribeStore } from '@/data/events';
 import { openInApp } from '@/hooks/use-deep-link-source';
 
 // Deferred past boot for the same reason as the widget refresh in _layout —
@@ -33,10 +34,19 @@ export function useAlarmReconcile(): void {
     // A reminder tap opens its event (the month view lands on the day, then
     // opens it once fetched) — the widget's links take the same path.
     const untap = onAlarmTap(openInApp);
+    // Android: a sync landing in the phone's calendar store can add, move or
+    // drop reminders — reconcile once the burst of writes settles.
+    let settle: ReturnType<typeof setTimeout> | null = null;
+    const unwatch = subscribeStore(() => {
+      if (settle) clearTimeout(settle);
+      settle = setTimeout(kick, 2000);
+    });
     return () => {
       clearTimeout(timer);
+      if (settle) clearTimeout(settle);
       appState.remove();
       untap();
+      unwatch();
     };
   }, []);
 }

@@ -2,7 +2,7 @@
 // the platform's scheduled set in line. Runs on app start, foreground, and
 // after every editor write — the "reconcile on open" cadence is also the
 // safety net against ColorOS force-stops wiping AlarmManager registrations.
-import { fetchMonth } from '@/caldav/events';
+import { fetchMonth } from '@/data/events';
 import type { CalEvent } from '@/caldav/types';
 import { cacheKey } from '@/hooks/use-month-events';
 import { reviveEvents } from '@/utils/event-snapshot';

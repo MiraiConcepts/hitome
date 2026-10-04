@@ -19,7 +19,7 @@ import {
   listCalendars,
   moveEvent,
   updateEvent,
-} from '@/caldav/events';
+} from '@/data/events';
 import { getDefaultAlert } from '@/config/alert-pref';
 import { writeFailureMessage } from '@/config/dav-config';
 import type {

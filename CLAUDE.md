@@ -71,10 +71,13 @@ helper scripts.
   - **Web** is unchanged and holds nothing: it derives `/dav/` from the page's
     own origin and the host Caddy injects Authorization (password lives only in
     the server `.env`). No browser ever stores a credential.
-  - **Android** asks on first run and keeps the address + login in the OS
-    keystore (`expo-secure-store`, `src/config/dav-storage.ts`) — the device,
-    entered by the user, never the build. The login stays optional, because
-    pointing the app at the injecting proxy means sending none.
+  - **Android** holds no login at all (since v0.5): it reads and writes the
+    phone's calendar store (`src/store/`, native bridge in
+    `app/modules/calendar-store`), which DAVx⁵ or another sync app keeps in
+    step with the server — DAVx⁵ holds the login, and offline edits wait in
+    the store for it. A login saved by an earlier version is erased at launch
+    (`src/config/source.android.ts`). Screens import events from
+    `src/data/events` (CalDAV on web, the store on Android).
   - Never reintroduce credential baking, and never store a credential anywhere
     a browser can read it.
 - UI is square: no corner radius on cards, buttons, fields, chips, sheets or

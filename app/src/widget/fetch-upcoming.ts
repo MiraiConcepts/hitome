@@ -1,5 +1,5 @@
 // Fetches the widget's event window and reduces it to the next-10 snapshot.
-import { fetchMonth } from '@/caldav/events';
+import { fetchMonth } from '@/data/events';
 import {
   ensureHiddenCalendars,
   inHiddenCalendar,

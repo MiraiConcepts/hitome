@@ -10,7 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BootScreen } from '@/components/boot-screen';
 import { SetupScreen } from '@/components/settings/setup-screen';
 import { ensureDefaultAlert } from '@/config/alert-pref';
-import { ensureDavConfig, useDavStatus } from '@/config/dav-store';
+import { ensureSource, useSourceStatus } from '@/config/source';
 import { useAlarmReconcile } from '@/hooks/use-alarm-reconcile';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DeepLinkProvider } from '@/hooks/use-deep-link';
@@ -32,9 +32,9 @@ export default function RootLayout() {
   // bundle, so it is a fourth thing the shell has to wait for. 'loading' is a
   // real state: concluding "not configured" from a null that has not been read
   // yet would flash the setup screen at someone who is already set up.
-  const davStatus = useDavStatus();
+  const davStatus = useSourceStatus();
   useEffect(() => {
-    ensureDavConfig();
+    ensureSource();
     // Read before any editor opens: a new event starts with this alert.
     ensureDefaultAlert();
   }, []);

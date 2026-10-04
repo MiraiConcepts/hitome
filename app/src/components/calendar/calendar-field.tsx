@@ -1,4 +1,4 @@
-import type { CalendarChoice } from '@/caldav/events';
+import type { CalendarChoice } from '@/data/events';
 import { ChipRow } from '@/components/fields/chip-row';
 import { AccentColor } from '@/constants/theme';
 

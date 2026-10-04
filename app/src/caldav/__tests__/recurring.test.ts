@@ -1,3 +1,4 @@
+import { readRecurrence } from '../rrule';
 import {
   editOccurrence,
   editPreserving,
@@ -225,6 +226,17 @@ describe('truncateSeries (delete this and following)', () => {
     const fourth = expand(WEEKLY)[3];
     const occ = expand(truncateSeries(WEEKLY, fourth.recurrenceStart!));
     expect(occ.map((o) => o.start.getUTCDate())).toEqual([5, 12, 19]);
+  });
+
+  it('reads back as repeating until the day before the cut', () => {
+    const fourth = expand(WEEKLY)[3]; // Monday 26 Oct
+    const read = readRecurrence(
+      truncateSeries(WEEKLY, fourth.recurrenceStart!)
+    );
+    // Not "until 26 Oct", which the series no longer reaches.
+    expect(read).toMatchObject({ preset: 'weekly' });
+    const until = (read as { until: Date }).until;
+    expect(until.getDate()).toBe(25);
   });
 
   it('ends an endless all-day series the day before', () => {

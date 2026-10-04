@@ -147,6 +147,31 @@ export function readRecurrence(ics: string): RecurrenceInput | 'custom' | null {
   return {
     preset,
     ...(recur.count ? { count: recur.count } : {}),
-    ...(recur.until ? { until: recur.until.toJSDate() } : {}),
+    ...(recur.until
+      ? {
+          until: lastRepeatDay(
+            recur.until,
+            vevent.getFirstPropertyValue('dtstart') as ICAL.Time | null
+          ),
+        }
+      : {}),
   };
+}
+
+/**
+ * The last day a timed rule still repeats on, from its UNTIL. A rule cut
+ * short ("this and following") stops one second before an occurrence — on
+ * that occurrence's own day — so read naively it claimed to run until a day
+ * it no longer reaches. When UNTIL falls earlier in its day than the event
+ * starts, the last repeat is the day before.
+ */
+function lastRepeatDay(until: ICAL.Time, dtstart: ICAL.Time | null): Date {
+  const end = until.toJSDate();
+  if (until.isDate || !dtstart || dtstart.isDate) return end;
+  const start = dtstart.toJSDate();
+  const minutes = (d: Date) => d.getHours() * 60 + d.getMinutes();
+  if (minutes(end) >= minutes(start)) return end;
+  const day = new Date(end);
+  day.setDate(day.getDate() - 1);
+  return day;
 }
