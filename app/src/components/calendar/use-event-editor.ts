@@ -20,6 +20,7 @@ import {
   moveEvent,
   updateEvent,
 } from '@/caldav/events';
+import { getDefaultAlert } from '@/config/alert-pref';
 import type {
   AlarmInput,
   CalEvent,
@@ -68,7 +69,9 @@ type EditorProblem = { field?: EditorField; text: string } | null;
 type ScopeAsk = { action: 'save' | 'delete'; allowThis: boolean };
 
 export function useEventEditor({ event, defaultDay, onDone }: Options) {
-  const [initial] = useState(() => initialFormState(event, defaultDay));
+  const [initial] = useState(() =>
+    initialFormState(event, defaultDay, new Date(), getDefaultAlert())
+  );
 
   const [summary, setSummaryState] = useState(initial.summary);
   const [allDay, setAllDayState] = useState(initial.allDay);

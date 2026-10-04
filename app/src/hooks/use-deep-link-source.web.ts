@@ -1,7 +1,17 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 
 import type { DeepLink } from '@/hooks/use-deep-link';
+
+/** Open a day (and event) in the app — on web, by navigating there. */
+export function openInApp(target: { day: string; event?: string }): void {
+  router.navigate({
+    pathname: '/',
+    params: target.event
+      ? { day: target.day, event: target.event }
+      : { day: target.day },
+  });
+}
 
 /**
  * On web the router is the right source: the URL bar is the intent, a reload

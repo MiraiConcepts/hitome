@@ -8,6 +8,7 @@ import {
   sendTestNotification,
   TEST_DELAY_SECONDS,
 } from '@/alarms/scheduler';
+import { SNOOZE_MINUTES } from '@/alarms/actions';
 import {
   permissionState,
   scheduledLabel,
@@ -18,12 +19,19 @@ import {
   SettingsButton,
   SettingsBlock,
   SettingsButtonRow,
+  SettingsMessage,
   SettingsOutcomeLine,
   SettingsSection,
   SettingsToggle,
   SettingsValue,
   type SettingsOutcome,
 } from '@/components/settings/settings-parts';
+import { TIMED_PRESETS } from '@/components/calendar/alarm-field';
+import { ChipRow } from '@/components/fields/chip-row';
+import { FieldStack } from '@/components/fields/field-stack';
+import { BellIcon, EyeIcon } from '@/components/icons';
+import { ReminderPreview } from '@/components/settings/reminder-preview';
+import { setDefaultAlert, useDefaultAlert } from '@/config/alert-pref';
 
 // Android can be sent to the app's own notification settings; a browser's site
 // permission is only reversible from the browser's own UI.
@@ -46,6 +54,7 @@ const TEST_SENT =
  * channel so a working setup is provable rather than assumed.
  */
 export function NotificationsSection() {
+  const defaultAlert = useDefaultAlert();
   const [snapshot, setSnapshot] = useState<PermissionSnapshot | null>(null);
   const [scheduled, setScheduled] = useState<number | null>(null);
   const [outcome, setOutcome] = useState<SettingsOutcome>(null);
@@ -163,6 +172,30 @@ export function NotificationsSection() {
         value={scheduledLabel(scheduled)}
         testID="settings-scheduled"
       />
+
+      <SettingsBlock>
+        <FieldStack label="Default alert for new events" icon={BellIcon}>
+          <ChipRow
+            options={TIMED_PRESETS}
+            value={defaultAlert === null ? 'none' : String(defaultAlert)}
+            onChange={(next) =>
+              setDefaultAlert(next === 'none' ? null : Number(next))
+            }
+            singleLine
+            testID="settings-default-alert"
+          />
+        </FieldStack>
+      </SettingsBlock>
+
+      <SettingsBlock>
+        <FieldStack label="What a reminder looks like" icon={EyeIcon}>
+          <ReminderPreview />
+          <SettingsMessage>
+            Tapping it opens the event. Join appears when the event has a
+            meeting link; Snooze brings it back in {SNOOZE_MINUTES} minutes.
+          </SettingsMessage>
+        </FieldStack>
+      </SettingsBlock>
 
       <SettingsBlock>
         <SettingsOutcomeLine

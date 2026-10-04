@@ -1,9 +1,9 @@
-import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { runAlarmReconcile } from '@/alarms/runner';
 import { onAlarmTap } from '@/alarms/scheduler';
+import { openInApp } from '@/hooks/use-deep-link-source';
 
 // Deferred past boot for the same reason as the widget refresh in _layout —
 // don't compete with startup allocations; alarms tolerate an 8s lag.
@@ -12,7 +12,7 @@ const MIN_INTERVAL_MS = 5000;
 
 /**
  * App-lifecycle alarm reconciliation (mount + return-to-foreground) and the
- * notification-tap → `?day=` deep link. Lives in the root layout so it runs
+ * reminder tap → that event, the same way a widget link opens one. Lives in the root layout so it runs
  * app-wide, independent of which route is mounted.
  */
 export function useAlarmReconcile(): void {
@@ -30,11 +30,9 @@ export function useAlarmReconcile(): void {
     const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active') kick();
     });
-    const untap = onAlarmTap((day) => {
-      // month-screen already understands ?day= (same path as the e2e deep
-      // links) and centers the grid on it.
-      router.navigate({ pathname: '/', params: { day } });
-    });
+    // A reminder tap opens its event (the month view lands on the day, then
+    // opens it once fetched) — the widget's links take the same path.
+    const untap = onAlarmTap(openInApp);
     return () => {
       clearTimeout(timer);
       appState.remove();

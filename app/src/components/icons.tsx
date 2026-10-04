@@ -26,6 +26,7 @@ import {
   MapPinOutlineBody,
   NotesOutlineBody,
   FlagOutlineBody,
+  EyeOutlineBody,
 } from '@/constants/icon-paths';
 
 export type IconProps = { size?: number; color: string };
@@ -118,4 +119,8 @@ export function NotesIcon({ size = 24, color }: IconProps) {
 
 export function FlagIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(FlagOutlineBody, size, color)} />;
+}
+
+export function EyeIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(EyeOutlineBody, size, color)} />;
 }

@@ -4,7 +4,17 @@
 // (install-time grants — the library then takes its setExactAndAllowWhileIdle
 // branch); reboot replay is handled by the library's BOOT_COMPLETED receiver.
 import * as Notifications from 'expo-notifications';
+import { Linking } from 'react-native';
 
+import {
+  JOIN_ACTION,
+  REMINDER_CATEGORY,
+  REMINDER_JOIN_CATEGORY,
+  type ReminderData,
+  SNOOZE_ACTION,
+  SNOOZE_ID_PREFIX,
+  SNOOZE_MINUTES,
+} from './actions';
 import { ALARM_ID_PREFIX, type DesiredAlarm } from './occurrences';
 import type { PermissionSnapshot } from './status';
 
@@ -37,6 +47,30 @@ export async function ensureSetup(): Promise<void> {
     name: 'Event alarms',
     importance: Notifications.AndroidImportance.HIGH,
   });
+  await registerReminderCategories();
+}
+
+/**
+ * The buttons on a reminder. Snooze is answered without opening the app (the
+ * background task in alarms/background-task.ts handles it when hitome is
+ * closed); Join has to open it, to hand the link to the browser or meeting app.
+ */
+export async function registerReminderCategories(): Promise<void> {
+  const snooze: Notifications.NotificationAction = {
+    identifier: SNOOZE_ACTION,
+    buttonTitle: `Snooze ${SNOOZE_MINUTES} min`,
+    options: { opensAppToForeground: false },
+  };
+  const join: Notifications.NotificationAction = {
+    identifier: JOIN_ACTION,
+    buttonTitle: 'Join',
+    options: { opensAppToForeground: true },
+  };
+  await Notifications.setNotificationCategoryAsync(REMINDER_CATEGORY, [snooze]);
+  await Notifications.setNotificationCategoryAsync(REMINDER_JOIN_CATEGORY, [
+    join,
+    snooze,
+  ]);
 }
 
 /** Ask for POST_NOTIFICATIONS (Android 13+) — call from a user gesture. */
@@ -98,7 +132,14 @@ export async function scheduleAlarm(alarm: DesiredAlarm): Promise<void> {
       content: {
         title: alarm.title,
         body: alarm.body,
-        data: { day: alarm.day },
+        data: {
+          day: alarm.day,
+          event: alarm.event,
+          ...(alarm.join ? { join: alarm.join } : {}),
+        } satisfies ReminderData,
+        categoryIdentifier: alarm.join
+          ? REMINDER_JOIN_CATEGORY
+          : REMINDER_CATEGORY,
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -117,17 +158,75 @@ export async function cancelAlarm(id: string): Promise<void> {
 }
 
 /**
- * Notification-tap deep-link: yields the occurrence's day ('YYYY-MM-DD').
- * Covers warm taps and the cold-start tap. Returns an unsubscribe.
+ * Snooze: the same reminder again in SNOOZE_MINUTES, and this one cleared.
+ * Keyed by the reminder it came from, so a tap answered twice (the app's
+ * listener and the background task can both see it) schedules one, not two.
  */
-export function onAlarmTap(cb: (day: string) => void): () => void {
-  const deliver = (
-    response: Notifications.NotificationResponse | null
-  ): void => {
-    const day = response?.notification.request.content.data?.day;
-    if (typeof day === 'string') cb(day);
+export async function snoozeReminder(
+  response: Notifications.NotificationResponse
+): Promise<void> {
+  const { request } = response.notification;
+  const original = request.identifier.replace(SNOOZE_ID_PREFIX, '');
+  await ensureSetup();
+  await Notifications.scheduleNotificationAsync({
+    identifier: `${SNOOZE_ID_PREFIX}${original}`,
+    content: {
+      title: request.content.title ?? 'Reminder',
+      body: request.content.body ?? undefined,
+      data: request.content.data,
+      categoryIdentifier: request.content.categoryIdentifier ?? undefined,
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: new Date(Date.now() + SNOOZE_MINUTES * 60_000),
+      channelId: CHANNEL_ID,
+    },
+  });
+  await Notifications.dismissNotificationAsync(request.identifier);
+}
+
+/**
+ * What a reminder's tap or button asks for. Snooze and Join are carried out
+ * here; a plain tap is passed to `open` with the event to show.
+ */
+export async function answerReminder(
+  response: Notifications.NotificationResponse,
+  open: (target: { day: string; event?: string }) => void
+): Promise<void> {
+  const data = response.notification.request.content.data as
+    | Partial<ReminderData>
+    | undefined;
+  if (response.actionIdentifier === SNOOZE_ACTION) {
+    await snoozeReminder(response);
+    return;
+  }
+  if (response.actionIdentifier === JOIN_ACTION && data?.join) {
+    await Notifications.dismissNotificationAsync(
+      response.notification.request.identifier
+    );
+    await Linking.openURL(data.join);
+    return;
+  }
+  if (typeof data?.day === 'string') open({ day: data.day, event: data.event });
+}
+
+/**
+ * Reminder taps and buttons while the app is running, and the tap that cold-
+ * started it. The cold-start response is cleared once answered, or every
+ * later launch would reopen the same event. Returns an unsubscribe.
+ */
+export function onAlarmTap(
+  open: (target: { day: string; event?: string }) => void
+): () => void {
+  const deliver = (response: Notifications.NotificationResponse | null) => {
+    if (!response) return;
+    answerReminder(response, open).catch(() => {});
   };
   const sub = Notifications.addNotificationResponseReceivedListener(deliver);
-  Notifications.getLastNotificationResponseAsync().then(deliver, () => {});
+  const last = Notifications.getLastNotificationResponse();
+  if (last) {
+    deliver(last);
+    Notifications.clearLastNotificationResponse();
+  }
   return () => sub.remove();
 }

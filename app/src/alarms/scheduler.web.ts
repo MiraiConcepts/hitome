@@ -17,7 +17,7 @@ export const TEST_DELAY_SECONDS = 0;
 
 const scheduled = new Map<string, DesiredAlarm>();
 let timer: ReturnType<typeof setInterval> | null = null;
-let tapCb: ((day: string) => void) | null = null;
+let tapCb: ((target: { day: string; event?: string }) => void) | null = null;
 
 function supported(): boolean {
   return typeof Notification !== 'undefined';
@@ -36,7 +36,7 @@ function checkDue(): void {
       });
       n.onclick = () => {
         window.focus();
-        tapCb?.(alarm.day);
+        tapCb?.({ day: alarm.day, event: alarm.event });
       };
     } catch {
       // Some mobile browsers only allow ServiceWorker notifications — treat
@@ -103,7 +103,9 @@ export async function cancelAlarm(id: string): Promise<void> {
   scheduled.delete(id);
 }
 
-export function onAlarmTap(cb: (day: string) => void): () => void {
+export function onAlarmTap(
+  cb: (target: { day: string; event?: string }) => void
+): () => void {
   tapCb = cb;
   return () => {
     if (tapCb === cb) tapCb = null;

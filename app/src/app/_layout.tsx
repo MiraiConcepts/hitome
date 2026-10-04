@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { BootScreen } from '@/components/boot-screen';
 import { SetupScreen } from '@/components/settings/setup-screen';
+import { ensureDefaultAlert } from '@/config/alert-pref';
 import { ensureDavConfig, useDavStatus } from '@/config/dav-store';
 import { useAlarmReconcile } from '@/hooks/use-alarm-reconcile';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -34,6 +35,8 @@ export default function RootLayout() {
   const davStatus = useDavStatus();
   useEffect(() => {
     ensureDavConfig();
+    // Read before any editor opens: a new event starts with this alert.
+    ensureDefaultAlert();
   }, []);
   const { link, ready: linkReady } = useDeepLinkSource();
   useSilentReload();

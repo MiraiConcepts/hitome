@@ -52,5 +52,17 @@ calendar. Choosing another moves the whole object (create in the target, then
 delete the original under its etag; the copy is removed again if that delete
 is refused). A repeating event moves with every occurrence, and says so.
 ## 3. Notifications: preview, open the event, Snooze/Join, default reminder
+
+- A reminder carries its event (CalEvent.id) and meeting link; a tap opens
+  the event (`openInApp` → the same deep-link path the widget uses — native
+  links arrive by intent, so in-app ones are pushed to the source directly).
+- Buttons: Snooze 10 min on every reminder, Join first when there is a meeting
+  link (`findMeetingLink`, shared with the widget). Snooze is answered in a
+  headless task while the app is closed (`expo-task-manager`, new native dep:
+  the dev client was rebuilt; the release picks it up from CI), keyed by the
+  reminder so the listener and the task cannot both schedule one.
+- Settings → Notifications: default alert for new timed events (prefills the
+  editor), and a sample reminder drawn as an Android notification.
+- Not yet watched on the device: the phone was asleep after the rebuild.
 ## 4. Hide calendars; Sign out and erase; connect help; About links
 ## 5. Follow the phone: week start, 12/24h, widget language

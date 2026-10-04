@@ -5,6 +5,7 @@
 import type { CalEvent } from '@/caldav/types';
 import { alarmTimeFor } from '@/caldav/valarm';
 import { toDateString } from '@/utils/date';
+import { findMeetingLink } from '@/widget/meeting-link';
 
 export type DesiredAlarm = {
   /** Deterministic: alarm:{uid}:{occStartEpochSec} — re-scheduling replaces. */
@@ -14,10 +15,16 @@ export type DesiredAlarm = {
   body: string;
   /** The occurrence's local day — notification tap deep-links here. */
   day: string;
+  /** CalEvent.id — a tap opens this event, not just its day. */
+  event: string;
+  /** The event's meeting link, if it has one — the notification's Join. */
+  join?: string;
 };
 
 export const ALARM_ID_PREFIX = 'alarm:';
 export const HORIZON_MS = 14 * 24 * 60 * 60 * 1000;
+
+const join = (event: CalEvent) => findMeetingLink(event);
 
 function timeLabel(event: CalEvent): string {
   if (event.allDay) return 'All day';
@@ -56,6 +63,8 @@ export function desiredAlarms(
         ? `${timeLabel(event)} · ${event.location}`
         : timeLabel(event),
       day: toDateString(event.start),
+      event: event.id,
+      ...(join(event) ? { join: join(event) } : {}),
     });
   }
   return out.sort((a, b) => a.fireDate.getTime() - b.fireDate.getTime());

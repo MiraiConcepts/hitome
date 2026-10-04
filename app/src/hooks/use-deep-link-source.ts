@@ -7,6 +7,23 @@ function first(value: unknown): string | null {
   return typeof value === 'string' && value ? value : null;
 }
 
+/** Links raised inside the app (a reminder tapped while it runs), which reach
+ *  no intent: delivered straight to the mounted source. */
+const inAppListeners = new Set<(link: DeepLink) => void>();
+
+/**
+ * Open a day — and optionally an event — as if a link had arrived: the month
+ * view lands there exactly as it does for the widget's links.
+ */
+export function openInApp(target: { day: string; event?: string }): void {
+  const link: DeepLink = {
+    ...EMPTY_DEEP_LINK,
+    day: target.day,
+    event: target.event ?? null,
+  };
+  inAppListeners.forEach((listener) => listener(link));
+}
+
 function parseDeepLink(url: string | null): DeepLink {
   if (!url) return EMPTY_DEEP_LINK;
   const query = Linking.parse(url).queryParams ?? {};
@@ -60,9 +77,14 @@ export function useDeepLinkSource(): { link: DeepLink; ready: boolean } {
     const subscription = Linking.addEventListener('url', ({ url }) =>
       settle(url)
     );
+    const inApp = (link: DeepLink) => {
+      if (alive) setState({ link, ready: true });
+    };
+    inAppListeners.add(inApp);
     return () => {
       alive = false;
       subscription.remove();
+      inAppListeners.delete(inApp);
     };
   }, []);
 

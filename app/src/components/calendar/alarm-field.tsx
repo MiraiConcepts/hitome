@@ -13,7 +13,7 @@ export type AlarmState =
   | { kind: 'set'; offsetMinutes: number }
   | { kind: 'foreign' };
 
-const TIMED_PRESETS = [
+export const TIMED_PRESETS = [
   { value: 'none', label: 'None' },
   { value: '0', label: 'At time' },
   { value: '5', label: '5m' },

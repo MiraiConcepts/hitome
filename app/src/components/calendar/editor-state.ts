@@ -30,7 +30,9 @@ export type FormState = {
 export function initialFormState(
   event: CalEvent | null,
   defaultDay: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  /** A new event's alert, from settings (minutes before; null for none). */
+  defaultAlert: number | null = null
 ): FormState {
   const defaultStart = nextFullHour(now);
   const defaultEnd = new Date(defaultStart);
@@ -48,7 +50,10 @@ export function initialFormState(
       location: '',
       description: '',
       recurrence: { kind: 'none' },
-      alarm: { kind: 'none' },
+      alarm:
+        defaultAlert === null
+          ? { kind: 'none' }
+          : { kind: 'set', offsetMinutes: defaultAlert },
     };
   }
 

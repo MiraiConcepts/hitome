@@ -46,6 +46,16 @@ describe('initialFormState', () => {
     expect(s.alarm).toEqual({ kind: 'none' });
   });
 
+  it('starts a new event with the default alert from settings', () => {
+    expect(initialFormState(null, '2026-07-25', NOW, 10).alarm).toEqual({
+      kind: 'set',
+      offsetMinutes: 10,
+    });
+    expect(initialFormState(null, '2026-07-25', NOW, null).alarm).toEqual({
+      kind: 'none',
+    });
+  });
+
   it('edit timed: days and times from the event', () => {
     const s = initialFormState(makeEvent({}), '2026-07-01', NOW);
     expect(s.summary).toBe('Standup');
