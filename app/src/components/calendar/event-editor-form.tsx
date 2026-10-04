@@ -29,7 +29,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, FontFamilyBold, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { dayLabel, parseDay } from '@/utils/date';
+import { dayLabel, formatTime, parseDay } from '@/utils/date';
 
 export type { EditorResult } from '@/components/calendar/use-event-editor';
 
@@ -76,9 +76,9 @@ function whenLabel(editor: EventEditorController): string {
   }
   const sameDay = editor.endDay === editor.startDay;
   const end = sameDay
-    ? editor.endTime
-    : `${dayLabel(editor.endDay)} ${editor.endTime}`;
-  return `${mode} · ${editor.startTime} – ${end}`;
+    ? formatTime(editor.endTime)
+    : `${dayLabel(editor.endDay)} ${formatTime(editor.endTime)}`;
+  return `${mode} · ${formatTime(editor.startTime)} – ${end}`;
 }
 
 /**

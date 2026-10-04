@@ -37,9 +37,37 @@ const MONTHS_SHORT = [
   'Dec',
 ] as const;
 
+/**
+ * The phone's language for day and month names — set at launch by
+ * utils/region.ts. Unset (as in tests), the English tables above are used.
+ */
+let nameLocale: string | undefined;
+
+export function setNameLocale(locale: string | undefined): void {
+  nameLocale = locale;
+}
+
+/** A day or month name in the phone's language, else from the table. */
+function named(
+  d: Date,
+  part: 'weekday' | 'month',
+  width: 'short' | 'long',
+  fallback: string
+): string {
+  if (!nameLocale) return fallback;
+  try {
+    return d.toLocaleDateString(nameLocale, { [part]: width });
+  } catch {
+    return fallback;
+  }
+}
+
+const weekday = (d: Date) => named(d, 'weekday', 'short', WEEKDAYS[d.getDay()]);
+
 /** Header date line, e.g. 'Thu ▪ 9 Jul' (local tz). */
 export function headerDate(now: Date): string {
-  return `${WEEKDAYS[now.getDay()]} ▪ ${now.getDate()} ${MONTHS_SHORT[now.getMonth()]}`;
+  const month = named(now, 'month', 'short', MONTHS_SHORT[now.getMonth()]);
+  return `${weekday(now)} ▪ ${now.getDate()} ${month}`;
 }
 
 /** Display label for an event link — bare host, e.g. 'meet.google.com'. */
@@ -68,7 +96,8 @@ export function dayHeader(d: Date, now: Date): string {
     now.getDate() + 1
   );
   if (sameLocalDay(d, tomorrow)) return 'Tomorrow';
-  return `${WEEKDAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  const month = named(d, 'month', 'long', MONTHS[d.getMonth()]);
+  return `${weekday(d)} ${d.getDate()} ${month}`;
 }
 
 /** One event's appearance on a single day. `dayIndex`/`spanDays` drive the

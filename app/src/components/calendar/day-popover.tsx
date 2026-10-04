@@ -4,7 +4,7 @@ import type { CalEvent } from '@/caldav/types';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AccentColor, Spacing } from '@/constants/theme';
-import { dayLabel, toTimeString } from '@/utils/date';
+import { dayLabel, formatTime } from '@/utils/date';
 
 type Props = {
   /** The day (dateString) whose events are listed. */
@@ -66,10 +66,10 @@ export function DayPopover({ day, events, onClose, onPressEvent }: Props) {
                         ) : (
                           <>
                             <ThemedText type="small">
-                              {toTimeString(event.start)}
+                              {formatTime(event.start)}
                             </ThemedText>
                             <ThemedText type="small" themeColor="textSecondary">
-                              {toTimeString(event.end)}
+                              {formatTime(event.end)}
                             </ThemedText>
                           </>
                         )}

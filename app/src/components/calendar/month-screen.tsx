@@ -37,7 +37,7 @@ import {
   inHiddenCalendar,
   useHiddenCalendars,
 } from '@/config/calendar-visibility';
-import type { MonthAnchor } from '@/utils/calendar-grid';
+import { getFirstDayOfWeek, type MonthAnchor } from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
 import { refreshAgendaWidget } from '@/widget/app-refresh';
 
@@ -343,11 +343,12 @@ export function MonthScreen() {
 
   const weekdayLabels = useMemo(
     () =>
-      // 2024-01-01 is a Monday; weeks start Monday.
+      // 2024-01-07 is a Sunday; the row starts on the phone's first weekday.
       Array.from({ length: 7 }, (_, i) =>
-        new Date(2024, 0, 1 + i).toLocaleDateString(undefined, {
-          weekday: 'short',
-        })
+        new Date(2024, 0, 7 + getFirstDayOfWeek() + i).toLocaleDateString(
+          undefined,
+          { weekday: 'short' }
+        )
       ),
     []
   );

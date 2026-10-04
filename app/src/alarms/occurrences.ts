@@ -4,7 +4,7 @@
 // sync/foreground re-derives and reconciles.
 import type { CalEvent } from '@/caldav/types';
 import { alarmTimeFor } from '@/caldav/valarm';
-import { toDateString } from '@/utils/date';
+import { formatTime, toDateString } from '@/utils/date';
 import { findMeetingLink } from '@/widget/meeting-link';
 
 export type DesiredAlarm = {
@@ -28,9 +28,7 @@ const join = (event: CalEvent) => findMeetingLink(event);
 
 function timeLabel(event: CalEvent): string {
   if (event.allDay) return 'All day';
-  const hh = `${event.start.getHours()}`.padStart(2, '0');
-  const mm = `${event.start.getMinutes()}`.padStart(2, '0');
-  return `${hh}:${mm}`;
+  return formatTime(event.start);
 }
 
 /**

@@ -78,3 +78,14 @@ is refused). A repeating event moves with every occurrence, and says so.
 - Found on web: label/value rows grew to the vertical rule's 150px default —
   the rule is now out of flow. Calendars' load error uses the friendly copy.
 ## 5. Follow the phone: week start, 12/24h, widget language
+
+- `utils/region.ts` (expo-localization, new native dep) reads the phone's
+  first weekday, 12/24-hour clock and language at launch, from index.ts so the
+  headless widget and reminder tasks get them too; pure modules take them as
+  module values (`setFirstDayOfWeek`, `setClock24`, `setNameLocale`).
+- Grid weeks start on the phone's first day; the weekend split moves with it.
+  Displayed times (editor fields and header, day popover, widget, reminder
+  text) go through `formatTime`; the fields' 'HH:MM' values are unchanged.
+- Open question for the user: the test phone (en-SG, no explicit week-start
+  preference) defaults to Sunday, while Monday weeks were a deliberate earlier
+  choice (v0.6.0).

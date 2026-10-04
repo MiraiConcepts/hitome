@@ -31,7 +31,7 @@ import {
   type ThemeColor,
 } from '@/constants/theme';
 import { rgbHex } from '@/utils/color';
-import { toTimeString } from '@/utils/date';
+import { formatTime } from '@/utils/date';
 
 import {
   continuationEnd,
@@ -229,13 +229,13 @@ function EventRow({
               style={MARKER_ICON}
             />
             <TextWidget
-              text={toTimeString(spanEdge.at)}
+              text={formatTime(spanEdge.at)}
               style={rowText(palette)}
             />
           </FlexWidget>
         ) : (
           <TextWidget
-            text={toTimeString(new Date(event.start))}
+            text={formatTime(new Date(event.start))}
             style={rowText(palette)}
           />
         )}
@@ -418,7 +418,7 @@ function Agenda({
           />
           {cache ? (
             <TextWidget
-              text={`Last Updated: ${toTimeString(new Date(cache.fetchedAt))}`}
+              text={`Last Updated: ${formatTime(new Date(cache.fetchedAt))}`}
               style={{
                 fontSize: 10,
                 fontFamily: FontFamily,

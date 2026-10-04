@@ -6,7 +6,7 @@ import { Keyboard, Pressable, StyleSheet, Text } from 'react-native';
 
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { parseDayTime, toDateString } from '@/utils/date';
+import { formatTime, parseDayTime, toDateString } from '@/utils/date';
 
 import { FieldChrome, type TimeFieldProps } from './field-chrome';
 
@@ -31,7 +31,9 @@ export function TimeField({ value, onChange, testID }: TimeFieldProps) {
           },
         ]}
       >
-        <Text style={[styles.value, { color: theme.text }]}>{value}</Text>
+        <Text style={[styles.value, { color: theme.text }]}>
+          {formatTime(value)}
+        </Text>
       </Pressable>
       {open && (
         <Host style={styles.dialogHost}>

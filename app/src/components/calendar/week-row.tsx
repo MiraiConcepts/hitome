@@ -26,7 +26,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { addDays, layoutWeek } from '@/utils/calendar-grid';
+import { addDays, layoutWeek, weekendSplitColumn } from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
 
 /** Height of one banner/chip slot inside a day cell: one line of event text
@@ -172,10 +172,6 @@ const PULSE_FADE_MS = 320;
 
 /** Month ordinal — the unit a row's two shares are compared by. */
 const monthOrdOf = (d: Date) => d.getFullYear() * 12 + d.getMonth();
-
-/** The working week ends after this many columns — weeks start Monday, so
- *  five is the end of Friday. */
-const WEEK_SPLIT_AFTER_COL = 5;
 
 // Grid rules — every line in the grid.
 //
@@ -504,7 +500,7 @@ export const WeekRow = memo(function WeekRow({
         pointerEvents="none"
         style={[
           styles.weekSplit,
-          { left: cellWidth * WEEK_SPLIT_AFTER_COL - RULE_WIDTH },
+          { left: cellWidth * weekendSplitColumn() - RULE_WIDTH },
         ]}
       />
 

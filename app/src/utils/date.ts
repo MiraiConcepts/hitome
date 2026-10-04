@@ -8,9 +8,33 @@ export function toDateString(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-/** 'HH:MM' (24h, local). */
+/** 'HH:MM' (24h, local) — the form fields' VALUE format; for display, see
+ *  formatTime. */
 export function toTimeString(d: Date): string {
   return `${`${d.getHours()}`.padStart(2, '0')}:${`${d.getMinutes()}`.padStart(2, '0')}`;
+}
+
+/** Whether times are shown on a 24-hour clock. Set at launch from the phone
+ *  (utils/region.ts); a module value so this file stays pure. */
+let clock24 = true;
+
+export function setClock24(uses24h: boolean): void {
+  clock24 = uses24h;
+}
+
+/**
+ * A time as the phone shows them: '18:30', or '6:30 pm' on a 12-hour phone.
+ * Takes a Date or the fields' 'HH:MM'.
+ */
+export function formatTime(time: Date | string): string {
+  const [h, m] =
+    typeof time === 'string'
+      ? time.split(':').map(Number)
+      : [time.getHours(), time.getMinutes()];
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return String(time);
+  const mm = `${m}`.padStart(2, '0');
+  if (clock24) return `${`${h}`.padStart(2, '0')}:${mm}`;
+  return `${h % 12 === 0 ? 12 : h % 12}:${mm} ${h < 12 ? 'am' : 'pm'}`;
 }
 
 /**

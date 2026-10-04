@@ -1,8 +1,10 @@
 import {
   agoLabel,
   eventDays,
+  formatTime,
   nextFullHour,
   parseDayTime,
+  setClock24,
   toDateString,
 } from './date';
 
@@ -85,5 +87,22 @@ describe('agoLabel', () => {
 
   it('rounds down rather than up', () => {
     expect(agoLabel(minutesBefore(119), now)).toBe('1h ago');
+  });
+});
+
+describe('formatTime', () => {
+  afterEach(() => setClock24(true));
+
+  it('shows 24-hour times by default', () => {
+    expect(formatTime(new Date(2026, 9, 4, 18, 5))).toBe('18:05');
+    expect(formatTime('09:30')).toBe('09:30');
+  });
+
+  it('shows a 12-hour phone its own clock', () => {
+    setClock24(false);
+    expect(formatTime('00:15')).toBe('12:15 am');
+    expect(formatTime('09:30')).toBe('9:30 am');
+    expect(formatTime('12:00')).toBe('12:00 pm');
+    expect(formatTime(new Date(2026, 9, 4, 18, 5))).toBe('6:05 pm');
   });
 });

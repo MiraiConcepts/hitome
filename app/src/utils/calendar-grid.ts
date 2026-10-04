@@ -15,10 +15,33 @@ export function addDays(d: Date, n: number): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 }
 
-/** Local-midnight Monday of the week containing `d` (weeks start Monday).
- *  getDay() counts from Sunday, so it is rotated before subtracting. */
+/**
+ * The day a week starts on, as Date#getDay counts (0 = Sunday). Monday until
+ * the phone says otherwise: utils/region.ts sets it at launch from the device's
+ * calendar settings. A plain module value, so this file stays pure.
+ */
+let firstDay = 1;
+
+export function setFirstDayOfWeek(day: number): void {
+  if (Number.isInteger(day) && day >= 0 && day <= 6) firstDay = day;
+}
+
+export function getFirstDayOfWeek(): number {
+  return firstDay;
+}
+
+/** Local midnight of the first day of the week containing `d`. */
 export function weekStartOf(d: Date): Date {
-  return addDays(d, -((d.getDay() + 6) % 7));
+  return addDays(d, -((d.getDay() - firstDay + 7) % 7));
+}
+
+/**
+ * The column the weekend starts at — where the grid draws its orange split.
+ * Before Saturday; or, in a week that opens on Saturday, after Sunday.
+ */
+export function weekendSplitColumn(): number {
+  const saturday = (6 - firstDay + 7) % 7;
+  return saturday === 0 ? 2 : saturday;
 }
 
 /** A calendar month reference (month0 is 0-based like Date#getMonth). */
