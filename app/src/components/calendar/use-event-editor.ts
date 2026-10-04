@@ -30,6 +30,7 @@ import type {
 } from '@/caldav/types';
 import type { AlarmState } from '@/components/calendar/alarm-field';
 import {
+  endDayForAllDay,
   alarmEqual,
   initialFormState,
   recurEqual,
@@ -203,15 +204,9 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
     setAllDayState(next);
     // The alarm preset sets differ; an incompatible pick is cleared.
     if (alarm.kind === 'set') setAlarmState({ kind: 'none' });
-    if (parseDay(startDay) && endDay < startDay) setEndDayState(startDay);
-    // Ending at midnight — 23:00 to 00:00, say — is one all-day day, not two
-    // because the end landed on the next date. And back to timed, a span
-    // that collapsed to one day ends on the next again, after its start.
-    if (!parseDay(startDay)) return;
-    if (next && endTime === '00:00' && endDay === addDays(startDay, 1))
-      setEndDayState(startDay);
-    else if (!next && endDay === startDay && endTime <= startTime)
-      setEndDayState(addDays(startDay, 1));
+    setEndDayState(
+      endDayForAllDay(next, { startDay, startTime, endDay, endTime })
+    );
   }
 
   function setAlarm(next: AlarmState) {

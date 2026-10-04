@@ -1,6 +1,6 @@
 import type { CalEvent } from '@/caldav/types';
 
-import { initialFormState } from './editor-state';
+import { endDayForAllDay, initialFormState } from './editor-state';
 
 const NOW = new Date(2026, 6, 19, 14, 20); // local 2026-07-19 14:20
 
@@ -135,5 +135,51 @@ describe('initialFormState', () => {
     );
     expect(s.recurrence).toEqual({ kind: 'custom' });
     expect(s.alarm).toEqual({ kind: 'foreign' });
+  });
+});
+
+describe('endDayForAllDay', () => {
+  const late = {
+    startDay: '2026-10-04',
+    startTime: '23:00',
+    endDay: '2026-10-05',
+    endTime: '00:00',
+  };
+
+  it('makes 23:00 → midnight one all-day day', () => {
+    expect(endDayForAllDay(true, late)).toBe('2026-10-04');
+  });
+
+  it('puts the end back on the next day when All-day goes off again', () => {
+    const collapsed = { ...late, endDay: endDayForAllDay(true, late) };
+    expect(endDayForAllDay(false, collapsed)).toBe('2026-10-05');
+  });
+
+  it('keeps both days of a real two-day timed span', () => {
+    expect(
+      endDayForAllDay(true, {
+        startDay: '2026-10-09',
+        startTime: '10:00',
+        endDay: '2026-10-10',
+        endTime: '09:00',
+      })
+    ).toBe('2026-10-10');
+  });
+
+  it('leaves a same-day timed event alone either way', () => {
+    const day = {
+      startDay: '2026-10-09',
+      startTime: '09:00',
+      endDay: '2026-10-09',
+      endTime: '10:00',
+    };
+    expect(endDayForAllDay(true, day)).toBe('2026-10-09');
+    expect(endDayForAllDay(false, day)).toBe('2026-10-09');
+  });
+
+  it('pulls an end before the start up to it', () => {
+    expect(endDayForAllDay(true, { ...late, endDay: '2026-10-01' })).toBe(
+      '2026-10-04'
+    );
   });
 });

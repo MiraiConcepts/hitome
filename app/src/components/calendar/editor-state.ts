@@ -111,6 +111,27 @@ export function initialFormState(
   };
 }
 
+/**
+ * The end day after All-day is switched. An end before the start moves up to
+ * it; a timed span ending at midnight (23:00 → 00:00) is one all-day day, not
+ * two; and back to timed, a span that collapsed to one day ends on the next
+ * again, after its start. Days are 'YYYY-MM-DD', times 'HH:MM' — both compare
+ * correctly as strings.
+ */
+export function endDayForAllDay(
+  allDay: boolean,
+  form: { startDay: string; startTime: string; endDay: string; endTime: string }
+): string {
+  const { startDay, startTime, endDay, endTime } = form;
+  if (!parseDay(startDay)) return endDay;
+  if (endDay < startDay) return startDay;
+  if (allDay && endTime === '00:00' && endDay === addDays(startDay, 1))
+    return startDay;
+  if (!allDay && endDay === startDay && endTime <= startTime)
+    return addDays(startDay, 1);
+  return endDay;
+}
+
 export function recurEqual(a: RecurrenceState, b: RecurrenceState): boolean {
   if (a.kind !== b.kind) return false;
   if (a.kind !== 'preset' || b.kind !== 'preset') return true;

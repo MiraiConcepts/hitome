@@ -249,10 +249,11 @@ export function MonthScreen() {
     setArrivedDay(null);
   }
 
-  // Auto-dismiss the snackbar.
+  // Auto-dismiss the snackbar — after 8s, so Undo is still there once the
+  // grid has visibly changed and the mistake sinks in.
   useEffect(() => {
     if (!snack) return;
-    const timer = setTimeout(() => setSnack(null), 6000);
+    const timer = setTimeout(() => setSnack(null), 8000);
     return () => clearTimeout(timer);
   }, [snack]);
 
