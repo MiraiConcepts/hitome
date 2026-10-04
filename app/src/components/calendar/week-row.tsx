@@ -26,7 +26,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { addDays, layoutWeek, weekendSplitColumn } from '@/utils/calendar-grid';
+import { addDays, layoutWeek, weekendBoundaries } from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
 
 /** Height of one banner/chip slot inside a day cell: one line of event text
@@ -496,13 +496,13 @@ export const WeekRow = memo(function WeekRow({
           cells so no row's rule chops it up, below the events so a banner
           spanning the weekend is not sliced by it. Pulled up by its own width
           to bridge the row's top border and read as one continuous line. */}
-      <View
-        pointerEvents="none"
-        style={[
-          styles.weekSplit,
-          { left: cellWidth * weekendSplitColumn() - RULE_WIDTH },
-        ]}
-      />
+      {weekendBoundaries().map((col) => (
+        <View
+          key={col}
+          pointerEvents="none"
+          style={[styles.weekSplit, { left: cellWidth * col - RULE_WIDTH }]}
+        />
+      ))}
 
       {/* box-none: empty-area presses fall through to the day cells. Chips and
           banners do capture their own pixels, but they carry the cell's two

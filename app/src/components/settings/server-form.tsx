@@ -1,17 +1,11 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View, type TextInputProps } from 'react-native';
+import { StyleSheet, View, type TextInputProps } from 'react-native';
 
 import { cancelAllReminders } from '@/alarms/scheduler';
 import { probeConnection } from '@/caldav/client';
 import { FieldStack } from '@/components/fields/field-stack';
 import { TextField } from '@/components/fields/text-field';
-import {
-  HelpCircleIcon,
-  LockIcon,
-  LogoutIcon,
-  ServerIcon,
-  UserIcon,
-} from '@/components/icons';
+import { LockIcon, LogoutIcon, ServerIcon, UserIcon } from '@/components/icons';
 import {
   SettingsButton,
   SettingsBlock,
@@ -162,13 +156,10 @@ export function ConnectionFields({
   form,
   onFieldFocus,
   onFieldBlur,
-  help = false,
 }: {
   form: ServerFormState;
   onFieldFocus?: () => void;
   onFieldBlur?: () => void;
-  /** Offer the "what do I enter" help (first run, where it is needed). */
-  help?: boolean;
 }) {
   // What every one of the three inputs shares.
   const common: TextInputProps = {
@@ -212,45 +203,6 @@ export function ConnectionFields({
       </FieldStack>
 
       <SettingsOutcomeLine outcome={form.outcome} testID="settings-problem" />
-      {help && <ConnectionHelp />}
-    </View>
-  );
-}
-
-/**
- * Folded until asked for: one quiet line, which opens to what the fields want
- * — the server's CalDAV address with examples, and what the login is. Kept
- * short on purpose; the error messages carry the rest.
- */
-function ConnectionHelp() {
-  const [open, setOpen] = useState(false);
-  return (
-    <View style={styles.help}>
-      <Pressable
-        onPress={() => setOpen(!open)}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        testID="setup-help"
-      >
-        <SettingsMessage icon={HelpCircleIcon}>
-          What do I enter here?
-        </SettingsMessage>
-      </Pressable>
-      {open && (
-        <>
-          <SettingsMessage>
-            Your calendar server’s CalDAV address. For Radicale it is usually
-            https://your-server:5232/, for Nextcloud
-            https://your-server/remote.php/dav/.
-          </SettingsMessage>
-          <SettingsMessage>
-            Username and password are the ones that server knows you by. Leave
-            them empty if a proxy in front of it signs you in. Accounts that
-            need Google or Microsoft sign-in can’t connect.
-          </SettingsMessage>
-        </>
-      )}
     </View>
   );
 }
@@ -309,9 +261,6 @@ function EraseRow({ form }: { form: ServerFormState }) {
 }
 
 const styles = StyleSheet.create({
-  help: {
-    gap: Spacing.two,
-  },
   fields: {
     gap: Spacing.three - Spacing.one,
   },

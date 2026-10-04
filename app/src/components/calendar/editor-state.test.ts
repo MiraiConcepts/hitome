@@ -46,6 +46,16 @@ describe('initialFormState', () => {
     expect(s.alarm).toEqual({ kind: 'none' });
   });
 
+  it('ends a late-evening new event on the next day', () => {
+    const s = initialFormState(
+      null,
+      '2026-10-06',
+      new Date(2026, 9, 4, 22, 37)
+    );
+    expect([s.startDay, s.startTime]).toEqual(['2026-10-06', '23:00']);
+    expect([s.endDay, s.endTime]).toEqual(['2026-10-07', '00:00']);
+  });
+
   it('starts a new event with the default alert from settings', () => {
     expect(initialFormState(null, '2026-07-25', NOW, 10).alarm).toEqual({
       kind: 'set',

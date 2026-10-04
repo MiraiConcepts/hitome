@@ -45,7 +45,12 @@ export function initialFormState(
       allDay: false,
       startDay,
       startTime: toTimeString(defaultStart),
-      endDay: startDay,
+      // An 11pm start ends at midnight — on the next day, or the end would sit
+      // before the start and Save would refuse it.
+      endDay:
+        toDateString(defaultEnd) === toDateString(defaultStart)
+          ? startDay
+          : addDays(startDay, 1),
       endTime: toTimeString(defaultEnd),
       location: '',
       description: '',

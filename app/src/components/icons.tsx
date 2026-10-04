@@ -33,7 +33,6 @@ import {
   FileTextOutlineBody,
   BugOutlineBody,
   ShieldLockOutlineBody,
-  HelpCircleOutlineBody,
 } from '@/constants/icon-paths';
 
 export type IconProps = { size?: number; color: string };
@@ -154,8 +153,4 @@ export function BugIcon({ size = 24, color }: IconProps) {
 
 export function ShieldLockIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(ShieldLockOutlineBody, size, color)} />;
-}
-
-export function HelpCircleIcon({ size = 24, color }: IconProps) {
-  return <SvgXml xml={svg(HelpCircleOutlineBody, size, color)} />;
 }

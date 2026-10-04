@@ -16,7 +16,7 @@ import {
   weeksBetween,
   type GridEventLike,
   setFirstDayOfWeek,
-  weekendSplitColumn,
+  weekendBoundaries,
 } from './calendar-grid';
 import { parseDay, toDateString } from './date';
 
@@ -707,19 +707,19 @@ describe('the phone’s first day of the week', () => {
   it('starts weeks on Monday by default, weekend split before Saturday', () => {
     // Sun 4 Oct 2026 → Mon 28 Sep.
     expect(toDateString(weekStartOf(new Date(2026, 9, 4)))).toBe('2026-09-28');
-    expect(weekendSplitColumn()).toBe(5);
+    expect(weekendBoundaries()).toEqual([5]);
   });
 
-  it('follows a Sunday-first phone', () => {
+  it('follows a Sunday-first phone, lining both ends of the weekend', () => {
     setFirstDayOfWeek(0);
     expect(toDateString(weekStartOf(new Date(2026, 9, 4)))).toBe('2026-10-04');
     expect(toDateString(weekStartOf(new Date(2026, 9, 10)))).toBe('2026-10-04');
-    expect(weekendSplitColumn()).toBe(6);
+    expect(weekendBoundaries()).toEqual([1, 6]);
   });
 
-  it('puts the split after Sunday when weeks open on Saturday', () => {
+  it('puts the line after Sunday when weeks open on Saturday', () => {
     setFirstDayOfWeek(6);
     expect(toDateString(weekStartOf(new Date(2026, 9, 4)))).toBe('2026-10-03');
-    expect(weekendSplitColumn()).toBe(2);
+    expect(weekendBoundaries()).toEqual([2]);
   });
 });

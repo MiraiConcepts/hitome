@@ -83,8 +83,7 @@ export function AboutSection() {
       </SettingsBlock>
       <SettingsBlock>
         <SettingsMessage icon={ShieldLockIcon}>
-          hitome talks only to your calendar server. It has no account of its
-          own, no analytics and no tracking.
+          No tracking, no analytics.
         </SettingsMessage>
       </SettingsBlock>
     </SettingsSection>

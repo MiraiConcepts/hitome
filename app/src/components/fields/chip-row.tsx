@@ -73,17 +73,30 @@ export function ChipRow<T extends string>({
         ]}
       >
         {own && <View style={[styles.dot, { backgroundColor: own }]} />}
-        <ThemedText
-          type="small"
-          style={[
-            styles.label,
-            selected && styles.labelSelected,
-            selected && { color: own ?? OnAccentColor },
-            !selected && own ? { color: theme.textSecondary } : null,
-          ]}
-        >
-          {option.label}
-        </ThemedText>
+        {/* Sized by an invisible bold copy, so selecting a chip (which
+            bolds its label) never changes its width and shifts the row. */}
+        <View>
+          <ThemedText
+            type="small"
+            style={[styles.label, styles.labelSelected, styles.sizer]}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            {option.label}
+          </ThemedText>
+          <ThemedText
+            type="small"
+            style={[
+              styles.label,
+              styles.labelShown,
+              selected && styles.labelSelected,
+              selected && { color: own ?? OnAccentColor },
+              !selected && own ? { color: theme.textSecondary } : null,
+            ]}
+          >
+            {option.label}
+          </ThemedText>
+        </View>
       </Pressable>
     );
   });
@@ -140,6 +153,15 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     lineHeight: 16,
+  },
+  sizer: {
+    opacity: 0,
+  },
+  labelShown: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
   },
   labelSelected: {
     fontFamily: FontFamilyBold,

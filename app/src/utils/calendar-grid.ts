@@ -36,12 +36,20 @@ export function weekStartOf(d: Date): Date {
 }
 
 /**
- * The column the weekend starts at — where the grid draws its orange split.
- * Before Saturday; or, in a week that opens on Saturday, after Sunday.
+ * Where the grid draws its orange weekend lines: every column edge (1–6)
+ * with a weekday on one side and Saturday or Sunday on the other. A Monday
+ * week gets one, before Saturday; a Sunday week, whose weekend sits at both
+ * ends, gets two — after Sunday and before Saturday.
  */
-export function weekendSplitColumn(): number {
-  const saturday = (6 - firstDay + 7) % 7;
-  return saturday === 0 ? 2 : saturday;
+export function weekendBoundaries(): number[] {
+  const isWeekend = (col: number) => {
+    const day = (firstDay + col) % 7;
+    return day === 0 || day === 6;
+  };
+  const edges: number[] = [];
+  for (let col = 1; col < 7; col++)
+    if (isWeekend(col - 1) !== isWeekend(col)) edges.push(col);
+  return edges;
 }
 
 /** A calendar month reference (month0 is 0-based like Date#getMonth). */
