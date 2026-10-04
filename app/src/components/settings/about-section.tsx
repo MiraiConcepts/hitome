@@ -7,11 +7,9 @@ import {
   FileTextIcon,
   GithubIcon,
   type IconProps,
-  ShieldLockIcon,
 } from '@/components/icons';
 import {
   SettingsBlock,
-  SettingsMessage,
   SettingsSection,
   SettingsValue,
 } from '@/components/settings/settings-parts';
@@ -80,11 +78,6 @@ export function AboutSection() {
             </ThemedText>
           </Pressable>
         ))}
-      </SettingsBlock>
-      <SettingsBlock>
-        <SettingsMessage icon={ShieldLockIcon}>
-          No tracking, no analytics.
-        </SettingsMessage>
       </SettingsBlock>
     </SettingsSection>
   );

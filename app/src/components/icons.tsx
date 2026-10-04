@@ -32,7 +32,6 @@ import {
   GithubOutlineBody,
   FileTextOutlineBody,
   BugOutlineBody,
-  ShieldLockOutlineBody,
 } from '@/constants/icon-paths';
 
 export type IconProps = { size?: number; color: string };
@@ -149,8 +148,4 @@ export function FileTextIcon({ size = 24, color }: IconProps) {
 
 export function BugIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(BugOutlineBody, size, color)} />;
-}
-
-export function ShieldLockIcon({ size = 24, color }: IconProps) {
-  return <SvgXml xml={svg(ShieldLockOutlineBody, size, color)} />;
 }

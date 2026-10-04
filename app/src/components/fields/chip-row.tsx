@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { startTransition, useEffect, useEffectEvent, useState } from 'react';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 
 import { ThemedText } from '@/components/themed-text';
@@ -47,8 +48,23 @@ export function ChipRow<T extends string>({
   testID,
 }: Props<T>) {
   const theme = useTheme();
+  // A tap only moves the highlight; what it sets off (a settings write, the
+  // widget redrawn, the grid re-laid for a new week start) runs once that is
+  // on screen, so the chip never waits on it.
+  const [pending, setPending] = useState<T | null>(null);
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
+    setPending(null);
+  }
+  const shown = pending ?? value;
+  const commit = useEffectEvent((next: T) => onChange(next));
+  useEffect(() => {
+    if (pending === null || pending === value) return;
+    startTransition(() => commit(pending));
+  }, [pending, value]);
   const chips = options.map((option) => {
-    const selected = option.value === value;
+    const selected = option.value === shown;
     const own = option.color ? rgbHex(option.color) : null;
     return (
       <Pressable
@@ -56,7 +72,11 @@ export function ChipRow<T extends string>({
         testID={testID ? `${testID}-${option.value}` : undefined}
         accessibilityRole="button"
         accessibilityState={{ selected }}
-        onPress={() => onChange(option.value)}
+        onPress={() => setPending(option.value)}
+        android_ripple={{
+          color: `${rgbHex(own ?? AccentColor)}40`,
+          foreground: true,
+        }}
         style={({ pressed }) => [
           styles.chip,
           singleLine && styles.chipCompact,
@@ -66,9 +86,11 @@ export function ChipRow<T extends string>({
               : styles.chipAccent
             : {
                 borderColor: theme.backgroundSelected,
-                backgroundColor: pressed
-                  ? theme.backgroundSelected
-                  : 'transparent',
+                // Android has the ripple; elsewhere, a pressed fill.
+                backgroundColor:
+                  pressed && Platform.OS !== 'android'
+                    ? theme.backgroundSelected
+                    : 'transparent',
               },
         ]}
       >
@@ -149,6 +171,9 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+    // Centred on the lowercase letters, not the line box: a calendar name
+    // is lowercase-heavy, and centred on the line it read as sitting above.
+    transform: [{ translateY: 2 }],
   },
   label: {
     fontSize: 13,
