@@ -203,14 +203,14 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
     // The alarm preset sets differ; an incompatible pick is cleared.
     if (alarm.kind === 'set') setAlarmState({ kind: 'none' });
     if (parseDay(startDay) && endDay < startDay) setEndDayState(startDay);
-    // Timed but under a day — 23:00 to midnight, say — is one all-day day,
-    // not two because the end landed past midnight.
-    if (next) {
-      const start = parseDayTime(startDay, startTime);
-      const end = parseDayTime(endDay, endTime);
-      if (start && end && end.getTime() - start.getTime() < 86_400_000)
-        setEndDayState(startDay);
-    }
+    // Ending at midnight — 23:00 to 00:00, say — is one all-day day, not two
+    // because the end landed on the next date. And back to timed, a span
+    // that collapsed to one day ends on the next again, after its start.
+    if (!parseDay(startDay)) return;
+    if (next && endTime === '00:00' && endDay === addDays(startDay, 1))
+      setEndDayState(startDay);
+    else if (!next && endDay === startDay && endTime <= startTime)
+      setEndDayState(addDays(startDay, 1));
   }
 
   function setAlarm(next: AlarmState) {
