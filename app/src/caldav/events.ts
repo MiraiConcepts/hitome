@@ -22,10 +22,15 @@ import {
   truncateSeries,
   type EditScope,
 } from './ics';
-import type { CalEvent, EventChanges, EventInput } from './types';
+import type { CalEvent, EventChanges, EventIcon, EventInput } from './types';
 
 /** A calendar the editor can create into: URL (write target) + display bits. */
-export type CalendarChoice = { url: string; name: string; color?: string };
+export type CalendarChoice = {
+  url: string;
+  name: string;
+  color?: string;
+  icon?: EventIcon;
+};
 
 /** Server rejected the write because the object changed underneath us (HTTP 412). */
 export class ConflictError extends Error {
@@ -113,6 +118,7 @@ export async function listCalendars(): Promise<CalendarChoice[]> {
     url: c.url,
     name: calendarName(c),
     ...(calendarColor(c) ? { color: calendarColor(c) } : {}),
+    ...(calendarIcon(c) ? { icon: calendarIcon(c) } : {}),
   }));
 }
 

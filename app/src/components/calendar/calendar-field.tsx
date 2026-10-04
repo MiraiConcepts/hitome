@@ -22,6 +22,7 @@ export function CalendarField({ calendars, value, onChange, testID }: Props) {
     value: c.url,
     label: c.name,
     color: c.color ?? AccentColor,
+    icon: c.icon,
   }));
   return (
     <ChipRow

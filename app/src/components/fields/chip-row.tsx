@@ -2,6 +2,8 @@ import { startTransition, useEffect, useEffectEvent, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 
+import type { EventIcon } from '@/caldav/types';
+import { CalendarMark } from '@/components/calendar/calendar-mark';
 import { ThemedText } from '@/components/themed-text';
 import {
   AccentColor,
@@ -15,9 +17,12 @@ import { rgbHex } from '@/utils/color';
 export type ChipOption<T extends string> = {
   value: T;
   label: string;
-  /** Tint the selected chip in this color (a calendar's own) instead of the
-   *  accent: colored outline + text + faint fill. */
+  /** Tint the chip in this color (a calendar's own) instead of the accent:
+   *  its calendar mark at rest, colored outline + text + faint fill when
+   *  selected. */
   color?: string;
+  /** Which calendar mark to show beside a colored option. */
+  icon?: EventIcon;
 };
 
 type Props<T extends string> = {
@@ -94,6 +99,7 @@ export function ChipRow<T extends string>({
               },
         ]}
       >
+        {own && <CalendarMark icon={option.icon} color={own} />}
         {/* Sized by an invisible bold copy, so selecting a chip (which
             bolds its label) never changes its width and shifts the row. */}
         <View>

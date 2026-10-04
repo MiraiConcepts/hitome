@@ -32,6 +32,7 @@ import {
   GithubOutlineBody,
   FileTextOutlineBody,
   BugOutlineBody,
+  GiftOutlineBody,
 } from '@/constants/icon-paths';
 
 export type IconProps = { size?: number; color: string };
@@ -148,4 +149,8 @@ export function FileTextIcon({ size = 24, color }: IconProps) {
 
 export function BugIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(BugOutlineBody, size, color)} />;
+}
+
+export function GiftIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(GiftOutlineBody, size, color)} />;
 }

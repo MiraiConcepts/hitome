@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { listCalendars, type CalendarChoice } from '@/caldav/events';
+import { CalendarMark } from '@/components/calendar/calendar-mark';
 import { ChipRow } from '@/components/fields/chip-row';
 import { FieldStack } from '@/components/fields/field-stack';
 import {
@@ -97,13 +98,10 @@ export function CalendarsSection() {
             testID={`settings-calendar-${calendar.name}`}
           >
             <View style={styles.row}>
-              <View
-                style={[
-                  styles.swatch,
-                  {
-                    backgroundColor: calendar.color ?? theme.backgroundSelected,
-                  },
-                ]}
+              <CalendarMark
+                icon={calendar.icon}
+                size={MARK_SIZE}
+                color={calendar.color ?? theme.textSecondary}
               />
               <ThemedText
                 type="small"
@@ -173,6 +171,7 @@ export function CalendarsSection() {
 }
 
 const CHECK_SIZE = 20;
+const MARK_SIZE = 16;
 
 /** A weekday's name in the phone's language, from Date#getDay's numbering
  *  (2024-01-07 was a Sunday). */
@@ -188,12 +187,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     minHeight: CONTROL_HEIGHT - 2 * Card.padV,
-  },
-  // The same 6pt square the day popover and the chip row use for a
-  // calendar's colour.
-  swatch: {
-    width: 6,
-    height: 6,
   },
   name: {
     flex: 1,

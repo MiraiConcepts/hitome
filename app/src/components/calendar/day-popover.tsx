@@ -1,6 +1,7 @@
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import type { CalEvent } from '@/caldav/types';
+import { CalendarMark } from '@/components/calendar/calendar-mark';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AccentColor, Spacing } from '@/constants/theme';
@@ -51,13 +52,14 @@ export function DayPopover({ day, events, onClose, onPressEvent }: Props) {
                       }
                       style={styles.row}
                     >
-                      {/* Source-calendar color accent (theme accent if none). */}
-                      <View
-                        style={[
-                          styles.dot,
-                          { backgroundColor: event.color ?? AccentColor },
-                        ]}
-                      />
+                      {/* Source calendar's mark, in its color (theme accent
+                          if none). */}
+                      <View style={styles.mark}>
+                        <CalendarMark
+                          icon={event.icon}
+                          color={event.color ?? AccentColor}
+                        />
+                      </View>
                       <View style={styles.time}>
                         {event.allDay ? (
                           <ThemedText type="small" themeColor="textSecondary">
@@ -129,10 +131,8 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.two,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    marginTop: 5, // sit level with the first text line
+  mark: {
+    marginTop: 3, // sit level with the first text line
   },
   time: {
     width: 52,
