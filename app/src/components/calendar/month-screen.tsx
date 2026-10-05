@@ -306,7 +306,7 @@ export function MonthScreen() {
     if (result === 'created') setSnack({ message: 'Event added' });
     else if (result === 'updated') setSnack({ message: 'Saved' });
     else if (result === 'conflict') {
-      setSnack({ message: 'Event changed elsewhere — list refreshed' });
+      setSnack({ message: 'Event changed elsewhere. List refreshed' });
     } else
       setSnack({
         message:

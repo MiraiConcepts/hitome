@@ -263,7 +263,7 @@ describe('writeFailureMessage', () => {
       new TypeError('Network request failed'),
       'save'
     );
-    expect(message).toMatch(/^Not saved — can’t reach/);
+    expect(message).toMatch(/^Not saved. Can’t reach/);
     expect(message).toContain('still here');
   });
 
@@ -271,13 +271,13 @@ describe('writeFailureMessage', () => {
     const err = new Error('The server rejected the saved login');
     err.name = 'AuthError';
     expect(writeFailureMessage(err, 'delete')).toMatch(
-      /^Not deleted — the server rejected the login/
+      /^Not deleted. The server rejected the login/
     );
   });
 
   it('keeps the server’s own words for anything else', () => {
     expect(
       writeFailureMessage(new Error('CalDAV update failed (HTTP 500)'), 'move')
-    ).toBe('Not moved — CalDAV update failed (HTTP 500)');
+    ).toBe('Not moved: CalDAV update failed (HTTP 500)');
   });
 });

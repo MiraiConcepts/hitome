@@ -131,7 +131,7 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
       .then((blocked) =>
         setAlarmHint(
           blocked
-            ? "Notifications are off — reminders won't ring on this device."
+            ? "Notifications are off, so reminders won't ring on this device."
             : null
         )
       )

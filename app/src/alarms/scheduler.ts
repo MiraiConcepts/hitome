@@ -110,7 +110,7 @@ export async function sendTestNotification(): Promise<void> {
     identifier: TEST_ID,
     content: {
       title: 'hitome',
-      body: 'Test notification — event reminders can ring on this device.',
+      body: 'Test notification. Event reminders can ring on this device.',
       // A real reminder's buttons, so the test shows (and Snooze proves)
       // exactly what one will.
       categoryIdentifier: REMINDER_CATEGORY,

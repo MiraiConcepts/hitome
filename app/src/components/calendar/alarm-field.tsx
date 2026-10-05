@@ -54,7 +54,7 @@ export function AlarmField({ value, onChange, allDay, hint, testID }: Props) {
     return (
       <FieldStack label="Alert" icon={BellIcon} testID={testID}>
         <SettingsMessage>
-          Custom alert (set in another app) — kept as is.
+          Custom alert (set in another app), kept as is.
         </SettingsMessage>
       </FieldStack>
     );

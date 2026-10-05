@@ -59,7 +59,7 @@ export function RecurrenceField({
     return (
       <FieldStack label="Repeat" icon={RepeatIcon} testID={testID}>
         <SettingsMessage>
-          Custom rule (set in another app) — kept as is.
+          Custom rule (set in another app), kept as is.
         </SettingsMessage>
       </FieldStack>
     );

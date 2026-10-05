@@ -65,7 +65,7 @@ export function SetupScreen() {
               accessibilityIgnoresInvertColors
             />
             <Animated.View layout={COLLAPSE}>
-              <AppName centred={!collapsed} />
+              <AppName />
             </Animated.View>
           </Animated.View>
           <Animated.View layout={COLLAPSE}>

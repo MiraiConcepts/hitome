@@ -83,7 +83,7 @@ export async function sendTestNotification(): Promise<void> {
   if (!supported() || Notification.permission !== 'granted') return;
   try {
     new Notification('hitome', {
-      body: 'Test notification — reminders can ring in this tab.',
+      body: 'Test notification. Reminders can ring in this tab.',
       tag: 'test-notification',
     });
   } catch {

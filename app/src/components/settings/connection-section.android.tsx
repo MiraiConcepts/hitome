@@ -23,7 +23,7 @@ export function ConnectionSection() {
       <SettingsBlock>
         <SettingsMessage>
           hitome uses the calendars synced to this phone. DAVx⁵ keeps them in
-          step with your server — changes made offline go up when you’re back
+          step with your server. Changes made offline go up when you’re back
           online.
         </SettingsMessage>
         <SettingsButtonRow>

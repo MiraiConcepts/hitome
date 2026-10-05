@@ -8,7 +8,6 @@ import {
   sendTestNotification,
   TEST_DELAY_SECONDS,
 } from '@/alarms/scheduler';
-import { SNOOZE_MINUTES } from '@/alarms/actions';
 import {
   permissionState,
   scheduledLabel,
@@ -19,7 +18,6 @@ import {
   SettingsButton,
   SettingsBlock,
   SettingsButtonRow,
-  SettingsMessage,
   SettingsOutcomeLine,
   SettingsSection,
   SettingsToggle,
@@ -41,8 +39,8 @@ const PERMISSION_OFF =
   'Notifications are off. Turn on Permission to send a test.';
 const TEST_SENT =
   TEST_DELAY_SECONDS > 0
-    ? `Sent — it should arrive in about ${TEST_DELAY_SECONDS} seconds. Leave the app to check it rings in the background.`
-    : 'Sent — it should have appeared just now.';
+    ? `Sent. It should arrive in about ${TEST_DELAY_SECONDS} seconds. Leave the app to check it rings in the background.`
+    : 'Sent. It should have appeared just now.';
 
 /**
  * Reminder plumbing, made visible. Everything under here already existed —
@@ -190,10 +188,6 @@ export function NotificationsSection() {
       <SettingsBlock>
         <FieldStack label="What a reminder looks like" icon={EyeIcon}>
           <ReminderPreview />
-          <SettingsMessage>
-            Tapping it opens the event. Join appears when the event has a
-            meeting link; Snooze brings it back in {SNOOZE_MINUTES} minutes.
-          </SettingsMessage>
         </FieldStack>
       </SettingsBlock>
 

@@ -274,7 +274,7 @@ test("writes reach the server: create, edit, delete, undo, move, conflict", asyn
       route.request().method() === "PUT" ? route.abort("internetdisconnected") : route.continue(),
     );
     await page.getByTestId("editor-save").click();
-    await expect(page.getByText(/^Not saved — can’t reach/)).toBeVisible({
+    await expect(page.getByText(/^Not saved. Can’t reach/)).toBeVisible({
       timeout: 30_000,
     });
     await expect(page.getByTestId("event-editor")).toBeVisible();

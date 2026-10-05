@@ -9,6 +9,7 @@ import type { ReactNode } from 'react';
 import type { WidgetRepresentation } from 'react-native-android-widget';
 import {
   FlexWidget,
+  ImageWidget,
   ListWidget,
   SvgWidget,
   TextWidget,
@@ -17,7 +18,6 @@ import {
 import {
   AddOutlineBody,
   ArrowRightOutlineBody,
-  EyeOutlineBody,
   GiftOutlineBody,
   RefreshOutlineBody,
   SunOutlineBody,
@@ -62,7 +62,6 @@ const iconSvg = (color: string, body: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${body.replace(/currentColor/g, color)}</svg>`;
 const ADD_ICON = iconSvg(OnAccentColor, AddOutlineBody);
 const REFRESH_ICON = iconSvg(OnAccentColor, RefreshOutlineBody);
-const BRAND_ICON = iconSvg(OnAccentColor, EyeOutlineBody);
 const ARROW_ICON = iconSvg(OnAccentColor, ArrowRightOutlineBody);
 
 /** An event's source-calendar color, alpha stripped for SVG fills / ColorProp;
@@ -337,7 +336,7 @@ function Body({
   const message = !configured
     ? 'Open hitome to set up your calendar'
     : !cache
-      ? 'Calendar unreachable — tap ↻ to try again'
+      ? 'Calendar unreachable. Tap ↻ to try again'
       : cache.events.length === 0
         ? 'No events in the next 60 days'
         : null;
@@ -394,12 +393,18 @@ function SignedOut() {
         backgroundColor: hex(AccentColor),
         padding: 16,
       }}
-      accessibilityLabel="Connect your calendar — opens hitome"
+      accessibilityLabel="Connect your calendar. Opens hitome"
     >
       <FlexWidget
         style={{ flexDirection: 'row', alignItems: 'center', flexGap: 8 }}
       >
-        <SvgWidget svg={BRAND_ICON} style={{ width: 20, height: 20 }} />
+        {/* The app's own icon (a 96px copy: widget bitmaps are counted
+            against a tight memory budget, see _layout). */}
+        <ImageWidget
+          image={require('@/assets/images/widget-icon.png')}
+          imageWidth={22}
+          imageHeight={22}
+        />
         <TextWidget
           text="hitome"
           style={{ fontSize: 15, fontFamily: FontFamilyBold, color: ink }}

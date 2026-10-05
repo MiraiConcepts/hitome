@@ -17,7 +17,7 @@ import {
   requestCalendarAccess,
   useSourceProblem,
 } from '@/config/source.android';
-import { Spacing } from '@/constants/theme';
+import { FontFamilyBold, Spacing } from '@/constants/theme';
 import { DAVX5_DOWNLOAD, openDavx5 } from '@/store/events';
 
 /**
@@ -53,11 +53,11 @@ export function SetupScreen() {
               style={styles.icon}
               accessibilityIgnoresInvertColors
             />
-            <AppName centred />
+            <AppName />
           </View>
           {noCalendars ? (
             <View style={styles.copy}>
-              <ThemedText type="subtitle">
+              <ThemedText style={styles.heading}>
                 No calendars on this phone
               </ThemedText>
               <ThemedText themeColor="textSecondary">
@@ -65,7 +65,7 @@ export function SetupScreen() {
               </ThemedText>
               <ThemedText themeColor="textSecondary">
                 1. Install DAVx⁵ (free on F-Droid).{'\n'}2. Add your server
-                there — its address and your login.{'\n'}3. Come back: hitome
+                there: its address and your login.{'\n'}3. Come back, and hitome
                 picks the calendars up.
               </ThemedText>
               <ThemedText themeColor="textSecondary">
@@ -74,13 +74,12 @@ export function SetupScreen() {
             </View>
           ) : (
             <View style={styles.copy}>
-              <ThemedText type="subtitle">
+              <ThemedText style={styles.heading}>
                 Use your phone’s calendars
               </ThemedText>
               <ThemedText themeColor="textSecondary">
-                hitome shows the calendars synced to this phone — by DAVx⁵,
-                Google or another account — and adds events to them. Your sync
-                app sends changes to the server, even ones made offline.
+                hitome shows the calendars your phone already syncs, from DAVx⁵,
+                Google or any other account.
               </ThemedText>
             </View>
           )}
@@ -150,6 +149,11 @@ const styles = StyleSheet.create({
   },
   copy: {
     gap: Spacing.three,
+  },
+  heading: {
+    fontFamily: FontFamilyBold,
+    fontSize: 22,
+    lineHeight: 28,
   },
   footer: {
     flexDirection: 'row',

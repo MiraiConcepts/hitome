@@ -209,21 +209,21 @@ export function writeFailureMessage(
   // events.ts's AuthError (401/403 on the write itself); named rather than
   // imported, so this file stays free of the CalDAV client.
   if (err instanceof Error && err.name === 'AuthError')
-    return `${not} — the server rejected the login. Check it in Settings.`;
+    return `${not}. The server rejected the login. Check it in Settings.`;
   const message = err instanceof Error ? err.message : String(err);
   switch (classifyConnectError(err, { hadLogin: true })) {
     case 'unreachable':
     case 'no-such-host':
     case 'timeout':
     case 'blocked-by-browser':
-      return `${not} — can’t reach your calendar server. Your changes are still here; try again when you’re connected.`;
+      return `${not}. Can’t reach your calendar server. Your changes are still here; try again when you’re connected.`;
     case 'unauthorized':
     case 'forbidden':
-      return `${not} — the server rejected the login. Check it in Settings.`;
+      return `${not}. The server rejected the login. Check it in Settings.`;
     case 'insecure':
-      return `${not} — couldn’t make a secure connection to the server.`;
+      return `${not}. Couldn’t make a secure connection to the server.`;
     default:
-      return `${not} — ${plainReason(message)}`;
+      return `${not}: ${plainReason(message)}`;
   }
 }
 
