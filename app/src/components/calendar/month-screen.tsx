@@ -19,6 +19,7 @@ import {
   requestSync,
 } from '@/data/events';
 import type { CalEvent } from '@/caldav/types';
+import { markCalendarReady } from '@/components/calendar/calendar-ready';
 import { DayPopover } from '@/components/calendar/day-popover';
 import {
   EventEditor,
@@ -117,7 +118,10 @@ export function MonthScreen() {
   // cover with a spinner sits over the grid area so no half-anchored state
   // ever paints. Latched: resizes re-anchor instantly and stay uncovered.
   const [gridAnchored, setGridAnchored] = useState(false);
-  const onGridAnchored = useCallback(() => setGridAnchored(true), []);
+  const onGridAnchored = useCallback(() => {
+    setGridAnchored(true);
+    markCalendarReady();
+  }, []);
   // A spinner over the cover only once anchoring has taken a noticeable
   // while: a quick anchor (the usual case) shows a still background that
   // fades away, not a spinner flashing for a frame or two.

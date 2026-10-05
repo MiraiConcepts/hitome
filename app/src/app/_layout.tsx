@@ -4,12 +4,18 @@ import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import Head from 'expo-router/head';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
-import Animated, { FadeOut } from 'react-native-reanimated';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { BootScreen } from '@/components/boot-screen';
+import { onCalendarReady } from '@/components/calendar/calendar-ready';
 import { SetupScreen } from '@/components/settings/setup-screen';
 import { ensureDefaultAlert } from '@/config/alert-pref';
 import { ensureSource, useSourceStatus } from '@/config/source';
@@ -41,6 +47,11 @@ export default function RootLayout() {
     ensureDefaultAlert();
   }, []);
   const { link, ready: linkReady } = useDeepLinkSource();
+  // Whether the setup screen is up — still true for a moment after Allow,
+  // while it fades over the calendar drawing beneath it.
+  const [setupShown, setSetupShown] = useState(false);
+  if (davStatus === 'unconfigured' && !setupShown) setSetupShown(true);
+  const hideSetup = useCallback(() => setSetupShown(false), []);
   useSilentReload();
   useAlarmReconcile();
   useEffect(() => {
@@ -83,11 +94,10 @@ export default function RootLayout() {
               {/* Nothing in this app works without a server, so setup is a gate
                   rather than a route — a deep link into the calendar has
                   nothing to show either. */}
-              {/* The calendar mounts underneath while the setup screen,
-                  layered on top, dissolves away (its exit animation keeps it
-                  painted while it fades) — so after Allow the grid draws
-                  itself out of sight, instead of the screen cutting to a
-                  half-built calendar. */}
+              {/* After Allow the calendar mounts underneath, and the setup
+                  screen stays on top until the grid has drawn, then fades
+                  (SetupOverlay) — one dissolve, not a cut to a header over
+                  an empty grid. */}
               {davStatus !== 'unconfigured' && (
                 /* A stack, not a Slot: settings is a pushed screen, so
                    Android's back press and the browser's back button both pop
@@ -96,13 +106,11 @@ export default function RootLayout() {
                    furniture). */
                 <Stack screenOptions={{ headerShown: false }} />
               )}
-              {davStatus === 'unconfigured' && (
-                <Animated.View
-                  exiting={FadeOut.duration(SETUP_FADE_MS)}
-                  style={StyleSheet.absoluteFill}
-                >
-                  <SetupScreen />
-                </Animated.View>
+              {setupShown && (
+                <SetupOverlay
+                  leaving={davStatus !== 'unconfigured'}
+                  onGone={hideSetup}
+                />
               )}
             </DeepLinkProvider>
           ) : (
@@ -114,8 +122,55 @@ export default function RootLayout() {
   );
 }
 
-/** Long enough for the grid to anchor underneath before it shows. */
-const SETUP_FADE_MS = 450;
+const SETUP_FADE_MS = 250;
+/** Fade anyway if the grid never says it is ready. */
+const SETUP_HOLD_MAX_MS = 1500;
+
+/**
+ * The setup screen as a layer over everything. While `leaving`, it waits
+ * for the calendar beneath to be drawn (or SETUP_HOLD_MAX_MS), fades out,
+ * then reports gone.
+ */
+function SetupOverlay({
+  leaving,
+  onGone,
+}: {
+  leaving: boolean;
+  onGone: () => void;
+}) {
+  const opacity = useSharedValue(1);
+  const style = useAnimatedStyle(() => ({ opacity: opacity.get() }));
+  useEffect(() => {
+    if (!leaving) {
+      opacity.set(1);
+      return;
+    }
+    let started = false;
+    const fade = () => {
+      if (started) return;
+      started = true;
+      opacity.set(
+        withTiming(0, { duration: SETUP_FADE_MS }, (done) => {
+          if (done) runOnJS(onGone)();
+        })
+      );
+    };
+    const off = onCalendarReady(fade);
+    const timer = setTimeout(fade, SETUP_HOLD_MAX_MS);
+    return () => {
+      off();
+      clearTimeout(timer);
+    };
+  }, [leaving, opacity, onGone]);
+  return (
+    <Animated.View
+      style={[StyleSheet.absoluteFill, style]}
+      pointerEvents={leaving ? 'none' : 'auto'}
+    >
+      <SetupScreen />
+    </Animated.View>
+  );
+}
 
 const styles = StyleSheet.create({
   root: {
