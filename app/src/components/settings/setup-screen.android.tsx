@@ -12,6 +12,7 @@ import {
   SettingsButtonRow,
   SettingsSection,
 } from '@/components/settings/settings-parts';
+import { Brand } from '@/components/brand';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
@@ -62,12 +63,12 @@ export function SetupScreen() {
             <SettingsSection title="No calendars on this phone">
               <SettingsBlock>
                 <ThemedText type="small" themeColor="textSecondary">
-                  hitome shows the calendars your phone syncs. To add yours:
+                  <Brand /> shows the calendars your phone syncs. To add yours:
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
                   1. Install DAVx⁵ (free on F-Droid).{'\n'}2. Add your server
                   there: its address and your login.{'\n'}3. Come back, and
-                  hitome picks the calendars up.
+                  <Brand /> picks the calendars up.
                 </ThemedText>
               </SettingsBlock>
               <SettingsBlock>
@@ -80,7 +81,7 @@ export function SetupScreen() {
             <SettingsSection title="Use your phone’s calendars">
               <SettingsBlock>
                 <ThemedText type="small" themeColor="textSecondary">
-                  hitome shows the calendars your phone already syncs, from
+                  <Brand /> shows the calendars your phone already syncs, from
                   DAVx⁵, Google or any other account.
                 </ThemedText>
               </SettingsBlock>

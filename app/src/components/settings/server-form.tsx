@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View, type TextInputProps } from 'react-native';
 
+import { Brand } from '@/components/brand';
 import { cancelAllReminders } from '@/alarms/scheduler';
 import { probeConnection } from '@/caldav/client';
 import { FieldStack } from '@/components/fields/field-stack';
@@ -245,7 +246,7 @@ function EraseRow({ form }: { form: ServerFormState }) {
     <SettingsBlock>
       <SettingsMessage icon={LogoutIcon}>
         Disconnect remembers your login for next time. Sign out and erase
-        removes it and everything hitome keeps on this phone.
+        removes it and everything <Brand size={12} /> keeps on this phone.
       </SettingsMessage>
       <SettingsButtonRow>
         <SettingsButton
