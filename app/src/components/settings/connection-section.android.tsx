@@ -87,10 +87,6 @@ export function ConnectionSection() {
             testID="settings-disconnect"
           />
         </SettingsButtonRow>
-        <SettingsMessage>
-          Disconnect stops hitome reading your calendars and clears what it
-          keeps on this phone. Your calendars and DAVx⁵ are untouched.
-        </SettingsMessage>
       </SettingsBlock>
     </SettingsSection>
   );
