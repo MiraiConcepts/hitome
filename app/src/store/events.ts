@@ -685,7 +685,8 @@ export async function moveEvent(
 
 // ---- Sync ------------------------------------------------------------------
 
-/** Ask the sync apps (DAVx⁵…) to sync now; false when there is no store. */
+/** Ask the sync apps (DAVx⁵…) to sync now; false when there is no store.
+ *  What lands then redraws the grid by itself (subscribeStore). */
 export async function requestSync(): Promise<boolean> {
   if (!CalendarStore) return false;
   await CalendarStore.requestSync();

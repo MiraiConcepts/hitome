@@ -56,27 +56,24 @@ class CalendarStoreModule : Module() {
       resolver.delete(Uri.parse(uri), selection, args?.toTypedArray())
     }
 
-    // Ask every account that has calendars here to sync now — what Etar's
-    // Refresh does. The sync app (DAVx⁵) decides when it actually runs.
+    // Sync now. A direct request to each account (what Etar's Refresh does)
+    // where Android takes it, plus the notice a local edit sends: "calendar
+    // data changed, sync to the network". The notice is what actually starts
+    // DAVx⁵ on ColorOS, which drops the direct request even for an account
+    // the app may see; DAVx⁵ runs it after its own short delay (~50s).
     AsyncFunction("requestSync") {
-      val accounts = mutableSetOf<Pair<String, String>>()
-      resolver.query(
-        CalendarContract.Calendars.CONTENT_URI,
-        arrayOf(CalendarContract.Calendars.ACCOUNT_NAME, CalendarContract.Calendars.ACCOUNT_TYPE),
-        null, null, null
-      )?.use { cursor ->
-        while (cursor.moveToNext()) {
-          val name = cursor.getString(0) ?: continue
-          val type = cursor.getString(1) ?: continue
-          if (type != CalendarContract.ACCOUNT_TYPE_LOCAL) accounts.add(name to type)
-        }
-      }
       val extras = Bundle().apply {
         putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true)
         putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true)
       }
-      for ((name, type) in accounts)
-        ContentResolver.requestSync(Account(name, type), CalendarContract.AUTHORITY, extras)
+      val accounts = calendarAccounts()
+      for (account in accounts)
+        ContentResolver.requestSync(account, CalendarContract.AUTHORITY, extras)
+      resolver.notifyChange(
+        CalendarContract.CONTENT_URI,
+        null,
+        ContentResolver.NOTIFY_SYNC_TO_NETWORK
+      )
       accounts.size
     }
 
@@ -118,6 +115,22 @@ class CalendarStoreModule : Module() {
   }
 
   private var observing = false
+  /** Each non-local account that has calendars here. */
+  private fun calendarAccounts(): List<Account> {
+    val accounts = mutableSetOf<Pair<String, String>>()
+    resolver.query(
+      CalendarContract.Calendars.CONTENT_URI,
+      arrayOf(CalendarContract.Calendars.ACCOUNT_NAME, CalendarContract.Calendars.ACCOUNT_TYPE),
+      null, null, null
+    )?.use { cursor ->
+      while (cursor.moveToNext()) {
+        val name = cursor.getString(0) ?: continue
+        val type = cursor.getString(1) ?: continue
+        if (type != CalendarContract.ACCOUNT_TYPE_LOCAL) accounts.add(name to type)
+      }
+    }
+    return accounts.map { (name, type) -> Account(name, type) }
+  }
 
   /** Register the store observer if someone is listening and it is not
    *  registered yet; true once it is. */

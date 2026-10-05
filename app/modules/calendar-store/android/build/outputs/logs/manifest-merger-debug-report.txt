@@ -1,16 +1,16 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2347883232252092300.xml:2:13-83
-INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2347883232252092300.xml:2:13-83
+ADDED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest9587258589770971929.xml:2:13-83
+INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest9587258589770971929.xml:2:13-83
 	package
-		INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2347883232252092300.xml
+		INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest9587258589770971929.xml
 	xmlns:android
-		ADDED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2347883232252092300.xml:2:23-81
+		ADDED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest9587258589770971929.xml:2:23-81
 uses-sdk
-INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2347883232252092300.xml reason: use-sdk injection requested
-INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2347883232252092300.xml
-INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2347883232252092300.xml
+INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest9587258589770971929.xml reason: use-sdk injection requested
+INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest9587258589770971929.xml
+INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest9587258589770971929.xml
 	android:targetSdkVersion
-		INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2347883232252092300.xml
+		INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest9587258589770971929.xml
 	android:minSdkVersion
-		INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2347883232252092300.xml
+		INJECTED from /Users/addison/Desktop/hitome/app/modules/calendar-store/android/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest9587258589770971929.xml

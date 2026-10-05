@@ -25,6 +25,7 @@ type NativeStore = {
     selection: string | null,
     args: string[] | null
   ): Promise<number>;
+  /** Ask the sync apps to sync now; how many accounts were asked. */
   requestSync(): Promise<number>;
   openApp(pkg: string): Promise<boolean>;
   /** Start watching for changes, if access has since been granted. */
