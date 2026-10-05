@@ -104,3 +104,25 @@ in the server's config, online-only (as Google Calendar on the web).
 - §4: Lighthouse a11y 84 → 100 (month + settings); best practices 96, the
   remaining point is tsdav's `/.well-known/caldav` probe 404ing (harmless;
   a host-Caddy redirect to /dav/ would clear it). Android targets to 48dp.
+
+## After v0.5.0 (2026-10-06): walk-through fixes, released as v0.5.1
+
+- First run: copy in the settings card; the setup screen holds over the
+  calendar until the grid has drawn, then fades (calendar-ready signal) —
+  measured frame by frame from the user's screen recordings.
+- Settings → Sync: Disconnect (an app-side switch; Android keeps the
+  permission). ↻ / Sync now: `requestSync` never reached DAVx⁵ on ColorOS,
+  even with the account made visible via Android's account picker;
+  `notifyChange(CONTENT_URI, NOTIFY_SYNC_TO_NETWORK)` does (DAVx⁵ runs it
+  after ~50s). Verified web edit → phone with only ↻.
+- Editor: header out of the scroll view; sheet re-settled after the keyboard
+  closes (and after a drag); tighter chips; "01:00 → 02:00".
+- A deep link acts once (a week-start rebuild had reopened a widget-tapped
+  event behind Settings, swallowing the next Back).
+- Brand mark for "hitome" in copy; no em/en dashes in UI text.
+- Pilot on the phone: reminders ring / Snooze / tap opens the event; widget
+  row opens its event; offline edit waits and syncs when Tailscale returns.
+- Store operations now unit-tested against an in-memory calendar store
+  (src/store/fake-store.testing.ts); e2e added to CI.
+- Open: a dev-build-only "Mon 5 October" header after a widget launch that
+  could not reach Metro — to recheck on the release build.
