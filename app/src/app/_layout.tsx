@@ -6,6 +6,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { BootScreen } from '@/components/boot-screen';
@@ -90,7 +91,14 @@ export default function RootLayout() {
                    it for free. No headers — every screen draws its own bar (the
                    month view's is part of the calendar's chrome, not navigation
                    furniture). */
-                <Stack screenOptions={{ headerShown: false }} />
+                // Faded in, so leaving the setup screen (Allow tapped) or the
+                // boot spinner is a dissolve, not a hard cut.
+                <Animated.View
+                  entering={FadeIn.duration(220)}
+                  style={styles.root}
+                >
+                  <Stack screenOptions={{ headerShown: false }} />
+                </Animated.View>
               )}
             </DeepLinkProvider>
           ) : (

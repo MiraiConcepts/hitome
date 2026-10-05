@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import Animated, { FadeOut } from 'react-native-reanimated';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -118,6 +119,18 @@ export function MonthScreen() {
   // ever paints. Latched: resizes re-anchor instantly and stay uncovered.
   const [gridAnchored, setGridAnchored] = useState(false);
   const onGridAnchored = useCallback(() => setGridAnchored(true), []);
+  // A spinner over the cover only once anchoring has taken a noticeable
+  // while: a quick anchor (the usual case) shows a still background that
+  // fades away, not a spinner flashing for a frame or two.
+  const [coverSpinner, setCoverSpinner] = useState(false);
+  useEffect(() => {
+    if (gridAnchored) return;
+    const timer = setTimeout(
+      () => setCoverSpinner(true),
+      COVER_SPINNER_DELAY_MS
+    );
+    return () => clearTimeout(timer);
+  }, [gridAnchored]);
   // Safety valve for environments where viewability callbacks never fire
   // (e.g. a hidden tab suspending rAF): show the grid regardless after 4s.
   useEffect(() => {
@@ -453,9 +466,18 @@ export function MonthScreen() {
               />
             )}
             {(!gridAnchored || !gridSize) && (
-              <ThemedView style={styles.gridCover}>
-                <ActivityIndicator size="large" color={AccentColor} />
-              </ThemedView>
+              // Fades out rather than vanishing, so the grid eases in under
+              // it; the spinner only shows if anchoring is actually slow.
+              <Animated.View
+                exiting={FadeOut.duration(COVER_FADE_MS)}
+                style={styles.gridCover}
+              >
+                <ThemedView style={styles.gridCoverFill}>
+                  {coverSpinner && (
+                    <ActivityIndicator size="large" color={AccentColor} />
+                  )}
+                </ThemedView>
+              </Animated.View>
             )}
           </View>
         </View>
@@ -502,6 +524,9 @@ export function MonthScreen() {
     </ThemedView>
   );
 }
+
+const COVER_FADE_MS = 180;
+const COVER_SPINNER_DELAY_MS = 600;
 
 const styles = StyleSheet.create({
   container: {
@@ -557,6 +582,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     left: 0,
+  },
+  gridCoverFill: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

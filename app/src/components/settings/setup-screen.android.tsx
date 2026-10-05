@@ -7,8 +7,10 @@ import {
 
 import { AppName } from '@/components/settings/app-name';
 import {
+  SettingsBlock,
   SettingsButton,
   SettingsButtonRow,
+  SettingsSection,
 } from '@/components/settings/settings-parts';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -17,7 +19,7 @@ import {
   requestCalendarAccess,
   useSourceProblem,
 } from '@/config/source.android';
-import { FontFamilyBold, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { DAVX5_DOWNLOAD, openDavx5 } from '@/store/events';
 
 /**
@@ -56,32 +58,32 @@ export function SetupScreen() {
             <AppName />
           </View>
           {noCalendars ? (
-            <View style={styles.copy}>
-              <ThemedText style={styles.heading}>
-                No calendars on this phone
-              </ThemedText>
-              <ThemedText themeColor="textSecondary">
-                hitome shows the calendars your phone syncs. To add yours:
-              </ThemedText>
-              <ThemedText themeColor="textSecondary">
-                1. Install DAVx⁵ (free on F-Droid).{'\n'}2. Add your server
-                there: its address and your login.{'\n'}3. Come back, and hitome
-                picks the calendars up.
-              </ThemedText>
-              <ThemedText themeColor="textSecondary">
-                A Google account on this phone works too.
-              </ThemedText>
-            </View>
+            <SettingsSection title="No calendars on this phone">
+              <SettingsBlock>
+                <ThemedText type="small" themeColor="textSecondary">
+                  hitome shows the calendars your phone syncs. To add yours:
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  1. Install DAVx⁵ (free on F-Droid).{'\n'}2. Add your server
+                  there: its address and your login.{'\n'}3. Come back, and
+                  hitome picks the calendars up.
+                </ThemedText>
+              </SettingsBlock>
+              <SettingsBlock>
+                <ThemedText type="small" themeColor="textSecondary">
+                  A Google account on this phone works too.
+                </ThemedText>
+              </SettingsBlock>
+            </SettingsSection>
           ) : (
-            <View style={styles.copy}>
-              <ThemedText style={styles.heading}>
-                Use your phone’s calendars
-              </ThemedText>
-              <ThemedText themeColor="textSecondary">
-                hitome shows the calendars your phone already syncs, from DAVx⁵,
-                Google or any other account.
-              </ThemedText>
-            </View>
+            <SettingsSection title="Use your phone’s calendars">
+              <SettingsBlock>
+                <ThemedText type="small" themeColor="textSecondary">
+                  hitome shows the calendars your phone already syncs, from
+                  DAVx⁵, Google or any other account.
+                </ThemedText>
+              </SettingsBlock>
+            </SettingsSection>
           )}
         </ScrollView>
         <View
@@ -146,14 +148,6 @@ const styles = StyleSheet.create({
   icon: {
     width: 72,
     height: 72,
-  },
-  copy: {
-    gap: Spacing.three,
-  },
-  heading: {
-    fontFamily: FontFamilyBold,
-    fontSize: 22,
-    lineHeight: 28,
   },
   footer: {
     flexDirection: 'row',
