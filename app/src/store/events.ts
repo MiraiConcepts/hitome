@@ -68,7 +68,17 @@ export function isAuthFailure(err: unknown): boolean {
   return err instanceof StoreUnavailableError;
 }
 
+type Store = NonNullable<typeof CalendarStore>;
+let testStore: Pick<Store, 'query' | 'insert' | 'update' | 'delete'> | null =
+  null;
+
+/** Tests only: run the operations against an in-memory store. */
+export function setStoreForTests(fake: typeof testStore): void {
+  testStore = fake;
+}
+
 function store() {
+  if (testStore) return testStore;
   if (!CalendarStore) throw new StoreUnavailableError('No calendar store');
   return CalendarStore;
 }
