@@ -6,6 +6,7 @@
 import type { EditScope } from '@/caldav/ics';
 import type { CalEvent, EventChanges, EventInput } from '@/caldav/types';
 import { ensureDefaultCalendar } from '@/config/calendar-pref';
+import { isStoreDisconnected } from '@/config/store-connection';
 
 import {
   CalendarStore,
@@ -88,6 +89,8 @@ const n = (v: StoreRow[string]) => (typeof v === 'number' ? v : Number(v));
 type StoreCalendar = CalendarChoice & { id: string; writable: boolean };
 
 async function calendars(): Promise<StoreCalendar[]> {
+  // Disconnected in Settings: no calendars, so nothing anywhere reads one.
+  if (isStoreDisconnected()) return [];
   const rows = await store().query(
     URI.calendars,
     CALENDAR_COLUMNS,

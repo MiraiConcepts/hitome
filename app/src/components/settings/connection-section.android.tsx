@@ -8,7 +8,26 @@ import {
   SettingsMessage,
   SettingsSection,
 } from '@/components/settings/settings-parts';
+import { cancelAllReminders } from '@/alarms/scheduler';
+import { recheckSource } from '@/config/source.android';
+import { setStoreDisconnected } from '@/config/store-connection';
 import { DAVX5_DOWNLOAD, openDavx5, requestSync } from '@/store/events';
+import { clearSnapshots } from '@/utils/snapshot-cache';
+import { refreshAgendaWidget } from '@/widget/app-refresh';
+
+/**
+ * Stop using the phone's calendars: nothing is read, the reminders hitome
+ * set are cancelled, its cached copy goes and the widget asks to connect
+ * again. Android keeps the permission itself (an app cannot revoke it while
+ * running); the first-run screen's Allow connects again.
+ */
+async function disconnect(): Promise<void> {
+  setStoreDisconnected(true);
+  await cancelAllReminders().catch(() => {});
+  await clearSnapshots().catch(() => {});
+  refreshAgendaWidget();
+  await recheckSource();
+}
 
 /**
  * Where the calendar comes from, on Android: the phone's own calendars, which
@@ -18,6 +37,7 @@ import { DAVX5_DOWNLOAD, openDavx5, requestSync } from '@/store/events';
  */
 export function ConnectionSection() {
   const [syncing, setSyncing] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   return (
     <SettingsSection title="Sync" testID="settings-connection">
       <SettingsBlock>
@@ -49,6 +69,28 @@ export function ConnectionSection() {
             testID="settings-open-davx5"
           />
         </SettingsButtonRow>
+      </SettingsBlock>
+      <SettingsBlock>
+        <SettingsButtonRow>
+          <SettingsButton
+            label="Disconnect"
+            variant="danger"
+            busy={disconnecting}
+            onPress={async () => {
+              setDisconnecting(true);
+              try {
+                await disconnect();
+              } finally {
+                setDisconnecting(false);
+              }
+            }}
+            testID="settings-disconnect"
+          />
+        </SettingsButtonRow>
+        <SettingsMessage>
+          Disconnect stops hitome reading your calendars and clears what it
+          keeps on this phone. Your calendars and DAVx⁵ are untouched.
+        </SettingsMessage>
       </SettingsBlock>
     </SettingsSection>
   );

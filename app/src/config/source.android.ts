@@ -5,6 +5,10 @@ import { useSyncExternalStore } from 'react';
 import { AppState, PermissionsAndroid } from 'react-native';
 
 import { clearLastConfig, clearStoredConfig } from '@/config/dav-storage';
+import {
+  isStoreDisconnected,
+  setStoreDisconnected,
+} from '@/config/store-connection';
 import { CalendarStore } from '../../modules/calendar-store';
 import { listCalendars } from '@/store/events';
 
@@ -28,6 +32,12 @@ function publish(next: SourceStatus, why: SourceProblem) {
 }
 
 async function check(): Promise<boolean> {
+  // Disconnected in Settings reads as not yet allowed: the first-run screen,
+  // whose Allow connects again (see requestCalendarAccess).
+  if (isStoreDisconnected()) {
+    publish('unconfigured', 'permission');
+    return false;
+  }
   try {
     const granted =
       (await PermissionsAndroid.check(READ)) &&
@@ -69,6 +79,7 @@ export function recheckSource(): Promise<boolean> {
 
 /** Ask for calendar access (the system prompt), then look again. */
 export async function requestCalendarAccess(): Promise<void> {
+  setStoreDisconnected(false);
   await PermissionsAndroid.requestMultiple([READ, WRITE]);
   await recheckSource();
 }
