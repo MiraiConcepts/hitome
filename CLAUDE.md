@@ -46,6 +46,13 @@ helper scripts.
   `--bun` breaks the build in ~3s at `settings.gradle`.
   (debug build under `com.miraiconcepts.hitome.dev`, coexists with the release
   app; needs the local Android SDK.)
+- Phone dev build without adb (anywhere on Tailscale): it is a plain RN
+  debug build (no expo-dev-client), so it loads from its saved bundle
+  location, default `localhost:8081` (= adb reverse). Point it at the Mac
+  once with `tooling/dev-phone/point-at-mac.sh` (needs adb that once; again
+  after a reinstall) or on the phone via Dev menu → Change Bundle Location
+  → `<mac tailscale ip>:8081`; run Metro with `bun run start:tailscale`. The
+  Mac firewall must allow incoming for node (it does as of 2026-10-05).
 - Checks from `app/`: `bun run typecheck`, `bun run lint`, `bun run
   format:check`.
 - Tests: local jest is broken under bun's runtime — run `bun test <files>`

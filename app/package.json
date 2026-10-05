@@ -54,6 +54,7 @@
   },
   "scripts": {
     "start": "expo start",
+    "start:tailscale": "REACT_NATIVE_PACKAGER_HOSTNAME=$(tailscale ip -4 2>/dev/null || /Applications/Tailscale.app/Contents/MacOS/Tailscale ip -4) expo start --port 8081",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "android:dev": "APP_VARIANT=development expo run:android",
