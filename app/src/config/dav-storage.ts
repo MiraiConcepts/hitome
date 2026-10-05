@@ -15,9 +15,6 @@ const KEY = 'dav-config';
  *  signing out and back in again does not mean retyping it. */
 const LAST_KEY = 'dav-config-last';
 
-/** True where a typed-in server address is the way in (i.e. not web). */
-export const CONFIGURABLE = true;
-
 export function readStoredConfig(): Promise<DavConfig | null> {
   return readItem(KEY);
 }

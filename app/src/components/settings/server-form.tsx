@@ -1,17 +1,11 @@
 import { useState } from 'react';
 import { StyleSheet, View, type TextInputProps } from 'react-native';
 
-import { Brand } from '@/components/brand';
-import { cancelAllReminders } from '@/alarms/scheduler';
 import { probeConnection } from '@/caldav/client';
 import { FieldStack } from '@/components/fields/field-stack';
 import { TextField } from '@/components/fields/text-field';
-import { LockIcon, LogoutIcon, ServerIcon, UserIcon } from '@/components/icons';
+import { LockIcon, ServerIcon, UserIcon } from '@/components/icons';
 import {
-  SettingsButton,
-  SettingsBlock,
-  SettingsButtonRow,
-  SettingsMessage,
   SettingsOutcomeLine,
   type SettingsOutcome,
 } from '@/components/settings/settings-parts';
@@ -21,22 +15,17 @@ import {
   normalizeDavUrl,
 } from '@/config/dav-config';
 import {
-  clearDavConfig,
-  eraseDavConfig,
   getLastDavConfig,
   saveDavConfig,
   useDavConfig,
 } from '@/config/dav-store';
 import { Spacing } from '@/constants/theme';
-import { refreshAgendaWidget } from '@/widget/app-refresh';
 
 /**
- * State and actions for the CalDAV connection form, shared by the first-run
- * setup screen and the Server section of settings. The two lay the same
- * fields out differently — setup pins its Connect button to the corner of the
- * screen, settings keeps Save and Disconnect under the fields — so the form is
- * split into this hook, the fields (ConnectionFields), and each screen's own
- * buttons.
+ * State and actions for the CalDAV connection form on the web's first-run
+ * setup screen (Android has no login form since v0.5: it uses the phone's
+ * calendars). Split into this hook and the fields (ConnectionFields), with
+ * the screen's own Connect button.
  *
  * Save connects before it stores: discovery has to complete, the login has to
  * be accepted, and the account has to actually have a calendar. A configuration
@@ -99,36 +88,6 @@ export function useServerForm(onSaved?: () => void) {
     }
   }
 
-  /** What both ways out share: nothing from this account should ring or
-   *  sit on the home screen afterwards. */
-  async function leaveAccount() {
-    await cancelAllReminders().catch(() => {});
-    refreshAgendaWidget();
-  }
-
-  async function disconnect() {
-    setBusy(true);
-    try {
-      // The fields keep their values: the store remembers this connection to
-      // prefill the setup screen, which replaces this one once it is cleared.
-      await clearDavConfig();
-      await leaveAccount();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /** Disconnect and forget: no remembered login, nothing cached. */
-  async function signOutAndErase() {
-    setBusy(true);
-    try {
-      await eraseDavConfig();
-      await leaveAccount();
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return {
     config,
     url,
@@ -140,8 +99,6 @@ export function useServerForm(onSaved?: () => void) {
     outcome,
     busy,
     save,
-    disconnect,
-    signOutAndErase,
   };
 }
 
@@ -205,59 +162,6 @@ export function ConnectionFields({
 
       <SettingsOutcomeLine outcome={form.outcome} testID="settings-problem" />
     </View>
-  );
-}
-
-/** The settings arrangement, as two card rows: the fields with Disconnect
- *  and Save under them (Save last, at the right), then the erase row. */
-export function ServerForm() {
-  const form = useServerForm();
-  return (
-    <>
-      <SettingsBlock>
-        <ConnectionFields form={form} />
-        <SettingsButtonRow>
-          {form.config && (
-            <SettingsButton
-              label="Disconnect"
-              variant="danger"
-              disabled={form.busy}
-              onPress={form.disconnect}
-              testID="settings-disconnect"
-            />
-          )}
-          <SettingsButton
-            label="Save"
-            variant="filled"
-            busy={form.busy}
-            onPress={form.save}
-            testID="settings-save"
-          />
-        </SettingsButtonRow>
-      </SettingsBlock>
-      {form.config && <EraseRow form={form} />}
-    </>
-  );
-}
-
-/** The way out that keeps nothing — its own row, away from Save. */
-function EraseRow({ form }: { form: ServerFormState }) {
-  return (
-    <SettingsBlock>
-      <SettingsMessage icon={LogoutIcon}>
-        Disconnect remembers your login for next time. Sign out and erase
-        removes it and everything <Brand size={12} /> keeps on this phone.
-      </SettingsMessage>
-      <SettingsButtonRow>
-        <SettingsButton
-          label="Sign out and erase"
-          variant="danger"
-          disabled={form.busy}
-          onPress={form.signOutAndErase}
-          testID="settings-erase"
-        />
-      </SettingsButtonRow>
-    </SettingsBlock>
   );
 }
 

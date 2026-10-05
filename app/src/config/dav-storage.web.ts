@@ -8,9 +8,6 @@
 // Native twin: dav-storage.ts (typed-in address + login in the OS keystore).
 import type { DavConfig } from './dav-config';
 
-/** No typed-in address on web — the page's own origin is the answer. */
-export const CONFIGURABLE = false;
-
 export async function readStoredConfig(): Promise<DavConfig | null> {
   // Static-export prerender runs this in Node with no window; the client picks
   // the real origin up on hydration.

@@ -5,10 +5,8 @@ import { clearSnapshots } from '@/utils/snapshot-cache';
 import type { DavConfig, DavStatus } from './dav-config';
 import {
   clearLastConfig,
-  clearStoredConfig,
   readLastConfig,
   readStoredConfig,
-  writeLastConfig,
   writeStoredConfig,
 } from './dav-storage';
 
@@ -111,34 +109,6 @@ export async function saveDavConfig(next: DavConfig): Promise<void> {
     last = null;
   }
   publish(next);
-}
-
-/**
- * Disconnect. The calendar cache goes, but the address and login are kept
- * (in the same keystore, under their own key) to prefill the setup screen —
- * signing out to try something and back in should not mean retyping them.
- */
-export async function clearDavConfig(): Promise<void> {
-  if (config) {
-    await writeLastConfig(config);
-    last = config;
-  }
-  await clearStoredConfig();
-  await clearSnapshots();
-  publish(null);
-}
-
-/**
- * Sign out and erase: the connection, the remembered copy of it, and every
- * cached calendar, preference and widget snapshot on this device. What is
- * left is a fresh install's state.
- */
-export async function eraseDavConfig(): Promise<void> {
-  await clearStoredConfig();
-  await clearLastConfig();
-  last = null;
-  await clearSnapshots();
-  publish(null);
 }
 
 /**

@@ -28,7 +28,6 @@ import {
   FlagOutlineBody,
   EyeOutlineBody,
   EyeOffOutlineBody,
-  LogoutOutlineBody,
   GithubOutlineBody,
   FileTextOutlineBody,
   BugOutlineBody,
@@ -133,10 +132,6 @@ export function EyeIcon({ size = 24, color }: IconProps) {
 
 export function EyeOffIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(EyeOffOutlineBody, size, color)} />;
-}
-
-export function LogoutIcon({ size = 24, color }: IconProps) {
-  return <SvgXml xml={svg(LogoutOutlineBody, size, color)} />;
 }
 
 export function GithubIcon({ size = 24, color }: IconProps) {
