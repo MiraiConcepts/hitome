@@ -37,10 +37,11 @@ export function SetupScreen() {
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
+    let stay = false;
     try {
-      await action();
+      stay = (await action()) === 'stay-busy';
     } finally {
-      setBusy(false);
+      if (!stay) setBusy(false);
     }
   }
 
@@ -116,11 +117,15 @@ export function SetupScreen() {
               busy={busy}
               onPress={() =>
                 run(async () => {
-                  if (asked) await Linking.openSettings();
-                  else {
-                    await requestCalendarAccess();
-                    setAsked(true);
+                  if (asked) {
+                    await Linking.openSettings();
+                    return;
                   }
+                  // Granted: the spinner keeps going while this screen holds
+                  // over the calendar drawing beneath it, then fades. Only a
+                  // refusal changes the button (to Open settings).
+                  if (await requestCalendarAccess()) return 'stay-busy';
+                  setAsked(true);
                 })
               }
               testID="setup-allow"

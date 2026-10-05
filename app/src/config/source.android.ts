@@ -77,11 +77,12 @@ export function recheckSource(): Promise<boolean> {
   return checking;
 }
 
-/** Ask for calendar access (the system prompt), then look again. */
-export async function requestCalendarAccess(): Promise<void> {
+/** Ask for calendar access (the system prompt), then look again; true when
+ *  hitome can now read a calendar. */
+export async function requestCalendarAccess(): Promise<boolean> {
   setStoreDisconnected(false);
   await PermissionsAndroid.requestMultiple([READ, WRITE]);
-  await recheckSource();
+  return recheckSource();
 }
 
 export function getSourceStatus(): SourceStatus {
