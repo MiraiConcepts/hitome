@@ -15,6 +15,8 @@ TS_IP=$(tailscale ip -4 2>/dev/null || /Applications/Tailscale.app/Contents/MacO
 HOST="${TS_IP}:8081"
 
 adb shell am force-stop "$PKG"
+# A fresh install has no shared_prefs yet.
+adb shell "run-as $PKG mkdir -p shared_prefs"
 adb shell "run-as $PKG sh -c 'cat > shared_prefs/${PKG}_preferences.xml'" <<XML
 <?xml version='1.0' encoding='utf-8' standalone='yes' ?>
 <map>
