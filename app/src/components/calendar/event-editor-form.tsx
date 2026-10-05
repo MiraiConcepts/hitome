@@ -78,7 +78,7 @@ function whenLabel(editor: EventEditorController): string {
   const end = sameDay
     ? formatTime(editor.endTime)
     : `${dayLabel(editor.endDay)} ${formatTime(editor.endTime)}`;
-  return `${mode} · ${formatTime(editor.startTime)} to ${end}`;
+  return `${mode} · ${formatTime(editor.startTime)} → ${end}`;
 }
 
 /**

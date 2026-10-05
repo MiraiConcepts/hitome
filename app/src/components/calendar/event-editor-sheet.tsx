@@ -206,12 +206,21 @@ export function EventEditorSheet({
   // After the keyboard closes the library can leave the sheet a hair off its
   // resting point, and it only lets the form scroll at rest: a new event
   // (title focused, keyboard up, then closed) would not scroll at all.
-  // Settling it again on every keyboard close puts it back.
+  // Settling it again on every keyboard close puts it back — after a beat,
+  // because a drag can be what closed the keyboard: settled mid-drag, the
+  // drag's end left the sheet halfway down with the title under the header.
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const sub = Keyboard.addListener('keyboardDidHide', () => {
-      if (!dismissing.current) sheetRef.current?.snapToIndex(0);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!dismissing.current) sheetRef.current?.snapToIndex(0);
+      }, RESETTLE_DELAY_MS);
     });
-    return () => sub.remove();
+    return () => {
+      if (timer) clearTimeout(timer);
+      sub.remove();
+    };
   }, []);
 
   return (
@@ -291,6 +300,9 @@ export function EventEditorSheet({
     </BottomSheetModal>
   );
 }
+
+/** Past the end of a drag that closed the keyboard. */
+const RESETTLE_DELAY_MS = 400;
 
 const styles = StyleSheet.create({
   handle: {
