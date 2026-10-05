@@ -32,3 +32,55 @@ jobs:
 
       - name: Test
         run: bun run test -- --ci
+
+  # The web app end to end (tooling/e2e): Metro serving the web build on :8082,
+  # a throwaway Radicale behind its own Caddy, Playwright in Docker. The same
+  # run.sh used locally; the real calendar is never touched.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # Metro runs under real node (see CLAUDE.md: bun breaks its watcher).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: app
+        run: bun install --frozen-lockfile
+
+      - name: Start the web dev server
+        working-directory: app
+        env:
+          CI: '1'
+        run: |
+          nohup bun run web:proxy > metro.log 2>&1 &
+          for i in $(seq 1 90); do
+            curl -sf -o /dev/null http://localhost:8082 && exit 0
+            sleep 2
+          done
+          cat metro.log
+          exit 1
+
+      - name: Run e2e
+        working-directory: tooling/e2e
+        run: ./run.sh
+
+      - name: Metro log on failure
+        if: failure()
+        run: tail -100 app/metro.log
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-results
+          path: |
+            tooling/e2e/test-results
+            tooling/e2e/artifacts
+          retention-days: 7
