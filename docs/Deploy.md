@@ -103,15 +103,13 @@ even the URL.
   (base64 of `user:app-password`); Caddy attaches it upstream on `/dav/*`.
 - Rotating the password = update Radicale + the `.env` value → restart caddy.
   No image rebuild, no client changes.
-- The Android app asks for its server on first run and keeps the address and
-  login in the device keystore (`expo-secure-store`) — nothing is baked into the
-  APK any more, so a URL or port change no longer needs a release. Pointed at
-  this same origin (`https://<host>:<port>/dav/`) it should be left with **no**
-  login, so the proxy's injected Authorization is what reaches Radicale; pointed
-  straight at Radicale it takes the Radicale login instead. The setup screen
-  connects before it saves, so either way you find out on the spot.
+- The Android app does not talk to this server itself (since v0.5): it uses
+  the phone's calendars, which DAVx⁵ syncs. Add the server in DAVx⁵ with the
+  Radicale address and login (straight to Radicale, not through this proxy's
+  `/dav/`, which injects a login of its own). hitome holds no address or
+  login, so nothing about this deploy reaches the APK.
 - A deployer following this document gets the same shape: their web app needs no
-  configuration, and their phone needs the address typed once.
+  configuration, and their phone needs DAVx⁵ set up once.
 
 ## 4. Verify after deploy
 

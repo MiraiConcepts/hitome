@@ -25,9 +25,9 @@ its reminders on the device itself.
   because this calendar is written to by other clients as well.
 - Writes carry the object's etag, so an event that changed underneath is
   refused rather than overwritten.
-- Deletion removes the whole object, and undo re-writes the original bytes
-  under the original identifier, back into the calendar they came from rather
-  than the default one.
+- A repeating event is edited or deleted for this occurrence, this and the
+  following ones, or all of them; the series' exceptions move with it. Undo
+  puts back exactly what was there, into the calendar it came from.
 - Reminders are scheduled as one alarm per concrete occurrence inside a rolling
   two-week horizon, because the platform has no recurring trigger. Every open
   re-derives the whole set and reschedules it, since a force-stop can wipe the
@@ -39,12 +39,14 @@ its reminders on the device itself.
 - Location autocomplete is the only third-party call, and it fails silently:
   debounced, cached, and abandoned for the session after three consecutive
   failures, leaving an ordinary text field behind.
+- On Android it works on the phone's own calendars, which DAVx⁵ (or Google, or
+  any sync app) keeps in step with the server. Edits made offline are kept and
+  sent when the phone is back online, and Refresh asks the sync app to sync now.
 - No credentials are ever built in. On the web the app is served from the same
   origin as the calendar server and the host proxy injects the authorization,
-  so no browser holds a password at all. On Android the server address and
-  login are asked for on first run and kept in the device keystore — so no
-  bundle, image or CI secret holds either, and pointing it at a new server is
-  something you do on the phone rather than in a release.
+  so no browser holds a password at all. On Android hitome holds no address or
+  login of its own: the sync app does, so no bundle, image or CI secret holds
+  either, and pointing it at a new server is done in DAVx⁵.
 - Web and Android ship from one tag. The same commit produces the container
   image and the signed APK, so the two halves cannot report different versions.
   Android is delivered as a release artifact tracked by an updater rather than

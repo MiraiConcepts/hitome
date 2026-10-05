@@ -33,17 +33,19 @@
     the same key — so the local backup in `~/.hitome-keys/` matters more, not
     less. The CalDAV invariant is untouched: **no server credentials in CI, the
     repo, images or bundles**, ever.
-- **No baked server URL** (since v0.4): the app asks on first run and keeps the
-  address and login in the device keystore, so a URL or port change no longer
-  needs a release. Builds don't prefill the address either: a fresh install
-  starts with an empty form.
+- **No server URL or login in the app at all** (since v0.5): Android hitome
+  reads and writes the phone's calendar store, which DAVx⁵ (or another sync
+  app) keeps in step with the server. DAVx⁵ holds the address and login, so a
+  URL, port or password change never needs a release. First run asks only for
+  calendar access. (v0.4 kept a typed address and login in the keystore; v0.5
+  erases that on first launch.)
 - **Signing keystore**: `~/.hitome-keys/` (`release.keystore` + `keystore.properties`),
   NEVER in git. ⚠️ **Back it up** — Android only installs updates signed by the same
   key; losing it means uninstall/reinstall + Obtainium re-add.
-- APKs contain **no credentials and no server URL**. What the device holds, the
-  person typed; it lives in the OS keystore (`expo-secure-store`). Web is
-  unchanged — it derives `/dav/` from its own origin and the host Caddy injects
-  Authorization (`docs/Deploy.md`).
+- APKs contain **no credentials and no server URL**, and hitome on Android
+  holds none either: the login is DAVx⁵'s. Web is unchanged: it derives
+  `/dav/` from its own origin and the host Caddy injects Authorization
+  (`docs/Deploy.md`).
 
 ## Cutting a release
 
