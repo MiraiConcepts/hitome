@@ -272,10 +272,13 @@ export function EventEditorSheet({
       handleStyle={styles.handle}
       handleIndicatorStyle={styles.handleIndicator}
     >
+      {/* Above the scroll view, not pinned inside it: a sticky header in a
+          sheet that also moves for the keyboard could slide off its place,
+          leaving a gap above it and the first field tucked under it. */}
+      <EventEditorHeader editor={editor} />
       <BottomSheetScrollView
         ref={scrollRef}
         testID="event-editor"
-        stickyHeaderIndices={[0]}
         keyboardShouldPersistTaps="handled"
         // Pads the content by the footer's live height (gesture-bar inset
         // and any error line included), so the last field scrolls clear of
@@ -283,7 +286,6 @@ export function EventEditorSheet({
         // library pads by its unset sentinel and the content collapses.
         enableFooterMarginAdjustment={Platform.OS !== 'web'}
       >
-        <EventEditorHeader editor={editor} />
         <EventEditorFields
           editor={editor}
           TextInputComponent={SheetTextInput}
