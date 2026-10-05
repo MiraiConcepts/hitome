@@ -203,6 +203,17 @@ export function EventEditorSheet({
     return () => sub.remove();
   }, []);
 
+  // After the keyboard closes the library can leave the sheet a hair off its
+  // resting point, and it only lets the form scroll at rest: a new event
+  // (title focused, keyboard up, then closed) would not scroll at all.
+  // Settling it again on every keyboard close puts it back.
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidHide', () => {
+      if (!dismissing.current) sheetRef.current?.snapToIndex(0);
+    });
+    return () => sub.remove();
+  }, []);
+
   return (
     <BottomSheetModal
       ref={sheetRef}

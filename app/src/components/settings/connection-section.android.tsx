@@ -5,10 +5,10 @@ import {
   SettingsBlock,
   SettingsButton,
   SettingsButtonRow,
-  SettingsMessage,
   SettingsSection,
 } from '@/components/settings/settings-parts';
 import { cancelAllReminders } from '@/alarms/scheduler';
+import { ThemedText } from '@/components/themed-text';
 import { recheckSource } from '@/config/source.android';
 import { setStoreDisconnected } from '@/config/store-connection';
 import { DAVX5_DOWNLOAD, openDavx5, requestSync } from '@/store/events';
@@ -41,11 +41,11 @@ export function ConnectionSection() {
   return (
     <SettingsSection title="Sync" testID="settings-connection">
       <SettingsBlock>
-        <SettingsMessage>
+        <ThemedText type="small" themeColor="textSecondary">
           hitome uses the calendars synced to this phone. DAVx⁵ keeps them in
           step with your server. Changes made offline go up when you’re back
           online.
-        </SettingsMessage>
+        </ThemedText>
         <SettingsButtonRow>
           <SettingsButton
             label="Sync now"

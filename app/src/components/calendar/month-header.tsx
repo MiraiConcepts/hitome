@@ -3,10 +3,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
-  runOnUI,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -89,9 +87,6 @@ const LABEL_FADE_IN_MS = 160;
 /** How far the label drifts while fading (px). */
 const LABEL_SHIFT_PX = 10;
 
-/** One full refresh-icon revolution. */
-const SPIN_MS = 800;
-
 /** The freshness line when the server cannot be reached. Fixed rather than a
  *  palette token because the palette has no danger colour and this is the only
  *  place that wants one; light enough to carry on the header's black ground. */
@@ -158,51 +153,11 @@ export function MonthHeader({
     transform: [{ translateY: labelShift.value }],
   }));
 
-  // Refresh-icon spin while a fetch is in flight — clockwise, the way the
-  // glyph's arrow points.
-  const spin = useSharedValue(0);
-  useEffect(() => {
-    if (refreshing) {
-      spin.value = 0;
-      spin.value = withRepeat(
-        withTiming(360, { duration: SPIN_MS, easing: Easing.linear }),
-        -1
-      );
-      return;
-    }
-    // Landing, not cancelling: a fetch that answers mid-turn carries the glyph
-    // on to the top of the turn it is in, at the same speed, so the icon never
-    // stops askew. Run on the UI thread, where the live angle actually lives.
-    runOnUI(() => {
-      'worklet';
-      const from = spin.value % 360;
-      if (from === 0) return;
-      // Assigning a plain value stops the repeat; the timing below then covers
-      // only what is left of this revolution.
-      spin.value = from;
-      spin.value = withTiming(
-        360,
-        {
-          duration: SPIN_MS * ((360 - from) / 360),
-          easing: Easing.linear,
-        },
-        (finished) => {
-          // 0 and 360 are the same picture, so this is invisible — it just
-          // leaves the next spin starting from a known angle.
-          if (finished) spin.value = 0;
-        }
-      );
-    })();
-  }, [refreshing, spin]);
-
-  const spinStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${spin.value}deg` }],
-  }));
-
   return (
     <View style={styles.header}>
-      {/* The first fetch's progress, along the very top of the screen. */}
-      <LoadingBar visible={loading} />
+      {/* Progress along the very top of the screen: the first fetch, and a
+          refresh asked for with the button (the icon itself stays still). */}
+      <LoadingBar visible={loading || refreshing} />
       <View style={styles.labelColumn}>
         <View style={styles.labelWrap}>
           <Pressable
@@ -266,9 +221,7 @@ export function MonthHeader({
           accessibilityRole="button"
           accessibilityLabel="Refresh"
         >
-          <Animated.View style={spinStyle}>
-            <RefreshIcon size={Bar.iconSize} color={AccentColor} />
-          </Animated.View>
+          <RefreshIcon size={Bar.iconSize} color={AccentColor} />
         </Pressable>
         <Pressable
           testID="calendar-settings"

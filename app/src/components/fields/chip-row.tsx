@@ -172,8 +172,10 @@ const styles = StyleSheet.create({
     flexWrap: 'nowrap',
     gap: Spacing.one,
   },
+  // Tight enough that the repeat presets (None → Yearly) fit a phone's
+  // width without the last one cut off at the edge.
   chipCompact: {
-    paddingHorizontal: Spacing.two,
+    paddingHorizontal: Spacing.one + Spacing.half,
   },
   chipAccent: {
     borderColor: AccentColor,

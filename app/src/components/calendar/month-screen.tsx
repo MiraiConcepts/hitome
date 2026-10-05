@@ -307,7 +307,12 @@ export function MonthScreen() {
     // Android: ask DAVx⁵ to sync now (what lands then redraws the grid by
     // itself); web: nothing to ask. Either way, read what is there now.
     requestSync().catch(() => {});
-    refresh().finally(() => setManualRefreshing(false));
+    // Held for a beat at least: reading the phone's own store takes a few
+    // milliseconds, and a bar that only flashes reads as nothing happening.
+    Promise.all([
+      refresh(),
+      new Promise((resolve) => setTimeout(resolve, MIN_REFRESH_BAR_MS)),
+    ]).finally(() => setManualRefreshing(false));
   }
 
   function onEditorDone(result: EditorResult) {
@@ -523,6 +528,7 @@ export function MonthScreen() {
 }
 
 const COVER_SPINNER_DELAY_MS = 600;
+const MIN_REFRESH_BAR_MS = 900;
 
 const styles = StyleSheet.create({
   container: {
