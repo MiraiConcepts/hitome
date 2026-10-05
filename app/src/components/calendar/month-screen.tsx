@@ -60,6 +60,9 @@ type Snack = {
  *  the more precise question anyway. */
 type PendingEvent = { id: string; day: string; since: Date | null } | null;
 
+/** Deep links already acted on, kept across rebuilds of the screen. */
+const actedOn = new Set<string>();
+
 /** How long to wait for a fetch before treating a widget-tapped event as gone.
  *  Off the tailnet nothing will ever land, and hanging on an unresolved tap is
  *  worse than showing the day. */
@@ -83,8 +86,18 @@ export function MonthScreen() {
   // `?new=` (a nonce so repeat taps re-fire) opens the new-event editor.
   const link = useDeepLink();
   const dayParam = link.day && parseDay(link.day) ? link.day : null;
-  const eventParam = link.event;
-  const newParam = link.new;
+  // A link opens its event (or the new-event editor) once. The screen is
+  // rebuilt without the app relaunching (a new week start keys it), and a
+  // rebuild that re-read the last link reopened a widget-tapped event behind
+  // Settings, where the next Back closed it instead of leaving Settings.
+  const eventParam =
+    link.event && !actedOn.has(`event:${link.event}`) ? link.event : null;
+  const newParam =
+    link.new && !actedOn.has(`new:${link.new}`) ? link.new : null;
+  useEffect(() => {
+    if (link.event) actedOn.add(`event:${link.event}`);
+    if (link.new) actedOn.add(`new:${link.new}`);
+  }, [link.event, link.new]);
 
   const bottomInset = Platform.select({
     web: Spacing.four,
