@@ -6,7 +6,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import Head from 'expo-router/head';
 import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeOut } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { BootScreen } from '@/components/boot-screen';
@@ -83,21 +83,25 @@ export default function RootLayout() {
               {/* Nothing in this app works without a server, so setup is a gate
                   rather than a route — a deep link into the calendar has
                   nothing to show either. */}
-              {davStatus === 'unconfigured' ? (
-                <SetupScreen />
-              ) : (
+              {/* The calendar mounts underneath while the setup screen,
+                  layered on top, dissolves away (its exit animation keeps it
+                  painted while it fades) — so after Allow the grid draws
+                  itself out of sight, instead of the screen cutting to a
+                  half-built calendar. */}
+              {davStatus !== 'unconfigured' && (
                 /* A stack, not a Slot: settings is a pushed screen, so
                    Android's back press and the browser's back button both pop
-                   it for free. No headers — every screen draws its own bar (the
+                   it for free. No headers: every screen draws its own bar (the
                    month view's is part of the calendar's chrome, not navigation
                    furniture). */
-                // Faded in, so leaving the setup screen (Allow tapped) or the
-                // boot spinner is a dissolve, not a hard cut.
+                <Stack screenOptions={{ headerShown: false }} />
+              )}
+              {davStatus === 'unconfigured' && (
                 <Animated.View
-                  entering={FadeIn.duration(220)}
-                  style={styles.root}
+                  exiting={FadeOut.duration(SETUP_FADE_MS)}
+                  style={StyleSheet.absoluteFill}
                 >
-                  <Stack screenOptions={{ headerShown: false }} />
+                  <SetupScreen />
                 </Animated.View>
               )}
             </DeepLinkProvider>
@@ -109,6 +113,9 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+/** Long enough for the grid to anchor underneath before it shows. */
+const SETUP_FADE_MS = 450;
 
 const styles = StyleSheet.create({
   root: {

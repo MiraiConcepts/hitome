@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import Animated, { FadeOut } from 'react-native-reanimated';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -466,18 +465,12 @@ export function MonthScreen() {
               />
             )}
             {(!gridAnchored || !gridSize) && (
-              // Fades out rather than vanishing, so the grid eases in under
-              // it; the spinner only shows if anchoring is actually slow.
-              <Animated.View
-                exiting={FadeOut.duration(COVER_FADE_MS)}
-                style={styles.gridCover}
-              >
-                <ThemedView style={styles.gridCoverFill}>
-                  {coverSpinner && (
-                    <ActivityIndicator size="large" color={AccentColor} />
-                  )}
-                </ThemedView>
-              </Animated.View>
+              // The spinner only shows if anchoring is actually slow.
+              <ThemedView style={styles.gridCover}>
+                {coverSpinner && (
+                  <ActivityIndicator size="large" color={AccentColor} />
+                )}
+              </ThemedView>
             )}
           </View>
         </View>
@@ -525,7 +518,6 @@ export function MonthScreen() {
   );
 }
 
-const COVER_FADE_MS = 180;
 const COVER_SPINNER_DELAY_MS = 600;
 
 const styles = StyleSheet.create({
@@ -582,9 +574,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     left: 0,
-  },
-  gridCoverFill: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
