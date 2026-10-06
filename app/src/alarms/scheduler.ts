@@ -223,21 +223,24 @@ export async function answerReminder(
 
 /**
  * Reminder taps and buttons while the app is running, and the tap that cold-
- * started it. The cold-start response is cleared once answered, or every
- * later launch would reopen the same event. Returns an unsubscribe.
+ * started it. Every response is cleared once answered, or a later mount
+ * would answer it again. Returns an unsubscribe.
  */
 export function onAlarmTap(
   open: (target: { day: string; event?: string }) => void
 ): () => void {
-  const deliver = (response: Notifications.NotificationResponse | null) => {
-    if (!response) return;
+  // The library keeps the last response for the process, live ones
+  // included, so each is cleared once answered: left behind, the next mount
+  // of this screen (a widget tap reopening it) answered it again, and a
+  // Snooze pressed minutes earlier snoozed once more from that moment.
+  const deliver = (response: Notifications.NotificationResponse) => {
+    Notifications.clearLastNotificationResponse();
     answerReminder(response, open).catch(() => {});
   };
   const sub = Notifications.addNotificationResponseReceivedListener(deliver);
   const last = Notifications.getLastNotificationResponse();
-  if (last) {
-    deliver(last);
-    Notifications.clearLastNotificationResponse();
-  }
+  // Snooze never opens the app: the background task has answered it.
+  if (last && last.actionIdentifier !== SNOOZE_ACTION) deliver(last);
+  else if (last) Notifications.clearLastNotificationResponse();
   return () => sub.remove();
 }
