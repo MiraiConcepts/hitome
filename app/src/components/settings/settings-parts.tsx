@@ -424,8 +424,9 @@ type ButtonProps = {
   label: string;
   onPress: () => void;
   disabled?: boolean;
-  /** 'filled' is the section's primary action; 'danger' is destructive. */
-  variant?: 'text' | 'filled' | 'danger';
+  /** 'filled' is the section's primary action; 'danger' is destructive, and
+   *  'filledDanger' is a destructive one that is the primary action. */
+  variant?: 'text' | 'filled' | 'danger' | 'filledDanger';
   /** The action is running: a spinner replaces the label, the button keeps
    *  its size, and presses are ignored until it finishes. */
   busy?: boolean;
@@ -446,7 +447,7 @@ export function SettingsButton({
   testID,
 }: ButtonProps) {
   const theme = useTheme();
-  const filled = variant === 'filled';
+  const filled = variant === 'filled' || variant === 'filledDanger';
   const fill = useSharedValue(1);
   const started = cooldown?.started;
   const ms = cooldown?.ms ?? 0;
@@ -480,6 +481,7 @@ export function SettingsButton({
       hitSlop={8}
       style={({ pressed }) => [
         filled ? styles.filledButton : styles.textButton,
+        variant === 'filledDanger' && styles.filledDangerButton,
         variant === 'text' && styles.outlinedButton,
         filled && cooling && styles.filledButtonCooling,
         pressed &&
@@ -668,6 +670,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: AccentColor,
     paddingHorizontal: Spacing.four - Spacing.half,
+  },
+  filledDangerButton: {
+    backgroundColor: DangerColor,
   },
   filledButtonPressed: {
     opacity: 0.85,

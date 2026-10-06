@@ -1,4 +1,4 @@
-import type { ComponentType, Ref } from 'react';
+import { useState, type ComponentType, type Ref } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { AlarmField } from '@/components/calendar/alarm-field';
@@ -8,6 +8,7 @@ import { HEADER_GROUND } from '@/components/calendar/month-header';
 import { RecurrenceField } from '@/components/calendar/recurrence-field';
 import type { EventEditorController } from '@/components/calendar/use-event-editor';
 import type { EditScope } from '@/data/events';
+import { ChipRow } from '@/components/fields/chip-row';
 import { DateField } from '@/components/fields/date-field';
 import { FieldStack } from '@/components/fields/field-stack';
 import { TextField } from '@/components/fields/text-field';
@@ -27,7 +28,12 @@ import {
   SettingsToggle,
 } from '@/components/settings/settings-parts';
 import { ThemedText } from '@/components/themed-text';
-import { AccentColor, FontFamilyBold, Spacing } from '@/constants/theme';
+import {
+  AccentColor,
+  DangerColor,
+  FontFamilyBold,
+  Spacing,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, formatTime, parseDay, timeSpan } from '@/utils/date';
 
@@ -384,10 +390,21 @@ export function EventEditorActions({
   );
 }
 
+/** The occurrences a scope reaches, as five in a row with the one being
+ *  edited in the middle: earlier ones, this one, later ones. */
+const SCOPE_REACH: Record<EditScope, readonly boolean[]> = {
+  this: [false, false, true, false, false],
+  following: [false, false, true, true, true],
+  all: [true, true, true, true, true],
+};
+
 /**
  * "Which occurrences?" for a repeating event's Save or Delete, in place of
  * the action row — the question and its answers where the button was just
- * pressed, rather than a dialog over the form.
+ * pressed, rather than a dialog over the form. Pick, then confirm: the
+ * choice is a chip row like the form's others, a strip of squares shows
+ * which occurrences it reaches, and the one action keeps the Cancel/Save
+ * row's shape, so a stray tap on an answer never deletes anything.
  */
 function ScopeChoice({
   ask,
@@ -398,42 +415,68 @@ function ScopeChoice({
   onChoose: (scope: EditScope) => void;
   onCancel: () => void;
 }) {
-  const variant = ask.action === 'delete' ? 'danger' : 'text';
+  const theme = useTheme();
+  const deleting = ask.action === 'delete';
+  // The narrowest reach on offer, so the default is the least that can go.
+  const [scope, setScope] = useState<EditScope>(
+    ask.allowThis ? 'this' : 'following'
+  );
+  const tint = deleting ? DangerColor : AccentColor;
+  const options = [
+    ...(ask.allowThis ? [{ value: 'this' as const, label: 'This event' }] : []),
+    { value: 'following' as const, label: 'This and following' },
+    { value: 'all' as const, label: 'All events' },
+  ].map((option) => ({ ...option, color: tint, noMark: true }));
   return (
     <View style={styles.scope}>
       <SettingsMessage icon={RepeatIcon}>
-        {ask.action === 'delete'
+        {deleting
           ? 'This is a repeating event. Delete:'
           : 'This is a repeating event. Save the changes to:'}
       </SettingsMessage>
-      <View style={styles.scopeOptions}>
-        {ask.allowThis && (
+      <ChipRow
+        options={options}
+        value={scope}
+        onChange={setScope}
+        testID="editor-scope"
+      />
+      <View style={styles.actionRow}>
+        <View
+          style={styles.scopeReach}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {SCOPE_REACH[scope].map((reached, i) => (
+            <View
+              key={i}
+              style={[
+                styles.scopeMark,
+                reached
+                  ? { backgroundColor: tint, borderColor: tint }
+                  : { borderColor: theme.textSecondary },
+              ]}
+            />
+          ))}
+          <ThemedText
+            type="small"
+            style={[styles.scopeMore, { color: theme.textSecondary }]}
+          >
+            …
+          </ThemedText>
+        </View>
+        <View style={styles.actionsRight}>
           <SettingsButton
-            label="This event"
-            variant={variant}
-            onPress={() => onChoose('this')}
-            testID="editor-scope-this"
+            label="Back"
+            onPress={onCancel}
+            testID="editor-scope-cancel"
           />
-        )}
-        <SettingsButton
-          label="This and following"
-          variant={variant}
-          onPress={() => onChoose('following')}
-          testID="editor-scope-following"
-        />
-        <SettingsButton
-          label="All events"
-          variant={variant}
-          onPress={() => onChoose('all')}
-          testID="editor-scope-all"
-        />
-      </View>
-      <View style={styles.actionsRight}>
-        <SettingsButton
-          label="Back"
-          onPress={onCancel}
-          testID="editor-scope-cancel"
-        />
+          <SettingsButton
+            label={deleting ? 'Delete' : 'Save'}
+            variant={deleting ? 'filledDanger' : 'filled'}
+            onPress={() => onChoose(scope)}
+            testID="editor-scope-confirm"
+          />
+        </View>
       </View>
     </View>
   );
@@ -515,10 +558,19 @@ const styles = StyleSheet.create({
   scope: {
     gap: Spacing.two,
   },
-  scopeOptions: {
+  scopeReach: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  scopeMark: {
+    width: 8,
+    height: 8,
+    borderWidth: 1,
+  },
+  scopeMore: {
+    fontSize: 11,
+    lineHeight: 12,
   },
   actionRow: {
     flexDirection: 'row',

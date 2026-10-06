@@ -82,7 +82,10 @@ async function retitle(
   await chips(page, title).nth(nth).click();
   await page.getByTestId("editor-summary").fill(next);
   await page.getByTestId("editor-save").click();
-  if (scope) await page.getByTestId(`editor-scope-${scope}`).click();
+  if (scope) {
+    await page.getByTestId(`editor-scope-${scope}`).click();
+    await page.getByTestId("editor-scope-confirm").click();
+  }
   await expect(page.getByTestId("event-editor")).toHaveCount(0);
 }
 
@@ -94,7 +97,10 @@ async function remove(
 ) {
   await chips(page, title).nth(nth).click();
   await page.getByTestId("editor-delete").click();
-  if (scope) await page.getByTestId(`editor-scope-${scope}`).click();
+  if (scope) {
+    await page.getByTestId(`editor-scope-${scope}`).click();
+    await page.getByTestId("editor-scope-confirm").click();
+  }
   await expect(page.getByTestId("event-editor")).toHaveCount(0);
 }
 

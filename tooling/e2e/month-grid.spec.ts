@@ -304,6 +304,9 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
     await grid(page).getByText("🧪 E2E Recurring").nth(1).click();
     await page.getByTestId("editor-delete").click();
     await page.getByTestId("editor-scope-this").click();
+    await page.getByTestId("editor-scope-confirm").scrollIntoViewIfNeeded();
+    await shot(page, "06c-recurring-delete-scope");
+    await page.getByTestId("editor-scope-confirm").click();
     await expect(grid(page).getByText("🧪 E2E Recurring")).toHaveCount(2, {
       timeout: 30_000,
     });
@@ -312,6 +315,7 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
     await grid(page).getByText("🧪 E2E Recurring").nth(1).click();
     await page.getByTestId("editor-delete").click();
     await page.getByTestId("editor-scope-all").click();
+    await page.getByTestId("editor-scope-confirm").click();
     await expect(grid(page).getByText("🧪 E2E Recurring")).toHaveCount(0, {
       timeout: 30_000,
     });

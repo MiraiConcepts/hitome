@@ -23,6 +23,8 @@ export type ChipOption<T extends string> = {
   color?: string;
   /** Which calendar mark to show beside a colored option. */
   icon?: EventIcon;
+  /** A colored option that is not a calendar: the color, without the mark. */
+  noMark?: boolean;
 };
 
 type Props<T extends string> = {
@@ -104,7 +106,9 @@ export function ChipRow<T extends string>({
               },
         ]}
       >
-        {own && <CalendarMark icon={option.icon} color={own} />}
+        {own && !option.noMark && (
+          <CalendarMark icon={option.icon} color={own} />
+        )}
         {/* Sized by an invisible bold copy, so selecting a chip (which
             bolds its label) never changes its width and shifts the row. */}
         <View>
