@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
+/** The editor sheet slides away before it unmounts; on a slow CI runner that
+ *  slide alone has outlasted the default 5s. */
+const SHEET_CLOSE_MS = 15_000;
+
 // Write-path e2e: every way the app changes the server — create, edit and
 // delete with each repeat scope, undo of each delete, moving between
 // calendars, and a conflicting edit — checked twice: on the grid, and in the
@@ -68,7 +72,9 @@ async function create(
     await page.getByTestId("editor-repeat-count").fill(String(repeat.daily));
   }
   await page.getByTestId("editor-save").click();
-  await expect(page.getByTestId("event-editor")).toHaveCount(0);
+  await expect(page.getByTestId("event-editor")).toHaveCount(0, {
+    timeout: SHEET_CLOSE_MS,
+  });
 }
 
 /** Open the nth chip with this title, retitle it, save with a scope. */
@@ -86,7 +92,9 @@ async function retitle(
     await page.getByTestId(`editor-scope-${scope}`).click();
     await page.getByTestId("editor-scope-confirm").click();
   }
-  await expect(page.getByTestId("event-editor")).toHaveCount(0);
+  await expect(page.getByTestId("event-editor")).toHaveCount(0, {
+    timeout: SHEET_CLOSE_MS,
+  });
 }
 
 async function remove(
@@ -101,7 +109,9 @@ async function remove(
     await page.getByTestId(`editor-scope-${scope}`).click();
     await page.getByTestId("editor-scope-confirm").click();
   }
-  await expect(page.getByTestId("event-editor")).toHaveCount(0);
+  await expect(page.getByTestId("event-editor")).toHaveCount(0, {
+    timeout: SHEET_CLOSE_MS,
+  });
 }
 
 const undo = (page: Page) =>
@@ -221,7 +231,9 @@ test("writes reach the server: create, edit, delete, undo, move, conflict", asyn
     await chips(page, "🧪 W Move").click();
     await page.getByRole("button", { name: "e2e-other", exact: true }).click();
     await page.getByTestId("editor-save").click();
-    await expect(page.getByTestId("event-editor")).toHaveCount(0);
+    await expect(page.getByTestId("event-editor")).toHaveCount(0, {
+      timeout: SHEET_CLOSE_MS,
+    });
     await expect(chips(page, "🧪 W Move")).toHaveCount(1, { timeout: 30_000 });
     await expect
       .poll(() => countOnServer(page, "🧪 W Move", OTHER), { timeout: 30_000 })
@@ -289,7 +301,9 @@ test("writes reach the server: create, edit, delete, undo, move, conflict", asyn
     // Back online: the same editor saves.
     await page.unrouteAll();
     await page.getByTestId("editor-save").click();
-    await expect(page.getByTestId("event-editor")).toHaveCount(0);
+    await expect(page.getByTestId("event-editor")).toHaveCount(0, {
+      timeout: SHEET_CLOSE_MS,
+    });
     await expect
       .poll(() => countOnServer(page, "🧪 W Offline"), { timeout: 30_000 })
       .toBe(1);

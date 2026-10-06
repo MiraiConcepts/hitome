@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
+/** The editor sheet slides away before it unmounts; on a slow CI runner that
+ *  slide alone has outlasted the default 5s. */
+const SHEET_CLOSE_MS = 15_000;
+
 // Month-grid e2e: drives the real web app (Metro on the host) against the
 // throwaway Radicale seeded by seed.mjs. Dates mirror seed.mjs: fixtures live
 // in the current month and current month + 3. Navigation uses `?day=` deep
@@ -36,7 +40,9 @@ async function shot(page: Page, name: string) {
 
 async function cancelEditor(page: Page) {
   await page.getByTestId("editor-cancel").click();
-  await expect(page.getByTestId("event-editor")).toHaveCount(0);
+  await expect(page.getByTestId("event-editor")).toHaveCount(0, {
+    timeout: SHEET_CLOSE_MS,
+  });
 }
 
 /** A hold — the create gesture. Comfortably past the app's 500ms threshold. */
@@ -293,7 +299,9 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
     await page.getByTestId("editor-repeat-end-count").click();
     await page.getByTestId("editor-repeat-count").fill("3");
     await page.getByTestId("editor-save").click();
-    await expect(page.getByTestId("event-editor")).toHaveCount(0);
+    await expect(page.getByTestId("event-editor")).toHaveCount(0, {
+      timeout: SHEET_CLOSE_MS,
+    });
     // One occurrence chip on each of the three days.
     await expect(grid(page).getByText("🧪 E2E Recurring")).toHaveCount(3, {
       timeout: 30_000,
