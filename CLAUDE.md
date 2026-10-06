@@ -34,7 +34,7 @@ helper scripts.
   which is the port both dockerized proxies expect; the web build always talks
   to `/dav/` on whatever origin it was loaded from, so browsing Metro directly
   reaches no Radicale.
-- Browse the dockerized dev proxy at `http://localhost:8882` (injects DAV
+- Browse the dockerized dev proxy at `http://localhost:4000` (injects DAV
   auth), NOT Metro's `:8082` directly (CORS). Start it from
   `tooling/dev-proxy/`: `docker compose up -d` (needs its gitignored `.env`;
   see `.env.example`). Docker runtime is colima.
@@ -93,5 +93,6 @@ helper scripts.
   not a dot. Only the month grid's tap ripple stays round. This breaks
   byte-identity with the notes app's `theme.ts`/`src/components/` until it
   makes the same change.
-- Ports on this Mac: 8080 and 8880 belong to unrelated dev servers, 8881 is
-  this repo's e2e proxy, 8882 is this repo's dev proxy.
+- Ports on this Mac: 4000 is this repo's dev proxy and 4100 is mitsume's
+  (fixed so both apps run side by side), 8881 is this repo's e2e proxy,
+  8080 belongs to an unrelated dev server, and 5000 is macOS AirPlay.

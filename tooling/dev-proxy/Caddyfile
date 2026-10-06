@@ -4,21 +4,21 @@
 # the browser would block CalDAV requests (CORS). This proxy puts Metro and Radicale
 # behind ONE local origin, exactly like production:
 #
-#   http://localhost:8882/        → Metro dev server on the host (incl. HMR websocket)
-#   http://localhost:8882/dav/*   → your Radicale (over Tailscale)
+#   http://localhost:4000/        → Metro dev server on the host (incl. HMR websocket)
+#   http://localhost:4000/dav/*   → your Radicale (over Tailscale)
 #
 # Usage:
 #   cp tooling/dev-proxy/.env.example tooling/dev-proxy/.env   # set RADICALE_ORIGIN
 #   docker compose -f tooling/dev-proxy/compose.yml up -d      # start
 #   docker compose -f tooling/dev-proxy/compose.yml down       # stop (removes container)
 #
-# Ports on this Mac: :8080 and :8880 belong to unrelated dev servers, :8881 is
-# the e2e proxy — hitome takes :8882 so all four can run at once.
+# Ports on this Mac: hitome browses at :4000 and mitsume at :4100 (fixed, so
+# both apps run side by side); :8881 is the e2e proxy. Avoid :5000 (AirPlay).
 #
 # (Native Android dev is never subject to CORS — point it straight at the
 # Tailscale URL and skip this proxy.)
 
-:8882 {
+:4000 {
 	# Strip /dav before forwarding; X-Script-Name makes Radicale emit hrefs
 	# under /dav so CalDAV discovery resolves through this proxy.
 	handle_path /dav/* {
@@ -28,6 +28,10 @@
 			# Server-side credential injection (base64 of user:app-password) —
 			# clients send no Authorization; this replaces whatever they send.
 			header_up Authorization "Basic {$RADICALE_BASIC_B64}"
+			# A rejected login must not reach the browser as a challenge: Chrome
+			# answers one with its own password box, inviting the very credential
+			# the browser must never hold. The app reports the 401 itself.
+			header_down -WWW-Authenticate
 		}
 	}
 

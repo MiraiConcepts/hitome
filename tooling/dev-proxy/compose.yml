@@ -9,7 +9,7 @@ services:
     container_name: hitome-dev-proxy
     image: caddy:2-alpine
     ports:
-      - '8882:8882'
+      - '4000:4000'
     environment:
       # From tooling/dev-proxy/.env (gitignored; see .env.example).
       RADICALE_ORIGIN: ${RADICALE_ORIGIN:?set RADICALE_ORIGIN in tooling/dev-proxy/.env}

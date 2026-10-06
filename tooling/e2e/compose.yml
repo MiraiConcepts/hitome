@@ -1,7 +1,7 @@
 # Throwaway e2e stack (see run.sh for the one-command entry point).
 #
 # Mirrors production shape with ZERO real data: a disposable Radicale plus a
-# same-origin Caddy on :8881 — the real dev proxy on :8880 keeps serving your
+# same-origin Caddy on :8881 — the real dev proxy on :4000 keeps serving your
 # actual calendar untouched.
 #
 #   http://localhost:8881/        → Metro dev server on the host
