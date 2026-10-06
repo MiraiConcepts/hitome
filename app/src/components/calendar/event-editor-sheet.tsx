@@ -16,6 +16,7 @@ import {
   StyleSheet,
   TextInput,
   useWindowDimensions,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -126,8 +127,28 @@ function makeFooter(
 }
 
 /**
+ * The grab handle with the header under it, as the sheet's handle: the bar a
+ * drag closes the sheet from. The form below only ever scrolls, so a hard
+ * flick to its top can't carry on into closing the sheet. Same store as the
+ * footer, for the same portal reason.
+ */
+function makeHandle(store: ReturnType<typeof createFooterStore>) {
+  return function SheetHandle() {
+    const { editor } = useSyncExternalStore(store.subscribe, store.get);
+    return (
+      <View>
+        <View style={styles.handle}>
+          <View style={styles.handleIndicator} />
+        </View>
+        <EventEditorHeader editor={editor} />
+      </View>
+    );
+  };
+}
+
+/**
  * Narrow-layout shell: the editor in a bottom sheet (drag-to-dismiss,
- * keyboard-aware). The header is pinned at the top of the scroll and the
+ * keyboard-aware). The header rides in the sheet's handle and the
  * action bar is the sheet's footer, which rides above the keyboard — Save
  * stays in reach while typing. Mounted only while open — presents itself on
  * mount and reports every dismissal path through onClose.
@@ -156,6 +177,7 @@ export function EventEditorSheet({
     createFooterStore({ editor, onClose: () => {} })
   );
   const [Footer] = useState(() => makeFooter(store, insets.bottom));
+  const [Handle] = useState(() => makeHandle(store));
   useEffect(() => {
     store.set({ editor, onClose: () => sheetRef.current?.dismiss() });
   });
@@ -247,6 +269,10 @@ export function EventEditorSheet({
       // than behind it (edge-to-edge gives it the whole screen otherwise).
       topInset={insets.top}
       enablePanDownToClose
+      // Dragged closed by its handle (header included) only: content pans
+      // handed a flick that hit the top of the form on to the sheet, which
+      // closed it mid-scroll.
+      enableContentPanningGesture={false}
       enableBlurKeyboardOnGesture
       backdropComponent={Backdrop}
       // Native only: the footer rides above the keyboard there. On web the
@@ -269,13 +295,11 @@ export function EventEditorSheet({
       }}
       // The grab handle sits on the header's black ground, so handle and
       // header read as one bar — the month header and weekday row's trick.
-      handleStyle={styles.handle}
-      handleIndicatorStyle={styles.handleIndicator}
+      // Above the scroll view, not pinned inside it: a sticky header in a
+      // sheet that also moves for the keyboard could slide off its place,
+      // leaving a gap above it and the first field tucked under it.
+      handleComponent={Handle}
     >
-      {/* Above the scroll view, not pinned inside it: a sticky header in a
-          sheet that also moves for the keyboard could slide off its place,
-          leaving a gap above it and the first field tucked under it. */}
-      <EventEditorHeader editor={editor} />
       <BottomSheetScrollView
         ref={scrollRef}
         testID="event-editor"
@@ -307,8 +331,11 @@ export function EventEditorSheet({
 const RESETTLE_DELAY_MS = 400;
 
 const styles = StyleSheet.create({
+  // The library's default handle box: 10 above and below the indicator.
   handle: {
     backgroundColor: HEADER_GROUND,
+    alignItems: 'center',
+    paddingVertical: 10,
   },
   handleIndicator: {
     backgroundColor: AccentColor,
