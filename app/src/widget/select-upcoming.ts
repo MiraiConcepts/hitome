@@ -4,7 +4,7 @@ import type { CalEvent } from '@/caldav/types';
 import {
   findMeetingLink,
   meetingLinkInText,
-  normalizeLink,
+  openableLink,
 } from './meeting-link';
 import type { WidgetEvent } from './types';
 
@@ -41,7 +41,7 @@ export function toWidgetEvent(e: CalEvent): WidgetEvent {
   // A URL property that IS the meeting link renders only as the Join chip;
   // any other URL property keeps its own plain link line.
   const meetingLink = findMeetingLink(e);
-  const plainLink = e.link ? normalizeLink(e.link) : undefined;
+  const plainLink = e.link ? openableLink(e.link) : undefined;
   // A location that carries a join link is not a place — it would render as a
   // maps chip pointing at a URL. The Join chip already covers it.
   const place =

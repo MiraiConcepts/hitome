@@ -7,6 +7,28 @@ export function normalizeLink(link: string): string {
   return /^[a-z][a-z0-9+.-]*:/i.test(link) ? link : `https://${link}`;
 }
 
+/** Schemes that run code or reach into the device rather than open a page or
+ *  an app. Event links are written by other people (invites, shared
+ *  calendars), so a tap must never hand one of these to ACTION_VIEW. A
+ *  denylist, not an allowlist: zoommtg:, tel:, geo: and friends keep working. */
+const UNSAFE_SCHEMES = new Set([
+  'javascript',
+  'vbscript',
+  'data',
+  'blob',
+  'file',
+  'content',
+  'intent',
+  'android-app',
+]);
+
+/** `normalizeLink`, or undefined when the link's scheme is unsafe to open. */
+export function openableLink(link: string): string | undefined {
+  const normalized = normalizeLink(link.trim());
+  const scheme = normalized.slice(0, normalized.indexOf(':')).toLowerCase();
+  return UNSAFE_SCHEMES.has(scheme) ? undefined : normalized;
+}
+
 /** Hosts whose URLs are joinable meetings (matched as host or subdomain). */
 const MEETING_HOSTS = [
   'meet.google.com',
@@ -60,8 +82,8 @@ export function findMeetingLink(e: {
     return e.conference.trim();
   }
   if (e.link) {
-    const normalized = normalizeLink(e.link);
-    if (isMeetingLink(normalized)) return normalized;
+    const normalized = openableLink(e.link);
+    if (normalized && isMeetingLink(normalized)) return normalized;
   }
   return (
     (e.location && meetingLinkInText(e.location)) ||

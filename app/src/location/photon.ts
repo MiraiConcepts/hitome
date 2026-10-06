@@ -37,7 +37,12 @@ export async function searchLocations(query: string): Promise<string[]> {
 
   try {
     const url = `${ENDPOINT}?q=${encodeURIComponent(q)}&limit=${LIMIT}&lang=en`;
-    const res = await fetch(url, { signal: controller.signal });
+    // no-referrer: on web the browser would otherwise send this page's origin,
+    // which is the private server's hostname.
+    const res = await fetch(url, {
+      signal: controller.signal,
+      referrerPolicy: 'no-referrer',
+    });
     if (!res.ok) throw new Error(`photon ${res.status}`);
     const body = (await res.json()) as {
       features?: { properties?: PhotonProperties }[];

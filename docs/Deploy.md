@@ -10,17 +10,19 @@ host Caddy. The app and Radicale share ONE origin — the app is served at `/` a
 Radicale is proxied under `/dav/` — so the browser never makes a cross-origin CalDAV
 request and **no CORS configuration is needed anywhere**.
 
-**Credentials are server-side only.** Clients (web *and* the Android app) send no
-Authorization; Caddy injects it on `/dav/*` from `HITOME_DAV_B64` in the server's
-`.env`. Consequence, explicitly accepted: **tailnet reachability = calendar access**
+**Credentials are server-side only.** The web app sends no Authorization; Caddy
+injects it on `/dav/*` from `HITOME_DAV_B64` in the server's `.env`. (The Android
+app never talks to this origin: it uses the phone's calendars, which DAVx⁵ syncs.) Consequence, explicitly accepted: **tailnet reachability = calendar access**
 on this origin (single-user tailnet, secured devices — Requirements §9.10 posture).
 Optional hardening: a Tailscale ACL restricting which devices may reach this port.
-Revisit if the tailnet ever gains other users.
+Revisit if the tailnet ever gains other users. Keep the site block addressed by
+hostname (as below), never a bare `:port`: with TLS on the real name, a page
+that rebinds its own DNS to this IP cannot reach the injected login.
 
 ```
-web browser ──┐  /dav/* (no credentials)                       ┌─► radicale:5232
-              ├───────────────► host Caddy ──[+ Authorization]──┤
-Android app ──┘                     ▲                           └  (X-Script-Name /dav)
+              /dav/* (no credentials)                         ┌─► radicale:5232
+web browser ─────────────────► host Caddy ──[+ Authorization]──┤
+                                    ▲                           └  (X-Script-Name /dav)
                       HITOME_DAV_B64 in server .env
 ```
 
@@ -78,6 +80,9 @@ and put it in the server `.env`):
 		reverse_proxy radicale:5232 {
 			header_up X-Script-Name /dav
 			header_up Authorization "Basic {$HITOME_DAV_B64}"
+			# Never pass a login challenge on: the browser would answer it
+			# with its own password box. The app explains a 401 itself.
+			header_down -WWW-Authenticate
 		}
 	}
 
@@ -130,12 +135,11 @@ Then run the smoke tests in `.claude/plans/caldav-calendar-plan.md` §Smoke test
 
 ## Android APK
 
-Shipped as its own pipeline: CI builds the APK unsigned, signing + publishing happen
-locally, Obtainium tracks the GitHub Releases feed. Full flow in `docs/Release.md`.
+Shipped from the same `v*` tag: CI builds, signs and publishes the APK as a GitHub
+Release, and Obtainium tracks that feed. Full flow in `docs/Release.md`.
 
-## Local web dev (same-origin without Docker)
+## Local web dev (same-origin)
 
-Use `tooling/dev-proxy/Caddyfile` (see its header comment):
-Metro on `:8081` + Radicale under `http://localhost:8880/dav/`, plus a local
-notes backend (sync + blobs containers built from `server/`) under
-`http://localhost:8880/sync` and `/blobs/`.
+Use the dockerized dev proxy in `tooling/dev-proxy/` (see its Caddyfile header):
+Metro (`bun run web:proxy`, :8082) and your Radicale behind one origin at
+`http://localhost:4000`, with the login injected from its gitignored `.env`.

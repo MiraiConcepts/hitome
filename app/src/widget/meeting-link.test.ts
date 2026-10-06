@@ -1,10 +1,39 @@
-import { findMeetingLink, isMeetingLink, normalizeLink } from './meeting-link';
+import {
+  findMeetingLink,
+  isMeetingLink,
+  normalizeLink,
+  openableLink,
+} from './meeting-link';
 
 describe('normalizeLink', () => {
   it('prefixes https on scheme-less URLs and leaves schemed ones alone', () => {
     expect(normalizeLink('google.com')).toBe('https://google.com');
     expect(normalizeLink('https://zoom.us/j/1')).toBe('https://zoom.us/j/1');
     expect(normalizeLink('geo:1.2,3.4')).toBe('geo:1.2,3.4');
+  });
+});
+
+describe('openableLink', () => {
+  it('keeps web links and app schemes', () => {
+    expect(openableLink('google.com')).toBe('https://google.com');
+    expect(openableLink('zoommtg://zoom.us/join?confno=1')).toBe(
+      'zoommtg://zoom.us/join?confno=1'
+    );
+    expect(openableLink('tel:+15551234')).toBe('tel:+15551234');
+  });
+
+  it('drops schemes that run code or reach into the device', () => {
+    expect(openableLink('javascript://zoom.us/%0aalert(1)')).toBeUndefined();
+    expect(openableLink('JavaScript:alert(1)')).toBeUndefined();
+    expect(openableLink(' intent://x#Intent;end')).toBeUndefined();
+    expect(openableLink('file:///sdcard/x')).toBeUndefined();
+    expect(openableLink('content://com.x/y')).toBeUndefined();
+  });
+
+  it('never yields an unsafe Join link', () => {
+    expect(
+      findMeetingLink({ link: 'javascript://zoom.us/%0aalert(1)' })
+    ).toBeUndefined();
   });
 });
 

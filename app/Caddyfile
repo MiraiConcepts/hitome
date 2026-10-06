@@ -12,6 +12,16 @@
 	header @immutable Cache-Control "public, max-age=31536000, immutable"
 	header ?Cache-Control "no-cache"
 
+	# The page talks to a calendar the host proxy logs in for, so: never framed
+	# by another site, never leaks its (private) hostname in a Referer, and no
+	# MIME sniffing.
+	header {
+		X-Frame-Options "DENY"
+		Content-Security-Policy "frame-ancestors 'none'"
+		Referrer-Policy "no-referrer"
+		X-Content-Type-Options "nosniff"
+	}
+
 	# Per-route static HTML first (expo-router emits one .html per route), then the
 	# client-side fallback for any route rendered after hydration.
 	try_files {path} {path}.html /index.html

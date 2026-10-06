@@ -38,7 +38,8 @@ its reminders on the device itself.
   tappable way into that meeting.
 - Location autocomplete is the only third-party call, and it fails silently:
   debounced, cached, and abandoned for the session after three consecutive
-  failures, leaving an ordinary text field behind.
+  failures, leaving an ordinary text field behind. Anything else leaves only
+  on a tap: a location opens in Google Maps, a link on its own site.
 - On Android it works on the phone's own calendars, which DAVx⁵ (or Google, or
   any sync app) keeps in step with the server. Edits made offline are kept and
   sent when the phone is back online, and Refresh asks the sync app to sync now.
