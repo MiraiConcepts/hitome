@@ -13,6 +13,8 @@ export default defineConfig({
   outputDir: './test-results',
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'http://e2e-proxy:8881',
+    // Logged in by globalSetup (seed.mjs); login.spec.ts starts without it.
+    storageState: '.auth/state.json',
     // Phone-ish portrait viewport: the agenda must actually overflow so the
     // scroll assertions mean something.
     viewport: { width: 480, height: 900 },

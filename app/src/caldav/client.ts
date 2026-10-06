@@ -8,6 +8,7 @@ import {
   type DavConfig,
 } from '@/config/dav-config';
 import { ensureDavConfig, subscribeDavConfig } from '@/config/dav-store';
+import { subscribeSession } from '@/config/session';
 
 import type { EventIcon } from './types';
 
@@ -235,3 +236,5 @@ export function resetClient(): void {
 // A cached client captured its server's URL and credentials when it was
 // constructed, so a config change has to take it with it.
 subscribeDavConfig(resetClient);
+// Logging in or out changes whose calendar the server opens for this page.
+subscribeSession(resetClient);

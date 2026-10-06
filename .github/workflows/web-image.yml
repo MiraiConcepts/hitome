@@ -1,12 +1,13 @@
 name: Web image
 
-# Build the static web app into ghcr.io/miraiconcepts/hitome:latest on every release
+# Build the web app and its server into ghcr.io/miraiconcepts/hitome:latest on every release
 # tag (v*) — the same trigger as the Android APK workflow, so web and Android
 # always ship the same versioned commit. Watchtower on the server polls GHCR
 # and redeploys automatically (see docs/Deploy.md, docs/Release.md).
 #
-# CREDENTIAL-FREE: no secrets are used or needed. CalDAV auth is injected
-# server-side by the host Caddy on /dav/* (see docs/Deploy.md).
+# CREDENTIAL-FREE: no secrets are used or needed. People log in on the page;
+# hitome's server keeps each login in its own data volume (see docs/Deploy.md).
+# Built for Intel/AMD and ARM (Raspberry Pi and the like).
 
 on:
   push:
@@ -23,6 +24,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: docker/setup-qemu-action@v3
+
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
@@ -34,6 +37,7 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: app
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ghcr.io/miraiconcepts/hitome:latest

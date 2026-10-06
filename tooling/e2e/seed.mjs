@@ -1,9 +1,17 @@
 // Playwright global setup: seed the throwaway Radicale with deterministic
-// fixtures. Dates are RELATIVE (current month + 3) so the suite stays valid on
+// fixtures, then log in once and save the session for every spec. Dates are RELATIVE (current month + 3) so the suite stays valid on
 // any run date. agenda.spec.ts derives the same dates independently.
 
+import { mkdirSync, writeFileSync } from 'node:fs';
+
 const BASE = process.env.E2E_BASE_URL ?? 'http://e2e-proxy:8881';
-const CAL_URL = `${BASE}/dav/test/e2e/`;
+// Seeded straight into Radicale with the test account: the app's /dav/ needs
+// a logged-in session, which is what the specs themselves exercise.
+const RADICALE = process.env.E2E_RADICALE_URL ?? 'http://radicale:5232';
+const CAL_URL = `${RADICALE}/test/e2e/`;
+const AUTH = { Authorization: `Basic ${btoa('test:test')}` };
+/** Where the logged-in browser state goes (playwright.config storageState). */
+export const AUTH_STATE = '.auth/state.json';
 
 const pad = (n) => `${n}`.padStart(2, '0');
 const icsDate = (d) =>
@@ -38,11 +46,14 @@ function vevent({ uid, summary, start, end, allDay = false }) {
 async function waitForStack() {
   for (let attempt = 0; attempt < 30; attempt++) {
     try {
-      const res = await fetch(`${BASE}/dav/`, {
-        method: 'PROPFIND',
-        headers: { Depth: '0' },
-      });
-      if (res.status < 500) return;
+      const [calendar, app] = await Promise.all([
+        fetch(`${RADICALE}/`, {
+          method: 'PROPFIND',
+          headers: { Depth: '0', ...AUTH },
+        }),
+        fetch(`${BASE}/healthz`),
+      ]);
+      if (calendar.status < 500 && app.ok) return;
     } catch {
       // proxy/radicale still starting
     }
@@ -54,7 +65,7 @@ async function waitForStack() {
 async function put(event) {
   const res = await fetch(`${CAL_URL}${event.uid}.ics`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'text/calendar; charset=utf-8' },
+    headers: { 'Content-Type': 'text/calendar; charset=utf-8', ...AUTH },
     body: vevent(event),
   });
   if (!res.ok) {
@@ -65,7 +76,7 @@ async function put(event) {
 export default async function seed() {
   await waitForStack();
 
-  const mk = await fetch(CAL_URL, { method: 'MKCALENDAR' });
+  const mk = await fetch(CAL_URL, { method: 'MKCALENDAR', headers: AUTH });
   // 405/409 = collection already exists (rerun against a live stack) — fine.
   if (!mk.ok && mk.status !== 405 && mk.status !== 409) {
     throw new Error(`MKCALENDAR failed (HTTP ${mk.status})`);
@@ -152,4 +163,42 @@ export default async function seed() {
 
   for (const event of events) await put(event);
   console.log(`seeded ${events.length} events into ${CAL_URL}`);
+
+  await logIn();
+}
+
+/**
+ * Log in through hitome's server, as the login screen does, and save the
+ * session cookie as Playwright storage state: every spec starts logged in
+ * (login.spec.ts opts out to test the screen itself).
+ */
+async function logIn() {
+  const res = await fetch(`${BASE}/api/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'test', password: 'test' }),
+  });
+  if (!res.ok) throw new Error(`e2e login failed (HTTP ${res.status})`);
+  const cookie = res.headers.get('set-cookie') ?? '';
+  const [name, value] = cookie.split(';')[0].split('=');
+  const host = new URL(BASE).hostname;
+  mkdirSync('.auth', { recursive: true });
+  writeFileSync(
+    AUTH_STATE,
+    JSON.stringify({
+      cookies: [
+        {
+          name,
+          value,
+          domain: host,
+          path: '/',
+          expires: -1,
+          httpOnly: true,
+          secure: false,
+          sameSite: 'Strict',
+        },
+      ],
+      origins: [],
+    })
+  );
 }

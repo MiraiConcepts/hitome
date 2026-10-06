@@ -1,11 +1,12 @@
 # Throwaway e2e stack (see run.sh for the one-command entry point).
 #
-# Mirrors production shape with ZERO real data: a disposable Radicale plus a
-# same-origin Caddy on :8881 — the real dev proxy on :4000 keeps serving your
-# actual calendar untouched.
+# Mirrors production shape with ZERO real data: a disposable Radicale with one
+# test account (test / test), and hitome's own server in front of it on :8881,
+# serving the app from Metro on the host instead of an export.
 #
-#   http://localhost:8881/        → Metro dev server on the host
-#   http://localhost:8881/dav/*   → test Radicale (this stack, anonymous volume)
+#   http://localhost:8881/        → the app (Metro on the host)
+#   http://localhost:8881/api/*   → login, logout, session
+#   http://localhost:8881/dav/*   → test Radicale, with the session's login
 #
 # `docker compose down -v` wipes the test calendar completely.
 name: hitome-e2e
@@ -16,15 +17,23 @@ services:
     image: tomsquest/docker-radicale
     volumes:
       - ./radicale-config:/config/config:ro
+      - ./radicale-users:/config/users:ro
       - /data # anonymous volume; run.sh always downs with -v so runs start empty
 
   e2e-proxy:
     container_name: hitome-e2e-proxy
-    image: caddy:2-alpine
+    image: oven/bun:1-alpine
+    working_dir: /app
+    command: ['bun', 'server/index.ts']
+    environment:
+      CALDAV_URL: http://radicale:5232/
+      DEV_UPSTREAM: http://host.docker.internal:8082
+      PORT: '8881'
+      DATA_DIR: /tmp/hitome
     ports:
       - '8881:8881'
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../../app/server:/app/server:ro
     extra_hosts:
-      # Lets the container reach the Mac (Metro on :8081), as in dev-proxy.
+      # Lets the container reach the Mac (Metro on :8082).
       - host.docker.internal:host-gateway

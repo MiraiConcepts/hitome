@@ -1,25 +1,65 @@
+import { useState } from 'react';
+
 import {
+  SettingsBlock,
+  SettingsButton,
+  SettingsButtonRow,
   SettingsSection,
   SettingsValue,
 } from '@/components/settings/settings-parts';
-import { useDavConfig } from '@/config/dav-store';
+import { logOut, useSession } from '@/config/session';
 
 /**
- * Where the calendar comes from, on the web: read-only, since the endpoint
- * derives from the page it was loaded from and rides the credentials its
- * reverse proxy injects. (Android's version is connection-section.android:
- * the phone's calendars, synced by DAVx⁵.)
+ * Where the calendar comes from, on the web: the server this copy of hitome
+ * was set up with (read-only; it is the deployer's setting), who is logged
+ * in, and the way out. Android's version is connection-section.android: the
+ * phone's calendars, synced by DAVx⁵.
  */
 export function ConnectionSection() {
-  const config = useDavConfig();
+  const { username, server } = useSession();
+  const [busy, setBusy] = useState<'here' | 'everywhere' | null>(null);
+
+  async function run(everywhere: boolean) {
+    setBusy(everywhere ? 'everywhere' : 'here');
+    // On success the login screen replaces everything, this included.
+    try {
+      await logOut(everywhere);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
-    <SettingsSection title="Server" testID="settings-connection">
+    <SettingsSection title="Account" testID="settings-connection">
       <SettingsValue
-        label="Address"
-        value={config?.url ?? 'Not configured'}
+        label="Logged in as"
+        value={username ?? '…'}
+        testID="settings-username"
+      />
+      <SettingsValue
+        label="Calendar server"
+        value={server ?? '…'}
         testID="settings-server-url"
       />
-      <SettingsValue label="Login" value="Supplied by the server" />
+      <SettingsBlock>
+        <SettingsButtonRow>
+          <SettingsButton
+            label="Log out everywhere"
+            busy={busy === 'everywhere'}
+            disabled={busy !== null}
+            onPress={() => run(true)}
+            testID="settings-logout-everywhere"
+          />
+          <SettingsButton
+            label="Log out"
+            variant="filled"
+            busy={busy === 'here'}
+            disabled={busy !== null}
+            onPress={() => run(false)}
+            testID="settings-logout"
+          />
+        </SettingsButtonRow>
+      </SettingsBlock>
     </SettingsSection>
   );
 }

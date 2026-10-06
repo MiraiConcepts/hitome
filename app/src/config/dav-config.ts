@@ -199,10 +199,10 @@ export function connectFailureMessage(
 export type ConnectionProblem = { title: string; body: string };
 
 /**
- * What the web app says when it cannot load the calendar. Not
- * connectFailureMessage: that one answers a form someone just typed into,
- * and the web has no form. Its calendar lives at /dav/ on the address the
- * page came from, and the server there signs in for it, so each cause is
+ * What the web app says when it cannot load the calendar after logging in.
+ * Not connectFailureMessage: that one answers a form someone just typed
+ * into. The web reaches its calendar through hitome's own server, which
+ * holds the login and talks to the deployer's CALDAV_URL, so each cause is
  * put in those terms.
  */
 export function webConnectionProblem(
@@ -214,13 +214,13 @@ export function webConnectionProblem(
     case 'unauthorized':
     case 'forbidden':
       return {
-        title: 'The calendar server turned down the login',
-        body: 'The server this page comes from signs in to your calendar for you, and that login was refused. It has probably changed: update it on the server, then try again.',
+        title: 'Your login stopped working',
+        body: 'The calendar server no longer accepts it. Log out in Settings, then log in again.',
       };
     case 'not-caldav':
       return {
         title: 'No calendar server here',
-        body: 'This address answered, but not as a calendar server. The calendar should be at /dav/ on the address this page was opened from.',
+        body: 'The calendar server address this copy of hitome was set up with (CALDAV_URL) answered, but not as a calendar server.',
       };
     case 'no-calendars':
       return {

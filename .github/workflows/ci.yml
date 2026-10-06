@@ -33,6 +33,11 @@ jobs:
       - name: Test
         run: bun run test -- --ci
 
+      # hitome's web server runs on Bun (app/server), so its tests run there
+      # rather than under jest's React Native preset.
+      - name: Test server
+        run: bun run test:server
+
   # The web app end to end (tooling/e2e): Metro serving the web build on :8082,
   # a throwaway Radicale behind its own Caddy, Playwright in Docker. The same
   # run.sh used locally; the real calendar is never touched.

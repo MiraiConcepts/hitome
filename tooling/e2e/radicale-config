@@ -1,10 +1,13 @@
-# Test-only Radicale for the e2e stack (compose.yml). Accepts any credentials —
-# the Caddyfile injects "test:test", making /test/ the owned principal.
+# Test-only Radicale for the e2e stack (compose.yml). One throwaway account,
+# test / test (radicale-users), so a wrong password is really refused and the
+# login screen can be tested; /test/ is that account's principal.
 [server]
 hosts = 0.0.0.0:5232
 
 [auth]
-type = none
+type = htpasswd
+htpasswd_filename = /config/users
+htpasswd_encryption = plain
 
 [storage]
 filesystem_folder = /data

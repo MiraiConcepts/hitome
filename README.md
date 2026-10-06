@@ -45,12 +45,36 @@ its reminders on the device itself.
 - On Android it works on the phone's own calendars, which DAVx⁵ (or Google, or
   any sync app) keeps in step with the server. Edits made offline are kept and
   sent when the phone is back online, and Refresh asks the sync app to sync now.
-- No credentials are ever built in. On the web the app is served from the same
-  origin as the calendar server and the host proxy injects the authorization,
-  so no browser holds a password at all. On Android hitome holds no address or
-  login of its own: the sync app does, so no bundle, image or CI secret holds
-  either, and pointing it at a new server is done in DAVx⁵.
+- No credentials are ever built in. On the web you log in on the page: hitome's
+  own small server checks the login with the calendar server, keeps it on the
+  server side, and gives the browser a cookie its pages cannot read, so no
+  browser holds a password at all. On Android hitome holds no address or login
+  of its own: the sync app does, so no bundle, image or CI secret holds either,
+  and pointing it at a new server is done in DAVx⁵.
 - Web and Android ship from one tag. The same commit produces the container
   image and the signed APK, so the two halves cannot report different versions.
   Android is delivered as a release artifact tracked by an updater rather than
   through an app store.
+
+# Running it
+
+The web app is one container. Point it at your CalDAV server (Radicale), put it
+behind whatever already serves HTTPS for you, open it and log in with your
+calendar account:
+
+```yaml
+services:
+  hitome:
+    image: ghcr.io/miraiconcepts/hitome:latest
+    environment:
+      CALDAV_URL: http://radicale:5232/
+    volumes:
+      - hitome-data:/data
+volumes:
+  hitome-data:
+```
+
+The front door, HTTPS and the move from earlier versions are in
+[docs/Deploy.md](docs/Deploy.md). On Android, install the APK from the
+[releases](https://github.com/miraiconcepts/hitome/releases) (Obtainium can
+track them) and add your server in DAVx⁵.

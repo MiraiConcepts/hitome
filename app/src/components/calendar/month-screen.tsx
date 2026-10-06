@@ -7,13 +7,7 @@ import {
   useState,
   type ComponentType,
 } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import {
   SafeAreaView,
@@ -27,6 +21,7 @@ import {
   requestSync,
 } from '@/data/events';
 import type { CalEvent } from '@/caldav/types';
+import { LARGE_SPINNER } from '@/components/boot-screen';
 import { markCalendarReady } from '@/components/calendar/calendar-ready';
 import { ConnectionProblem } from '@/components/calendar/connection-problem';
 import { DayPopover } from '@/components/calendar/day-popover';
@@ -48,6 +43,7 @@ import {
   TrashIcon,
   WifiOffIcon,
 } from '@/components/icons';
+import { Spinner } from '@/components/spinner';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AccentColor, Colors, OnAccentColor, Spacing } from '@/constants/theme';
@@ -55,6 +51,7 @@ import {
   classifyConnectError,
   webConnectionProblem,
 } from '@/config/dav-config';
+import { recheckSource } from '@/config/source';
 import { useCalendarKeys } from '@/hooks/use-calendar-keys';
 import { useDeepLink } from '@/hooks/use-deep-link';
 import { useMonthEvents } from '@/hooks/use-month-events';
@@ -463,6 +460,12 @@ export function MonthScreen() {
     [error, authFailed]
   );
   const neverLoaded = problem !== null && !fetchedAt && allEvents.length === 0;
+  // A refused request on the web usually means the session is over (the
+  // password changed, or Log out everywhere ran on another device): ask the
+  // server, which sends the app back to its login screen if so.
+  useEffect(() => {
+    if (Platform.OS === 'web' && authFailed) recheckSource();
+  }, [authFailed]);
 
   const popoverEvents = useMemo(() => {
     if (!popoverDay) return [];
@@ -562,7 +565,7 @@ export function MonthScreen() {
               // The spinner only shows if anchoring is actually slow.
               <ThemedView style={styles.gridCover}>
                 {coverSpinner && (
-                  <ActivityIndicator size="large" color={AccentColor} />
+                  <Spinner color={AccentColor} size={LARGE_SPINNER} />
                 )}
               </ThemedView>
             )}

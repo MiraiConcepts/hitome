@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-command e2e run: throwaway Radicale + same-origin Caddy (:8881) via
+# One-command e2e run: throwaway Radicale + hitome's own server (:8881) via
 # compose, Playwright in Docker (nothing installed on the host). Requires
 # Metro running on the host with the same-origin DAV URL (bun run web:proxy).
 set -euo pipefail

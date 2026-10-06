@@ -14,12 +14,15 @@ hitome added: `placeholder`, and `rule`/`ruleStrong` for the settings card).
 
 ## Layout
 
-- `app/` — the Expo client (all product code; has its own CLAUDE.md).
-- `docs/` — `Deploy.md` (web + same-origin Caddy), `Release.md` (Android APK
-  pipeline).
-- `tooling/` — `dev-proxy/` (dockerized same-origin Caddy for web dev),
-  `e2e/` (dockerized Playwright + throwaway Radicale),
-  `android-builder/` (local sign + release scripts).
+- `app/` — the Expo client (all product code; has its own CLAUDE.md), and
+  `app/server/`: hitome's small web server (Bun, no dependencies) that serves
+  the exported app, runs the login and passes `/dav/` to `CALDAV_URL` with
+  the session's login. Ships in the same image (`app/Dockerfile`).
+- `docs/` — `Deploy.md` (web image, login, front door), `Release.md`
+  (Android APK pipeline).
+- `tooling/` — `e2e/` (dockerized Playwright + throwaway Radicale + the
+  server), `android-builder/` (local sign + release scripts),
+  `dev-phone/`.
 - `.claude/plans/` — implementation plans and build logs (historical record).
 
 ## Dev loop (bun for scripts/checks; Metro and Gradle run under node)
@@ -31,16 +34,18 @@ helper scripts.
 
 - Always `cd app/` first, then plain `bun run web:proxy` — NOT `--bun`
   (breaks file watching → stale bundles). `web:proxy` is plain `web` on :8082,
-  which is the port both dockerized proxies expect; the web build always talks
-  to `/dav/` on whatever origin it was loaded from, so browsing Metro directly
-  reaches no Radicale.
-- Browse the dockerized dev proxy at `http://localhost:4000` (injects DAV
-  auth), NOT Metro's `:8082` directly (CORS). Start it from
-  `tooling/dev-proxy/`: `docker compose up -d` (needs its gitignored `.env`;
-  see `.env.example`). Docker runtime is colima.
+  which is the port the dev server and the e2e stack expect; the web build
+  talks to `/api/` and `/dav/` on whatever origin it was loaded from, so
+  browsing Metro directly reaches no login and no Radicale.
+- Then `bun run server:dev` (also from `app/`): hitome's server on
+  `http://localhost:4000`, the app passed through from Metro (hot reload
+  included). Browse that and log in with your Radicale account. It reads
+  `CALDAV_URL` from `app/.env.local` (gitignored) and keeps sessions in
+  `app/.hitome-dev/` (gitignored). Server unit tests: `bun run test:server`.
 - Web e2e: `tooling/e2e/run.sh` — dockerized Playwright + a throwaway Radicale
-  behind its own Caddy on :8881 (never touches the real calendar). Needs Metro
-  running (`web:proxy`).
+  (account `test` / `test`) behind the same server on :8881 (never touches
+  the real calendar). Needs Metro running (`web:proxy`). Docker runtime is
+  colima.
 - Android hot reload: plain `bun run android:dev` — do NOT add `--bun`. The
   Gradle steps shell out to `node` (expo autolinking, entry resolution), and
   `--bun` breaks the build in ~3s at `settings.gradle`.
@@ -53,8 +58,8 @@ helper scripts.
   after a reinstall) or on the phone via Dev menu → Change Bundle Location
   → `<mac tailscale ip>:8081`; run Metro with `bun run start:tailscale`. The
   Mac firewall must allow incoming for node (it does as of 2026-10-05).
-- Checks from `app/`: `bun run typecheck`, `bun run lint`, `bun run
-  format:check`.
+- Checks from `app/`: `bun run typecheck` (app and server), `bun run lint`,
+  `bun run format:check`.
 - Tests: local jest is broken under bun's runtime — run `bun test <files>`
   instead; CI runs jest via `bun run test`.
 - Install Expo packages with `bunx expo install` (SDK 56 line), never
@@ -75,9 +80,13 @@ helper scripts.
 
 - **No CalDAV credentials in the repo, CI, images or bundles** — ever. Nothing
   is baked: not the password, and (since v0.4) not the server URL either.
-  - **Web** is unchanged and holds nothing: it derives `/dav/` from the page's
-    own origin and the host Caddy injects Authorization (password lives only in
-    the server `.env`). No browser ever stores a credential.
+  - **Web** (since v0.7): people log in on the page. hitome's server
+    (`app/server/`) checks the login with `CALDAV_URL`, keeps it encrypted in
+    its data volume, and gives the browser an httpOnly, SameSite=Strict
+    session cookie; `/dav/` requests go upstream with the session's login.
+    The browser never holds the password or a readable token, and a 401 is
+    never passed on with `WWW-Authenticate` (it would raise the browser's own
+    password box). The image's only setting is `CALDAV_URL`, an address.
   - **Android** holds no login at all (since v0.5): it reads and writes the
     phone's calendar store (`src/store/`, native bridge in
     `app/modules/calendar-store`), which DAVx⁵ or another sync app keeps in
@@ -93,6 +102,7 @@ helper scripts.
   not a dot. Only the month grid's tap ripple stays round. This breaks
   byte-identity with the notes app's `theme.ts`/`src/components/` until it
   makes the same change.
-- Ports on this Mac: 4000 is this repo's dev proxy and 4100 is mitsume's
-  (fixed so both apps run side by side), 8881 is this repo's e2e proxy,
-  8080 belongs to an unrelated dev server, and 5000 is macOS AirPlay.
+- Ports on this Mac: 4000 is this repo's dev server (`server:dev`) and 4100
+  is mitsume's dev proxy (fixed so both apps run side by side), 8881 is this
+  repo's e2e stack, 8080 belongs to an unrelated dev server, and 5000 is
+  macOS AirPlay.

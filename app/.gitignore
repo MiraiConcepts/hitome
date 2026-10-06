@@ -45,3 +45,6 @@ example
 
 # Local Expo modules' Gradle output
 modules/*/android/build/
+
+# hitome dev server sessions (bun run server:dev)
+.hitome-dev/

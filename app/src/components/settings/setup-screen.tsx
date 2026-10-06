@@ -1,151 +1,75 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  Keyboard,
-  Dimensions,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
-import Animated, { LinearTransition } from 'react-native-reanimated';
+import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 
-import {
-  ConnectionFields,
-  useServerForm,
-} from '@/components/settings/server-form';
 import { AppName } from '@/components/settings/app-name';
+import { LoginFields, useLoginForm } from '@/components/settings/login-form';
 import { SettingsButton } from '@/components/settings/settings-parts';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { useIsWide } from '@/hooks/use-is-wide';
 
 const ICON_SIZE = 72;
-/** Collapsed while typing: the icon sits beside the name as a header. */
-const ICON_SIZE_COLLAPSED = 40;
-
-/** One shared timing for every piece that moves, so they land together. */
-const COLLAPSE = LinearTransition.duration(220);
 
 /**
- * First run. Nothing in this app works without a calendar server, so this is a
- * gate rather than a prompt over an empty grid: the app's icon and name, the
- * connection fields settings also uses, and Connect pinned to the bottom-right
- * corner, where it rides up with the keyboard.
+ * The web's login. Nothing here works without one, so this is a gate rather
+ * than a prompt over an empty grid: the app's icon and name, username and
+ * password straight on the ground, and Log in. The calendar's address is not
+ * asked: whoever runs this copy of hitome set it (CALDAV_URL). Android's twin
+ * is setup-screen.android.tsx.
  *
- * Typing collapses the icon and name into a header — icon shrunk beside the
- * name, top-left, the way the month view's title sits — which gives the
- * keyboard the room the big centred brand was taking.
+ * Nothing moves: no card arriving, no header collapsing while typing.
  */
 export function SetupScreen() {
   const insets = useSafeAreaInsets();
-  const form = useServerForm();
-  const { collapsed, keyboardInset, onFieldFocus, onFieldBlur } =
-    useCollapsedWhileTyping();
+  const form = useLoginForm();
+  const isWide = useIsWide();
+  const button = (
+    <SettingsButton
+      label="Log in"
+      variant="filled"
+      busy={form.busy}
+      onPress={form.submit}
+      testID="login-submit"
+    />
+  );
   return (
     <ThemedView style={styles.fill}>
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
         <ScrollView
-          contentContainerStyle={[
-            styles.body,
-            collapsed && styles.bodyCollapsed,
-          ]}
+          contentContainerStyle={styles.body}
           keyboardShouldPersistTaps="handled"
-          testID="setup-screen"
+          testID="login-screen"
         >
-          <Animated.View
-            layout={COLLAPSE}
-            style={[styles.brand, collapsed && styles.brandCollapsed]}
-          >
-            <Animated.Image
-              layout={COLLAPSE}
+          <View style={styles.brand}>
+            <Image
               source={require('@/assets/images/icon.png')}
-              style={collapsed ? styles.iconCollapsed : styles.icon}
+              style={styles.icon}
               accessibilityIgnoresInvertColors
             />
-            <Animated.View layout={COLLAPSE}>
-              <AppName />
-            </Animated.View>
-          </Animated.View>
-          <Animated.View layout={COLLAPSE}>
-            <ConnectionFields
-              form={form}
-              onFieldFocus={onFieldFocus}
-              onFieldBlur={onFieldBlur}
-            />
-          </Animated.View>
+            <AppName />
+          </View>
+          <LoginFields form={form} />
+          {/* A desktop window is tall and wide: the button belongs under the
+              fields, not in the far corner of the screen. */}
+          {isWide && <View style={styles.actions}>{button}</View>}
         </ScrollView>
-        <View
-          style={[
-            styles.footer,
-            {
-              // Above the keyboard while it is up, above the nav bar when not.
-              paddingBottom:
-                (keyboardInset > 0 ? keyboardInset : insets.bottom) +
-                Spacing.three,
-            },
-          ]}
-        >
-          <SettingsButton
-            label="Connect"
-            variant="filled"
-            busy={form.busy}
-            onPress={form.save}
-            testID="settings-save"
-          />
-        </View>
+        {!isWide && (
+          <View
+            style={[
+              styles.actions,
+              styles.footer,
+              { paddingBottom: insets.bottom + Spacing.three },
+            ]}
+          >
+            {button}
+          </View>
+        )}
       </SafeAreaView>
     </ThemedView>
   );
-}
-
-/**
- * Whether the screen is in its typing layout. Focusing any field collapses it;
- * it opens back up when the keyboard goes away or focus leaves the fields.
- * Blur waits a moment because moving between fields blurs one before focusing
- * the next, which would otherwise bounce the header open and shut. The
- * keyboard events cover Android's back button, which hides the keyboard but
- * leaves the field focused.
- *
- * Also reports how much of the screen the keyboard covers, so the Connect
- * button can sit on top of it. Measured here rather than left to
- * KeyboardAvoidingView, which on an edge-to-edge Android window kept part of
- * its padding after the keyboard closed and stranded the button mid-screen.
- */
-function useCollapsedWhileTyping() {
-  const [collapsed, setCollapsed] = useState(false);
-  const [keyboardInset, setKeyboardInset] = useState(0);
-  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const shown = Keyboard.addListener('keyboardDidShow', (e) => {
-      setCollapsed(true);
-      setKeyboardInset(
-        Math.max(0, Dimensions.get('screen').height - e.endCoordinates.screenY)
-      );
-    });
-    const hidden = Keyboard.addListener('keyboardDidHide', () => {
-      setCollapsed(false);
-      setKeyboardInset(0);
-    });
-    return () => {
-      shown.remove();
-      hidden.remove();
-      if (blurTimer.current) clearTimeout(blurTimer.current);
-    };
-  }, []);
-
-  function onFieldFocus() {
-    if (blurTimer.current) clearTimeout(blurTimer.current);
-    setCollapsed(true);
-  }
-
-  function onFieldBlur() {
-    blurTimer.current = setTimeout(() => setCollapsed(false), 100);
-  }
-
-  return { collapsed, keyboardInset, onFieldFocus, onFieldBlur };
 }
 
 const styles = StyleSheet.create({
@@ -156,35 +80,24 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     paddingTop: Spacing.six + Spacing.five,
     gap: Spacing.five,
-    // Centred on a wide window — this is a form, not the full-bleed grid.
+    // Centred on a wide window: this is a form, not the full-bleed grid.
     width: '100%',
     maxWidth: 560,
     alignSelf: 'center',
-  },
-  bodyCollapsed: {
-    paddingTop: Spacing.three,
-    gap: Spacing.five + Spacing.two,
   },
   brand: {
     alignItems: 'center',
     gap: Spacing.three,
   },
-  brandCollapsed: {
-    flexDirection: 'row',
-    alignSelf: 'flex-start',
-    gap: Spacing.three - Spacing.one,
-  },
   icon: {
     width: ICON_SIZE,
     height: ICON_SIZE,
   },
-  iconCollapsed: {
-    width: ICON_SIZE_COLLAPSED,
-    height: ICON_SIZE_COLLAPSED,
-  },
-  footer: {
+  actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+  },
+  footer: {
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,
   },

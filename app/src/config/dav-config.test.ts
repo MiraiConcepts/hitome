@@ -289,7 +289,7 @@ describe('webConnectionProblem', () => {
       new Error('Invalid credentials: PROPFIND https://x/dav/ returned 401')
     );
     expect(webConnectionProblem(failure, '').title).toBe(
-      'The calendar server turned down the login'
+      'Your login stopped working'
     );
   });
 

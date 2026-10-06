@@ -7,6 +7,7 @@
     "@gorhom/bottom-sheet": "5.2.14",
     "base-64": "^1.0.0",
     "expo": "~56.0.11",
+    "expo-asset": "~56.0.25",
     "expo-battery": "~56.0.4",
     "expo-constants": "~56.0.18",
     "expo-crypto": "~56.0.4",
@@ -42,6 +43,7 @@
   },
   "devDependencies": {
     "@types/base-64": "^1.0.2",
+    "@types/bun": "^1.4.2",
     "@types/jest": "29.5.14",
     "@types/react": "~19.2.2",
     "@types/text-encoding": "^0.0.40",
@@ -62,15 +64,21 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "web:proxy": "expo start --web --port 8082",
+    "server:dev": "DEV_UPSTREAM=http://localhost:8082 PORT=4000 DATA_DIR=.hitome-dev bun --watch server/index.ts",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p server",
     "test": "jest",
+    "test:server": "bun test server",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "private": true,
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/server/"
+    ]
   },
   "patchedDependencies": {
     "react-native-android-widget@0.22.1": "patches/react-native-android-widget@0.22.1.patch"
