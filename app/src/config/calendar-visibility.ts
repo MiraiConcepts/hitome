@@ -35,7 +35,10 @@ export function ensureHiddenCalendars(): Promise<readonly string[]> {
       return hidden;
     });
   }
-  return loading;
+  // The load runs once, but its promise holds the list as first read: answer
+  // with the current one, or a hide made since (setCalendarHidden) would not
+  // reach the widget's fetch until the app restarted.
+  return loading.then(() => hidden);
 }
 
 export function setCalendarHidden(url: string, hide: boolean): void {

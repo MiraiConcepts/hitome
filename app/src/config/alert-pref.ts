@@ -24,7 +24,8 @@ export function ensureDefaultAlert(): Promise<number | null> {
       return offset;
     });
   }
-  return loading;
+  // Current, not as first read (see calendar-pref.ts).
+  return loading.then(() => offset);
 }
 
 export function setDefaultAlert(next: number | null): void {

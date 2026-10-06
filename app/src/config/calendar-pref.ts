@@ -31,7 +31,9 @@ export function ensureDefaultCalendar(): Promise<string | null> {
       return preferred;
     });
   }
-  return loading;
+  // Current, not as first read: a choice made since (setDefaultCalendar)
+  // must reach the next new event without an app restart.
+  return loading.then(() => preferred);
 }
 
 export function setDefaultCalendar(url: string): void {
