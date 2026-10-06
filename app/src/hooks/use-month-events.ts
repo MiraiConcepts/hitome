@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 
-import { fetchMonth, isAuthFailure, subscribeStore } from '@/data/events';
+import {
+  fetchMonth,
+  isAuthFailure,
+  requestSync,
+  subscribeStore,
+} from '@/data/events';
 import type { CalEvent } from '@/caldav/types';
 import { getSourceStatus, useSourceStatus } from '@/config/source';
 import { gridFetchRange } from '@/utils/calendar-grid';
@@ -198,6 +203,10 @@ export function useMonthEvents(visibleMonth: Date) {
       lastRevalidate = Date.now();
       refresh();
       refreshAgendaWidget(); // foreground = the reliable widget trigger (no-op off-Android)
+      // Android: the store only learns of other devices' edits when the sync
+      // app next looks, which can be hours; coming to the front asks it to
+      // look now, and what lands redraws through subscribeStore. (Web: no-op.)
+      requestSync().catch(() => {});
     };
 
     const onAppStateChange = (state: AppStateStatus) => {
@@ -225,6 +234,12 @@ export function useMonthEvents(visibleMonth: Date) {
       }
     };
   }, [refresh, status]);
+
+  useEffect(() => {
+    // A cold open is a return to the front too (revalidate covers the
+    // rest). Its own effect: the polling one re-runs on every month change.
+    if (status === 'configured') requestSync().catch(() => {});
+  }, [status]);
 
   useEffect(() => {
     // Android: the phone's calendar store says when it changed — a sync
