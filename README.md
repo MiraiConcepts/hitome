@@ -2,6 +2,23 @@
 
 hitome is a calendar for me.
 
+# Screenshots
+
+Android
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="docs/screenshots/month.png" alt="The month grid"><br><sub>Month grid</sub></td>
+    <td align="center" width="33%"><img src="docs/screenshots/day.png" alt="A day's events in a popover over the grid"><br><sub>A day at a glance</sub></td>
+    <td align="center" width="33%"><img src="docs/screenshots/editor.png" alt="The event editor"><br><sub>Event editor</sub></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="docs/screenshots/widget.png" alt="The home-screen agenda widget"><br><sub>Home-screen agenda widget</sub></td>
+    <td align="center" valign="top"><img src="docs/screenshots/settings-sync.png" alt="Settings: sync and calendars"><br><sub>Settings: sync and calendars</sub></td>
+    <td align="center" valign="top"><img src="docs/screenshots/settings-notifications.png" alt="Settings: notifications and reminder preview"><br><sub>Settings: reminders</sub></td>
+  </tr>
+</table>
+
 # Capabilities
 
 hitome draws a self-hosted calendar as one continuous grid of weeks on the web
