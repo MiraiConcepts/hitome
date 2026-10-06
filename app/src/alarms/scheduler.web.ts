@@ -76,19 +76,56 @@ export async function permissionSnapshot(): Promise<PermissionSnapshot> {
   };
 }
 
-/** Immediate, for the same reason the scheduler is a timer: there is nothing
- *  to wake, so nothing is proven by delaying it. */
+/** How long to wait for the browser to say it showed the test. */
+const TEST_CONFIRM_MS = 3000;
+
+/**
+ * Immediate, for the same reason the scheduler is a timer: there is nothing
+ * to wake, so nothing is proven by delaying it. Resolves only once the
+ * browser says it showed the notification, and throws otherwise (refused,
+ * failed, or silent), so Settings never says "Sent" for one that was not:
+ * before, every failure was swallowed and reported as sent. Each test gets
+ * its own tag, because a repeated tag replaces the last one without a banner.
+ */
 export async function sendTestNotification(): Promise<void> {
   await ensureSetup();
-  if (!supported() || Notification.permission !== 'granted') return;
+  if (!supported() || Notification.permission !== 'granted')
+    throw new Error('This browser isn’t allowing notifications from hitome.');
+  let n: Notification;
   try {
-    new Notification('hitome', {
+    n = new Notification('hitome', {
       body: 'Test notification. Reminders can ring in this tab.',
-      tag: 'test-notification',
+      tag: `test-notification-${Date.now()}`,
     });
   } catch {
-    // ServiceWorker-only browsers — same silence as checkDue().
+    // Chrome on Android and some others only allow notifications from a
+    // service worker, which the web app does not have.
+    throw new Error(
+      'This browser can’t show hitome’s notifications. Use the Android app for reminders on a phone.'
+    );
   }
+  await new Promise<void>((resolve, reject) => {
+    // No word either way: the browser took it and went quiet, which is what
+    // a browser blocking it in private (a privacy mode, or the system not
+    // letting the browser notify) looks like from here.
+    const timer = setTimeout(
+      () =>
+        reject(
+          new Error(
+            'The browser took the notification but never showed it. Check your system’s notification settings for this browser, and its privacy settings.'
+          )
+        ),
+      TEST_CONFIRM_MS
+    );
+    n.onshow = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    n.onerror = () => {
+      clearTimeout(timer);
+      reject(new Error('The browser couldn’t show the notification.'));
+    };
+  });
 }
 
 export async function listScheduledAlarmIds(): Promise<string[]> {

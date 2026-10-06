@@ -18,6 +18,7 @@ import {
 import {
   SettingsButton,
   SettingsBlock,
+  SettingsBusy,
   SettingsButtonRow,
   SettingsMessage,
   SettingsOutcomeLine,
@@ -53,7 +54,7 @@ const PERMISSION_OFF =
 const TEST_SENT =
   TEST_DELAY_SECONDS > 0
     ? `Sent. It should arrive in about ${TEST_DELAY_SECONDS} seconds. Leave the app to check it rings in the background.`
-    : 'Sent. It should have appeared just now.';
+    : 'Sent, and the browser says it showed it. If you saw nothing, your computer is hiding it: check its notification settings for this browser, and Do Not Disturb.';
 
 /**
  * Reminder plumbing, made visible. Everything under here already existed —
@@ -193,7 +194,7 @@ export function NotificationsSection() {
               testID="settings-permission-toggle"
             />
           ) : (
-            (copy?.label ?? 'Checking…')
+            (copy?.label ?? <SettingsBusy label="Checking…" />)
           )
         }
         testID="settings-permission"
