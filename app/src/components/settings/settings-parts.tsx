@@ -1,6 +1,7 @@
-import { useEffect, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -400,6 +401,10 @@ type ButtonProps = {
   /** The action is running: a spinner replaces the label, the button keeps
    *  its size, and presses are ignored until it finishes. */
   busy?: boolean;
+  /** A wait after the action (a filled button only): the button empties and
+   *  refills left to right over `ms`, ignoring presses until it is full.
+   *  Restarted by a new `started`. */
+  cooldown?: { started: number; ms: number } | null;
   testID?: string;
 };
 
@@ -409,10 +414,28 @@ export function SettingsButton({
   disabled = false,
   variant = 'text',
   busy = false,
+  cooldown = null,
   testID,
 }: ButtonProps) {
   const theme = useTheme();
   const filled = variant === 'filled';
+  const fill = useSharedValue(1);
+  const started = cooldown?.started;
+  const ms = cooldown?.ms ?? 0;
+  // Cooling until the cooldown that started last has run out.
+  const [finished, setFinished] = useState<number | undefined>(undefined);
+  const cooling = started !== undefined && ms > 0 && finished !== started;
+  useEffect(() => {
+    if (started === undefined || ms <= 0) return;
+    fill.value = 0;
+    // Linear, so how full the bar is honestly says how long is left.
+    fill.value = withTiming(1, { duration: ms, easing: Easing.linear });
+    const timer = setTimeout(() => setFinished(started), ms);
+    return () => clearTimeout(timer);
+  }, [started, ms, fill]);
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${fill.value * 100}%`,
+  }));
   const inkStyle = filled
     ? styles.filledLabel
     : variant === 'danger'
@@ -421,11 +444,12 @@ export function SettingsButton({
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled || busy}
-      accessibilityState={{ busy, disabled: disabled || busy }}
+      disabled={disabled || busy || cooling}
+      accessibilityState={{ busy, disabled: disabled || busy || cooling }}
       hitSlop={8}
       style={({ pressed }) => [
         filled ? styles.filledButton : styles.textButton,
+        filled && cooling && styles.filledButtonCooling,
         pressed &&
           (filled
             ? styles.filledButtonPressed
@@ -434,12 +458,22 @@ export function SettingsButton({
       ]}
       testID={testID}
     >
-      {/* The label stays laid out while busy, only hidden, so the button
-          holds the width it had — the spinner sits over the same box. */}
-      <ThemedText type="smallBold" style={[inkStyle, busy && styles.hidden]}>
+      {filled && cooling && (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.cooldownFill, fillStyle]}
+        />
+      )}
+      {/* The label stays laid out while busy or cooling, only hidden, so
+          the button holds the width it had — the spinner sits over the same
+          box, and through a cooldown turns over the climbing fill. */}
+      <ThemedText
+        type="smallBold"
+        style={[inkStyle, (busy || cooling) && styles.hidden]}
+      >
         {label}
       </ThemedText>
-      {busy && (
+      {(busy || cooling) && (
         <View style={styles.spinnerSlot} pointerEvents="none">
           <Spinner color={inkStyle.color} />
         </View>
@@ -587,6 +621,18 @@ const styles = StyleSheet.create({
   },
   filledButtonPressed: {
     opacity: 0.85,
+  },
+  // Emptied to a faint accent the fill climbs back over; the black label
+  // reads on both.
+  filledButtonCooling: {
+    backgroundColor: 'rgba(255, 189, 79, 0.35)',
+  },
+  cooldownFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: AccentColor,
   },
   filledLabel: {
     color: OnAccentColor,

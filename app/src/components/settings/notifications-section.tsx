@@ -1,3 +1,4 @@
+import { isBatteryOptimizationEnabledAsync } from 'expo-battery';
 import { useEffect, useState } from 'react';
 import { AppState, Linking, Platform } from 'react-native';
 
@@ -36,6 +37,17 @@ import { setDefaultAlert, useDefaultAlert } from '@/config/alert-pref';
 // permission is only reversible from the browser's own UI.
 const CAN_OPEN_SYSTEM_SETTINGS = Platform.OS !== 'web';
 
+// Battery optimisation is Android's; the web has no background to restrict.
+const HAS_BACKGROUND_LIMIT = Platform.OS === 'android';
+
+/** Whether the phone lets hitome run in the background (exempt from battery
+ *  optimisation, which ColorOS calls "Allow background activity"); null where
+ *  it cannot tell. */
+async function backgroundAllowed(): Promise<boolean | null> {
+  if (!HAS_BACKGROUND_LIMIT) return null;
+  return !(await isBatteryOptimizationEnabledAsync());
+}
+
 const PERMISSION_OFF =
   'Notifications are off. Turn on Permission to send a test.';
 const TEST_SENT =
@@ -56,6 +68,13 @@ export function NotificationsSection() {
   const defaultAlert = useDefaultAlert();
   const [snapshot, setSnapshot] = useState<PermissionSnapshot | null>(null);
   const [scheduled, setScheduled] = useState<number | null>(null);
+  const [background, setBackground] = useState<boolean | null>(null);
+  // The test's wait, shown on its button: one test in flight at a time, so
+  // presses in the meantime are not quietly folded into the same one.
+  const [cooldown, setCooldown] = useState<{
+    started: number;
+    ms: number;
+  } | null>(null);
   const [outcome, setOutcome] = useState<SettingsOutcome>(null);
   const [busy, setBusy] = useState(false);
   // Bumped to re-read the platform, which is the only place this state lives.
@@ -63,11 +82,16 @@ export function NotificationsSection() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([permissionSnapshot(), listScheduledAlarmIds()])
-      .then(([next, ids]) => {
+    Promise.all([
+      permissionSnapshot(),
+      listScheduledAlarmIds(),
+      backgroundAllowed().catch(() => null),
+    ])
+      .then(([next, ids, allowed]) => {
         if (!alive) return;
         setSnapshot(next);
         setScheduled(ids.length);
+        setBackground(allowed);
       })
       .catch(() => {});
     return () => {
@@ -128,7 +152,18 @@ export function NotificationsSection() {
       });
       return;
     }
-    await run(sendTestNotification, TEST_SENT);
+    // From the tap, not from when the send returns: started after it, the
+    // button went spinner-on-amber, then emptied, a two-step flicker.
+    if (TEST_DELAY_SECONDS > 0)
+      setCooldown({ started: Date.now(), ms: TEST_DELAY_SECONDS * 1000 });
+    await run(async () => {
+      try {
+        await sendTestNotification();
+      } catch (err) {
+        setCooldown(null);
+        throw err;
+      }
+    }, TEST_SENT);
   }
 
   return (
@@ -140,12 +175,10 @@ export function NotificationsSection() {
             <SettingsToggle
               on={state === 'granted'}
               label={copy.label}
-              disabled={
-                busy ||
-                // Only the prompt can be shown from here where there are no
-                // system settings to open (web).
-                (!CAN_OPEN_SYSTEM_SETTINGS && copy.action !== 'enable')
-              }
+              // Not held by `busy`: dimmed for the length of a test send,
+              // the toggles flickered. Only the prompt can be shown from
+              // here where there are no system settings to open (web).
+              disabled={!CAN_OPEN_SYSTEM_SETTINGS && copy.action !== 'enable'}
               onPress={() =>
                 run(() =>
                   // Off and never asked: the system prompt. Anything else —
@@ -171,6 +204,33 @@ export function NotificationsSection() {
         value={scheduledLabel(scheduled)}
         testID="settings-scheduled"
       />
+
+      {HAS_BACKGROUND_LIMIT && background !== null && (
+        <>
+          <SettingsValue
+            label="Background Activity"
+            value={
+              <SettingsToggle
+                on={background}
+                label={background ? 'Allowed' : 'Restricted'}
+                // Changed only in the system's page for this app (Battery);
+                // the section re-reads on the way back.
+                onPress={() => run(() => Linking.openSettings())}
+                testID="settings-background-toggle"
+              />
+            }
+            testID="settings-background"
+          />
+          {!background && (
+            <SettingsBlock>
+              <SettingsMessage tone="problem">
+                The phone may stop hitome in the background, and Snooze can then
+                do nothing. Allow background activity under Battery.
+              </SettingsMessage>
+            </SettingsBlock>
+          )}
+        </>
+      )}
 
       <SettingsBlock>
         <FieldStack label="Default alert for new events" icon={BellIcon}>
@@ -204,21 +264,25 @@ export function NotificationsSection() {
       )}
 
       <SettingsBlock>
-        <SettingsOutcomeLine
-          outcome={shownOutcome}
-          testID="settings-notifications-problem"
-        />
-
         <SettingsButtonRow>
           <SettingsButton
             label="Send a test notification"
             variant="filled"
             busy={busy}
+            cooldown={cooldown}
             disabled={state === 'unsupported'}
             onPress={sendTest}
             testID="settings-test-notification"
           />
         </SettingsButtonRow>
+
+        {/* Under the button, not over it: arriving above, the line pushed
+            the button down out from under the finger that had just pressed
+            it. */}
+        <SettingsOutcomeLine
+          outcome={shownOutcome}
+          testID="settings-notifications-problem"
+        />
       </SettingsBlock>
     </SettingsSection>
   );
