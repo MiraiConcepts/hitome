@@ -1,5 +1,12 @@
 import { router, usePathname } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+} from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -7,6 +14,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -31,9 +39,18 @@ import {
   type MonthGridHandle,
 } from '@/components/calendar/month-grid';
 import { HEADER_GROUND, MonthHeader } from '@/components/calendar/month-header';
+import {
+  AlertCircleIcon,
+  CalendarPlusIcon,
+  CheckIcon,
+  type IconProps,
+  RefreshIcon,
+  TrashIcon,
+  WifiOffIcon,
+} from '@/components/icons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { AccentColor, Colors, Spacing } from '@/constants/theme';
+import { AccentColor, Colors, OnAccentColor, Spacing } from '@/constants/theme';
 import {
   classifyConnectError,
   webConnectionProblem,
@@ -54,8 +71,23 @@ type EditorState =
   | { mode: 'create'; day: string }
   | { mode: 'edit'; event: CalEvent };
 
+/** The toast's lead: what happened, black on an accent block. */
+function SnackMark({ icon: Icon }: { icon: ComponentType<IconProps> }) {
+  return (
+    <View style={styles.snackMark}>
+      <Icon size={18} color={OnAccentColor} />
+    </View>
+  );
+}
+
+/** The toast's fade in and out: long enough to read as easing, short
+ *  enough that a tap on Undo never waits on it. */
+const SNACK_FADE_MS = 150;
+
 type Snack = {
   message: string;
+  /** What happened, as a glyph on the toast's accent block. */
+  icon: ComponentType<IconProps>;
   undo?: { event: CalEvent; scope: EditScope };
 } | null;
 
@@ -372,12 +404,18 @@ export function MonthScreen() {
     // alarm notifications.
     refreshAgendaWidget();
     runAlarmReconcile();
-    if (result === 'created') setSnack({ message: 'Event added' });
-    else if (result === 'updated') setSnack({ message: 'Saved' });
+    if (result === 'created')
+      setSnack({ message: 'Event added', icon: CalendarPlusIcon });
+    else if (result === 'updated')
+      setSnack({ message: 'Saved', icon: CheckIcon });
     else if (result === 'conflict') {
-      setSnack({ message: 'Event changed elsewhere. List refreshed' });
+      setSnack({
+        message: 'Event changed elsewhere. List refreshed',
+        icon: RefreshIcon,
+      });
     } else
       setSnack({
+        icon: TrashIcon,
         message:
           result.scope === 'this'
             ? 'Occurrence deleted'
@@ -404,6 +442,7 @@ export function MonthScreen() {
     } catch (err) {
       setSnack({
         message: err instanceof Error ? err.message : 'Could not restore event',
+        icon: AlertCircleIcon,
       });
     }
   }
@@ -534,55 +573,60 @@ export function MonthScreen() {
       {/* Floating, not in the grid's flow: a bar that arrived in flow
           resized the grid pane after it had anchored, and the grid re-landed
           years off (Jul 2022 for an October start). */}
-      {(snack || (error && !neverLoaded)) && (
-        <View style={[styles.snackWrapper, { bottom: bottomInset }]}>
-          {error && !neverLoaded && (
-            <View style={styles.snack} testID="error-banner">
-              <ThemedText
-                type="small"
-                style={styles.snackText}
-                numberOfLines={2}
-              >
-                {problem?.title ?? error}
+      {/* Always mounted (it lays out nothing when empty), so a bar leaving
+          can fade out rather than vanish with its parent. */}
+      <View style={[styles.snackWrapper, { bottom: bottomInset }]}>
+        {error && !neverLoaded && (
+          <Animated.View
+            entering={FadeIn.duration(SNACK_FADE_MS)}
+            exiting={FadeOut.duration(SNACK_FADE_MS)}
+            style={styles.snack}
+            testID="error-banner"
+          >
+            <SnackMark icon={authFailed ? AlertCircleIcon : WifiOffIcon} />
+            <ThemedText type="small" style={styles.snackText} numberOfLines={2}>
+              {problem?.title ?? error}
+            </ThemedText>
+            {/* A rejected login is not something retrying fixes. */}
+            <Pressable
+              accessibilityRole="button"
+              style={styles.snackButton}
+              onPress={
+                authFailed && !problem
+                  ? () => router.navigate('/settings')
+                  : onManualRefresh
+              }
+            >
+              <ThemedText type="smallBold" style={styles.snackAction}>
+                {authFailed && !problem ? 'Settings' : 'Retry'}
               </ThemedText>
-              {/* A rejected login is not something retrying fixes. */}
+            </Pressable>
+          </Animated.View>
+        )}
+        {snack && (
+          <Animated.View
+            entering={FadeIn.duration(SNACK_FADE_MS)}
+            exiting={FadeOut.duration(SNACK_FADE_MS)}
+            style={[styles.snack, !snack.undo && styles.snackPlain]}
+          >
+            <SnackMark icon={snack.icon} />
+            <ThemedText type="small" style={styles.snackText} numberOfLines={2}>
+              {snack.message}
+            </ThemedText>
+            {snack.undo && (
               <Pressable
                 accessibilityRole="button"
-                onPress={
-                  authFailed && !problem
-                    ? () => router.navigate('/settings')
-                    : onManualRefresh
-                }
+                style={styles.snackButton}
+                onPress={() => undoDelete(snack.undo!)}
               >
-                <ThemedText type="smallBold" style={{ color: AccentColor }}>
-                  {authFailed && !problem ? 'Settings' : 'Retry'}
+                <ThemedText type="smallBold" style={styles.snackAction}>
+                  Undo
                 </ThemedText>
               </Pressable>
-            </View>
-          )}
-          {snack && (
-            <View style={styles.snack}>
-              <ThemedText
-                type="small"
-                style={styles.snackText}
-                numberOfLines={2}
-              >
-                {snack.message}
-              </ThemedText>
-              {snack.undo && (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => undoDelete(snack.undo!)}
-                >
-                  <ThemedText type="smallBold" style={{ color: AccentColor }}>
-                    Undo
-                  </ThemedText>
-                </Pressable>
-              )}
-            </View>
-          )}
-        </View>
-      )}
+            )}
+          </Animated.View>
+        )}
+      </View>
 
       {neverLoaded && problem && (
         <ConnectionProblem
@@ -675,27 +719,53 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
+    // Bottom right, clear of the thumb's reach for the grid's middle.
+    alignItems: 'flex-end',
+    paddingHorizontal: Spacing.three,
     gap: Spacing.two,
     pointerEvents: 'box-none',
   },
   snack: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.four,
+    // Stretched, so the mark's block runs the bar's full height; the text
+    // and the button centre themselves.
+    alignItems: 'stretch',
+    gap: Spacing.three,
     // Inverse surface: the snack keeps the dark palette in both schemes.
-    backgroundColor: Colors.dark.backgroundSelected,
-    // The settings cards' accent edge, so the bar reads as the app's own
-    // surface rather than a grey cell among the grid's.
-    borderLeftWidth: 3,
-    borderLeftColor: AccentColor,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
+    // Black with a ruled edge, so it stands off the grid's near-black cells.
+    backgroundColor: Colors.dark.backgroundElement,
+    borderWidth: 1,
+    borderColor: Colors.dark.ruleStrong,
+    paddingRight: Spacing.two,
+    // A bar with a button and one without stand the same height: the
+    // button's line plus its padding, the bar's padding, and the rule.
+    minHeight: 20 + Spacing.one * 2 + Spacing.two * 2 + 2,
     maxWidth: 480,
+  },
+  // No button: the right gets the left's padding, or the message sits off
+  // centre in its bar.
+  snackPlain: {
+    paddingRight: Spacing.three,
+  },
+  snackMark: {
+    width: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: AccentColor,
   },
   snackText: {
     color: Colors.dark.text,
     flexShrink: 1,
+    alignSelf: 'center',
+    paddingVertical: Spacing.two,
+  },
+  snackButton: {
+    alignSelf: 'center',
+  },
+  snackAction: {
+    color: OnAccentColor,
+    backgroundColor: AccentColor,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
   },
 });

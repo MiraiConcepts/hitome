@@ -5,8 +5,18 @@ import { CalendarMark } from '@/components/calendar/calendar-mark';
 import { SettingsButton } from '@/components/settings/settings-parts';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { AccentColor, Spacing } from '@/constants/theme';
-import { dayLabel, formatTime } from '@/utils/date';
+import {
+  AccentColor,
+  FontFamilyBold,
+  OnAccentColor,
+  Spacing,
+} from '@/constants/theme';
+import { dayLabel, formatTime, timeSpan } from '@/utils/date';
+
+/** The calendar mark beside a row's time; its box is the time's line
+ *  height, so the glyph centres on that line at any size. */
+const MARK_SIZE = 16;
+const WHEN_LINE = 20;
 
 type Props = {
   /** The day (dateString) whose events are listed. */
@@ -59,10 +69,11 @@ export function DayPopover({
             style={styles.card}
             testID="day-popover"
           >
-            <ThemedText type="smallBold" style={styles.title}>
-              {dayLabel(day)} ▪ {sorted.length}{' '}
-              {sorted.length === 1 ? 'event' : 'events'}
-            </ThemedText>
+            {/* An accent band, so the card reads as lifted off the grid
+                rather than one more dark cell. */}
+            <View style={styles.header}>
+              <ThemedText style={styles.headerText}>{dayLabel(day)}</ThemedText>
+            </View>
             <ScrollView contentContainerStyle={styles.list}>
               {sorted.map((event) => (
                 <Pressable
@@ -88,44 +99,38 @@ export function DayPopover({
                       }
                       style={styles.row}
                     >
-                      {/* Source calendar's mark, in its color (theme accent
-                          if none). */}
-                      <View style={styles.mark}>
-                        <CalendarMark
-                          icon={event.icon}
-                          color={event.color ?? AccentColor}
-                        />
-                      </View>
-                      <View style={styles.time}>
-                        {event.allDay ? (
-                          <ThemedText type="small" themeColor="textSecondary">
-                            All day
-                          </ThemedText>
-                        ) : (
-                          <>
-                            <ThemedText type="small">
-                              {formatTime(event.start)}
-                            </ThemedText>
-                            <ThemedText type="small" themeColor="textSecondary">
-                              {formatTime(event.end)}
-                            </ThemedText>
-                          </>
-                        )}
-                      </View>
-                      <View style={styles.body}>
-                        <ThemedText numberOfLines={1}>
-                          {event.summary || '(untitled)'}
+                      {/* Agenda order: when (with the source calendar's
+                          mark, in its colour), then what, then where. */}
+                      <View style={styles.when}>
+                        <View style={styles.mark}>
+                          <CalendarMark
+                            icon={event.icon}
+                            color={event.color ?? AccentColor}
+                            size={MARK_SIZE}
+                          />
+                        </View>
+                        <ThemedText type="small" style={styles.whenText}>
+                          {event.allDay
+                            ? 'All day'
+                            : timeSpan(
+                                formatTime(event.start),
+                                formatTime(event.end)
+                              )}
                         </ThemedText>
-                        {event.location ? (
-                          <ThemedText
-                            type="small"
-                            themeColor="textSecondary"
-                            numberOfLines={1}
-                          >
-                            {event.location}
-                          </ThemedText>
-                        ) : null}
                       </View>
+                      <ThemedText style={styles.indent} numberOfLines={1}>
+                        {event.summary || '(untitled)'}
+                      </ThemedText>
+                      {event.location ? (
+                        <ThemedText
+                          type="small"
+                          themeColor="textSecondary"
+                          style={styles.indent}
+                          numberOfLines={1}
+                        >
+                          {event.location}
+                        </ThemedText>
+                      ) : null}
                     </ThemedView>
                   )}
                 </Pressable>
@@ -166,33 +171,57 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
   },
   card: {
-    padding: Spacing.three,
     gap: Spacing.two,
+    paddingBottom: Spacing.three,
     maxHeight: '100%',
   },
-  title: {
-    paddingHorizontal: Spacing.one,
+  header: {
+    backgroundColor: AccentColor,
+    paddingHorizontal: Spacing.three,
+    // A point higher than even: centres the capitals (measured on device),
+    // which is what the eye reads, not the line box.
+    paddingTop: Spacing.four - Spacing.one - 1,
+    paddingBottom: Spacing.four - Spacing.one + 1,
+  },
+  headerText: {
+    color: OnAccentColor,
+    fontFamily: FontFamilyBold,
+    fontSize: 24,
+    lineHeight: 30,
+    // Android pads the line for accents the date never has, and the date
+    // sat low in the band; without it equal padding reads as centred.
+    includeFontPadding: false,
   },
   list: {
     gap: Spacing.one,
   },
+  // Full width, so a pressed row lights edge to edge; its inset matches the
+  // header's, so the marks line up under the date.
   row: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    gap: Spacing.half,
+  },
+  when: {
     flexDirection: 'row',
-    gap: Spacing.three,
-    padding: Spacing.two,
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   mark: {
-    marginTop: 3, // sit level with the first text line
+    height: WHEN_LINE,
+    justifyContent: 'center',
   },
-  time: {
-    width: 52,
+  whenText: {
+    color: AccentColor,
+    lineHeight: WHEN_LINE,
   },
-  body: {
-    flex: 1,
-    gap: Spacing.half,
+  // Title and place sit under the time, past the mark.
+  indent: {
+    paddingLeft: MARK_SIZE + Spacing.two,
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    paddingHorizontal: Spacing.three,
   },
 });

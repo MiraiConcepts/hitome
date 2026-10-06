@@ -32,6 +32,9 @@ import {
   FileTextOutlineBody,
   BugOutlineBody,
   GiftOutlineBody,
+  CalendarPlusOutlineBody,
+  TrashOutlineBody,
+  WifiOffOutlineBody,
 } from '@/constants/icon-paths';
 
 export type IconProps = { size?: number; color: string };
@@ -148,4 +151,16 @@ export function BugIcon({ size = 24, color }: IconProps) {
 
 export function GiftIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(GiftOutlineBody, size, color)} />;
+}
+
+export function CalendarPlusIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(CalendarPlusOutlineBody, size, color)} />;
+}
+
+export function TrashIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(TrashOutlineBody, size, color)} />;
+}
+
+export function WifiOffIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(WifiOffOutlineBody, size, color)} />;
 }

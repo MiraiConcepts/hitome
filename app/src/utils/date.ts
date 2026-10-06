@@ -89,6 +89,12 @@ export function parseDay(day: string): Date | null {
   return parseDayTime(day, '00:00');
 }
 
+/** An event's span as the app writes it everywhere: '16:15 → 17:15'. The
+ *  ends come formatted, so a caller can put a day before the end. */
+export function timeSpan(start: string, end: string): string {
+  return `${start} → ${end}`;
+}
+
 /** Next full hour after `from` (e.g. 14:23 → 15:00). */
 export function nextFullHour(from: Date): Date {
   const d = new Date(from);
