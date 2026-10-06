@@ -17,6 +17,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BootScreen } from '@/components/boot-screen';
 import { onCalendarReady } from '@/components/calendar/calendar-ready';
 import { SetupScreen } from '@/components/settings/setup-screen';
+import { declareBoldFace } from '@/constants/font-faces';
 import { ensureDefaultAlert } from '@/config/alert-pref';
 import { ensureSource, useSourceStatus } from '@/config/source';
 import { useAlarmReconcile } from '@/hooks/use-alarm-reconcile';
@@ -26,6 +27,9 @@ import { useDeepLinkSource } from '@/hooks/use-deep-link-source';
 import { useHydrated } from '@/hooks/use-hydrated';
 import { useSilentReload } from '@/hooks/use-silent-reload';
 import { refreshAgendaWidget } from '@/widget/app-refresh';
+
+// Web: Satoshi's bold file declared as bold, before anything draws text.
+declareBoldFace();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

@@ -15,6 +15,7 @@ import {
   Card,
   CONTROL_HEIGHT,
   SettingsBlock,
+  SettingsBusy,
   SettingsMessage,
   SettingsSection,
 } from '@/components/settings/settings-parts';
@@ -88,7 +89,7 @@ export function CalendarsSection() {
       )}
       {!calendars && !problem && (
         <SettingsBlock>
-          <SettingsMessage>Loading…</SettingsMessage>
+          <SettingsBusy label="Loading…" />
         </SettingsBlock>
       )}
       {calendars?.map((calendar) => {
@@ -144,15 +145,28 @@ export function CalendarsSection() {
         // What the tick means, once, at the foot of the card — the list
         // itself stays just the calendars.
         <SettingsBlock>
-          <SettingsMessage icon={CheckIcon}>
-            Where new events go. {ON_WEB ? 'Click' : 'Tap'} a calendar to
-            change.
-          </SettingsMessage>
-          <SettingsMessage icon={EyeIcon}>
-            {ON_WEB
-              ? 'Shown on the calendar. Click the eye to hide one.'
-              : 'Shown on the calendar and widget. Tap the eye to hide one.'}
-          </SettingsMessage>
+          {ON_WEB ? (
+            // One line on the web: a legend for the two marks, side by side.
+            // Rows show they can be clicked; what each mark means is the
+            // part worth saying.
+            <View style={styles.legend}>
+              <SettingsMessage icon={CheckIcon}>
+                New events go here
+              </SettingsMessage>
+              <SettingsMessage icon={EyeIcon}>
+                Shown on the calendar
+              </SettingsMessage>
+            </View>
+          ) : (
+            <>
+              <SettingsMessage icon={CheckIcon}>
+                Where new events go. Tap a calendar to change.
+              </SettingsMessage>
+              <SettingsMessage icon={EyeIcon}>
+                Shown on the calendar and widget. Tap the eye to hide one.
+              </SettingsMessage>
+            </>
+          )}
         </SettingsBlock>
       )}
       <SettingsBlock>
@@ -191,6 +205,12 @@ const dayName = (day: number) =>
   });
 
 const styles = StyleSheet.create({
+  legend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: Spacing.four,
+    rowGap: Spacing.two,
+  },
   eye: {
     padding: Spacing.one,
     margin: -Spacing.one,

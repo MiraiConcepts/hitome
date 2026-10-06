@@ -195,6 +195,29 @@ export function SettingsValue({
   );
 }
 
+/**
+ * Something being read, in the place its value will appear: the app's
+ * dashed circle turning beside a word that says what ("Loading…",
+ * "Checking…"), in the quiet secondary ink.
+ */
+export function SettingsBusy({
+  label,
+  testID,
+}: {
+  label: string;
+  testID?: string;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={styles.busyRow} testID={testID}>
+      <Spinner color={theme.textSecondary} size={14} />
+      <ThemedText type="small" themeColor="textSecondary">
+        {label}
+      </ThemedText>
+    </View>
+  );
+}
+
 /** Toggle geometry: square, like everything else here. */
 const Toggle = {
   width: 40,
@@ -316,7 +339,12 @@ export function SettingsBlock({
 
 /** Message-line type: the size of the Calendars legend, which every note,
  *  confirmation and error now shares. */
-const Message = { size: 12, lineHeight: 16, icon: 12 } as const;
+const Message = {
+  size: 12,
+  lineHeight: 16,
+  icon: 12,
+  glyphNudge: 1,
+} as const;
 
 type MessageTone = 'note' | 'success' | 'problem';
 
@@ -445,10 +473,14 @@ export function SettingsButton({
     <Pressable
       onPress={onPress}
       disabled={disabled || busy || cooling}
+      // Named as a button for screen readers, and on the web for the
+      // keyboard: without it the label was announced as plain text.
+      accessibilityRole="button"
       accessibilityState={{ busy, disabled: disabled || busy || cooling }}
       hitSlop={8}
       style={({ pressed }) => [
         filled ? styles.filledButton : styles.textButton,
+        variant === 'text' && styles.outlinedButton,
         filled && cooling && styles.filledButtonCooling,
         pressed &&
           (filled
@@ -488,6 +520,11 @@ export function SettingsButtonRow({ children }: { children: ReactNode }) {
 }
 
 const styles = StyleSheet.create({
+  busyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -593,6 +630,11 @@ const styles = StyleSheet.create({
   messageGlyph: {
     height: Message.lineHeight,
     justifyContent: 'center',
+    // Optical, not layout: Satoshi's lowercase sits about 1.6px below the
+    // line's centre (its ascent leaves far more room above the letters than
+    // its descent below), so a glyph centred on the line read as riding high
+    // beside a sentence. Same correction as the event chips' ink nudge.
+    marginTop: Message.glyphNudge,
   },
   messageText: {
     flexShrink: 1,
@@ -612,6 +654,14 @@ const styles = StyleSheet.create({
     minHeight: CONTROL_HEIGHT,
     justifyContent: 'center',
     paddingHorizontal: Spacing.three,
+  },
+  // The secondary action: drawn as a square amber outline, so it reads as a
+  // button beside the filled one rather than as a link. Same padding as the
+  // filled button, so a pair of them lines up.
+  outlinedButton: {
+    borderWidth: 1,
+    borderColor: AccentColor,
+    paddingHorizontal: Spacing.four - Spacing.half - 1,
   },
   filledButton: {
     minHeight: CONTROL_HEIGHT,

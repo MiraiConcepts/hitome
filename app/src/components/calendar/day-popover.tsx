@@ -163,6 +163,9 @@ const styles = StyleSheet.create({
   // The dialog still focuses this layer when it opens from the keyboard; it
   // is the whole screen, so a ring on it would frame the page.
   dismiss: {
+    // Solid at zero width: Chrome draws its 'auto' focus ring whatever the
+    // width says, so the style has to change too.
+    outlineStyle: 'solid',
     outlineWidth: 0,
   },
   cardWrap: {

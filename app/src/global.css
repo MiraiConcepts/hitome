@@ -28,3 +28,18 @@ a:focus-visible,
   outline: 2px solid #ffbd4f;
   outline-offset: -2px;
 }
+
+/* Never let the browser fake bold by thickening letters: every bold here is
+   the real Satoshi Bold file (see constants/font-faces.web.ts). Faked, it
+   doubled up on text that was already bold. */
+html {
+  font-synthesis-weight: none;
+}
+
+/* Text fields draw their own focus: the accent border (TextField). The
+   browser's ring on top of it (blue, rounded) doubled it and broke the
+   square UI. */
+input:focus,
+textarea:focus {
+  outline: none;
+}
