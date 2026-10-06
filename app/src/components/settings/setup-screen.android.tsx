@@ -22,6 +22,7 @@ import {
 } from '@/config/source.android';
 import { Spacing } from '@/constants/theme';
 import { DAVX5_DOWNLOAD, openDavx5 } from '@/store/events';
+import { refreshAgendaWidget } from '@/widget/app-refresh';
 
 /**
  * First run on Android. hitome holds no server login here: it reads the
@@ -125,7 +126,11 @@ export function SetupScreen() {
                   // Granted: the spinner keeps going while this screen holds
                   // over the calendar drawing beneath it, then fades. Only a
                   // refusal changes the button (to Open settings).
-                  if (await requestCalendarAccess()) return 'stay-busy';
+                  if (await requestCalendarAccess()) {
+                    // The widget was showing "connect"; tell it now.
+                    refreshAgendaWidget();
+                    return 'stay-busy';
+                  }
                   setAsked(true);
                 })
               }
