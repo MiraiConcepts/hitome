@@ -67,11 +67,15 @@ jobs:
         run: |
           nohup bun run web:proxy > metro.log 2>&1 &
           for i in $(seq 1 90); do
-            curl -sf -o /dev/null http://localhost:8082 && exit 0
+            curl -sf -o /dev/null http://localhost:8082 && break
             sleep 2
           done
-          cat metro.log
-          exit 1
+          curl -sf -o /dev/null http://localhost:8082 || { cat metro.log; exit 1; }
+          # The page answers before its bundle is built; a cold bundle takes
+          # ~30s on a runner, longer than the specs wait for the first screen.
+          # Build it now, from the script tag the page itself asks for.
+          bundle=$(curl -sf http://localhost:8082 | grep -oE 'src="/[^"]+\.bundle[^"]*"' | head -1 | sed 's/^src="//; s/"$//; s/&amp;/\&/g')
+          curl -sf -o /dev/null --max-time 300 "http://localhost:8082$bundle"
 
       - name: Run e2e
         working-directory: tooling/e2e
