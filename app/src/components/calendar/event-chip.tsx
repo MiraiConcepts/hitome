@@ -1,3 +1,4 @@
+import { useCallback, useSyncExternalStore } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -113,6 +114,32 @@ type BannerProps = PressProps & {
  * stays visible. Past a week edge the event continues over, it bleeds to the
  * pane edge instead.
  */
+/**
+ * The occurrence under the finger, shared by every strip of it. A banner that
+ * crosses a week edge is drawn once per week row, and each strip is its own
+ * Pressable, so a pressed state kept per strip lit only the week touched — the
+ * rest of the event stayed dark. Keyed by occurrence id, so another
+ * occurrence of the same series beside it does not light up too; a selector
+ * per strip means a press re-renders only that event's strips, not the grid.
+ */
+let pressedId: string | null = null;
+const pressListeners = new Set<() => void>();
+function setPressed(id: string | null) {
+  if (pressedId === id) return;
+  pressedId = id;
+  for (const listener of pressListeners) listener();
+}
+function subscribePressed(listener: () => void) {
+  pressListeners.add(listener);
+  return () => {
+    pressListeners.delete(listener);
+  };
+}
+function useIsPressed(id: string): boolean {
+  const get = useCallback(() => pressedId === id, [id]);
+  return useSyncExternalStore(subscribePressed, get, get);
+}
+
 export function EventBanner({
   placement,
   titleLines,
@@ -122,18 +149,22 @@ export function EventBanner({
   const { event, continuesRight } = placement;
   // Fill by source calendar; title contrasts against whatever that fill is.
   const fill = event.color ?? AccentColor;
+  const pressed = useIsPressed(event.id);
+  const { onPressIn, onPressOut } = press;
   return (
     <Pressable
       {...press}
+      onPressIn={(e) => {
+        setPressed(event.id);
+        onPressIn(e);
+      }}
+      onPressOut={() => {
+        if (pressedId === event.id) setPressed(null);
+        onPressOut();
+      }}
       accessibilityRole="button"
       accessibilityLabel={event.summary}
-      style={({
-        hovered,
-        pressed,
-      }: {
-        hovered?: boolean;
-        pressed: boolean;
-      }) => [
+      style={({ hovered }: { hovered?: boolean }) => [
         styles.banner,
         { backgroundColor: fill },
         continuesRight && styles.bannerContinuesRight,
