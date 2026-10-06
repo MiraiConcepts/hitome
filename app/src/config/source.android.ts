@@ -78,10 +78,18 @@ export function recheckSource(): Promise<boolean> {
 }
 
 /** Ask for calendar access (the system prompt), then look again; true when
- *  hitome can now read a calendar. */
-export async function requestCalendarAccess(): Promise<boolean> {
+ *  hitome can now read a calendar. `thenAsk` runs between the two once
+ *  access is granted (the notification prompt), so every prompt is answered
+ *  before the screen gives way to the calendar. */
+export async function requestCalendarAccess(
+  thenAsk?: () => Promise<void>
+): Promise<boolean> {
   setStoreDisconnected(false);
-  await PermissionsAndroid.requestMultiple([READ, WRITE]);
+  const result = await PermissionsAndroid.requestMultiple([READ, WRITE]);
+  const granted = Object.values(result).every(
+    (r) => r === PermissionsAndroid.RESULTS.GRANTED
+  );
+  if (granted && thenAsk) await thenAsk().catch(() => {});
   return recheckSource();
 }
 

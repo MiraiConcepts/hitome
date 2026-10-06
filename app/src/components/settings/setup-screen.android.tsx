@@ -5,6 +5,7 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 
+import { requestPermissionIfNeeded } from '@/alarms/scheduler';
 import { AppName } from '@/components/settings/app-name';
 import {
   SettingsBlock,
@@ -83,7 +84,7 @@ export function SetupScreen() {
               <SettingsBlock>
                 <ThemedText type="small" themeColor="textSecondary">
                   <Brand /> shows the calendars your phone already syncs, from
-                  DAVx⁵, Google or any other account.
+                  DAVx⁵, Google or any other account, and rings their reminders.
                 </ThemedText>
               </SettingsBlock>
             </SettingsSection>
@@ -126,7 +127,10 @@ export function SetupScreen() {
                   // Granted: the spinner keeps going while this screen holds
                   // over the calendar drawing beneath it, then fades. Only a
                   // refusal changes the button (to Open settings).
-                  if (await requestCalendarAccess()) {
+                  // Calendar first, then notifications: reminders are the
+                  // other half of a calendar, and a fresh install would
+                  // otherwise drop them silently until Settings was found.
+                  if (await requestCalendarAccess(requestPermissionIfNeeded)) {
                     // The widget was showing "connect"; tell it now.
                     refreshAgendaWidget();
                     return 'stay-busy';
