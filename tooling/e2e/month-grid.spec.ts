@@ -236,11 +236,16 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
     await cancelEditor(page);
   });
 
-  await test.step("hold an empty day → create editor dated that day", async () => {
+  await test.step("click or hold an empty day → create editor dated that day", async () => {
     const cell = grid(page).getByTestId(`day-cell-${dateString(target(15))}`);
-    // A tap on a day with nothing to list is inert — creating is the hold.
+    // On the web a click on a day with nothing to list creates there (a
+    // mouse has no hold); the phone's hold still works too.
     await cell.click();
-    await expect(page.getByTestId("event-editor")).toHaveCount(0);
+    await expect(page.getByTestId("event-editor")).toBeVisible();
+    await expect(page.getByTestId("editor-start-date")).toHaveValue(
+      dateString(target(15)),
+    );
+    await cancelEditor(page);
 
     await cell.click(HOLD);
     await expect(page.getByTestId("event-editor")).toBeVisible();
@@ -406,9 +411,10 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
     await page.goto("/?new=e2e-dialog-nonce");
     const editor = page.getByTestId("event-editor");
     await expect(editor).toBeVisible({ timeout: 30_000 });
-    // Dialog, not sheet: capped at maxWidth 480 and vertically centered.
+    // Dialog, not sheet: capped at maxWidth 840 (two columns) and
+    // vertically centered.
     const box = await editor.boundingBox();
-    expect(box!.width).toBeLessThanOrEqual(500);
+    expect(box!.width).toBeLessThanOrEqual(840);
     expect(box!.y).toBeGreaterThan(20);
     await expect(page.getByTestId("editor-title")).toHaveText(
       await editorTitleFor(page, dateString(now)),

@@ -1,4 +1,5 @@
-import { Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import type { CalEvent } from '@/caldav/types';
 import {
@@ -10,7 +11,7 @@ import {
 import { EventEditorSheet } from '@/components/calendar/event-editor-sheet';
 import { useEventEditor } from '@/components/calendar/use-event-editor';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 
 export type { EditorResult } from '@/components/calendar/use-event-editor';
@@ -59,13 +60,34 @@ export function EventEditor({ event, defaultDay, onClose, onDone }: Props) {
  *  in a centered card. */
 function EventEditorDialog({ event, defaultDay, onClose, onDone }: Props) {
   const editor = useEventEditor({ event, defaultDay, onDone });
+  // Cmd/Ctrl+Enter saves from any field, as in a mail composer; Esc already
+  // closes through the modal. Re-subscribed whenever save changes, so the
+  // listener always saves the form as it stands.
+  const { save, busy, scopeAsk } = editor;
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey)) return;
+      if (busy || scopeAsk) return;
+      e.preventDefault();
+      save();
+    };
+    // Capture phase: the title field handles Enter itself (submit and blur)
+    // and stops it there, so a bubbling listener never hears it.
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [save, busy, scopeAsk]);
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <ThemedView style={styles.card} testID="event-editor">
           <EventEditorHeader editor={editor} />
           <ScrollView keyboardShouldPersistTaps="handled">
-            <EventEditorFields editor={editor} autoFocusTitle={!event} />
+            <EventEditorFields
+              editor={editor}
+              autoFocusTitle={!event}
+              columns
+            />
           </ScrollView>
           <EventEditorActions editor={editor} onClose={onClose} />
         </ThemedView>
@@ -82,10 +104,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.three,
   },
+  // Wide enough for two columns of fields. The edge is drawn because the
+  // header's black ground is the dimmed backdrop's colour: without it the
+  // date title looked to float above the card.
   card: {
     overflow: 'hidden',
     width: '100%',
-    maxWidth: 480,
+    maxWidth: 840,
     maxHeight: '90%',
+    borderWidth: 1,
+    borderColor: Colors.dark.ruleStrong,
   },
 });

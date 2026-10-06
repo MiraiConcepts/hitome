@@ -116,6 +116,9 @@ type FieldsProps = {
   /** A field at the tail of the form (location, notes) took focus — the
    *  sheet scrolls it out from under the keyboard. */
   onFocusTail?: () => void;
+  /** Two columns, for the wide dialog: what and when on the left, the
+   *  details (location, notes) on the right, so nothing is below the fold. */
+  columns?: boolean;
 };
 
 /**
@@ -130,6 +133,7 @@ export function EventEditorFields({
   titleRef,
   autoFocusTitle = false,
   onFocusTail,
+  columns = false,
 }: FieldsProps) {
   const {
     summary,
@@ -149,8 +153,8 @@ export function EventEditorFields({
     headerDay,
   } = editor;
 
-  return (
-    <View style={styles.fields}>
+  const what = (
+    <>
       <View style={styles.group}>
         <FieldStack label="Title" icon={PencilIcon}>
           <TextField
@@ -251,30 +255,47 @@ export function EventEditorFields({
           testID="editor-alert"
         />
       </View>
+    </>
+  );
 
-      <View style={styles.group}>
-        <FieldStack label="Location" icon={MapPinIcon}>
-          <LocationField
-            value={editor.location}
-            onChange={editor.setLocation}
-            TextInputComponent={TextInputComponent}
-            onFocus={onFocusTail}
-            testID="editor-location"
-          />
-        </FieldStack>
-        <FieldStack label="Notes" icon={NotesIcon}>
-          <TextField
-            TextInputComponent={TextInputComponent}
-            style={styles.notes}
-            value={editor.description}
-            onChangeText={editor.setDescription}
-            placeholder="Add notes"
-            onFocus={onFocusTail}
-            multiline
-            testID="editor-notes"
-          />
-        </FieldStack>
+  const details = (
+    <View style={[styles.group, columns && styles.detailsColumn]}>
+      <FieldStack label="Location" icon={MapPinIcon}>
+        <LocationField
+          value={editor.location}
+          onChange={editor.setLocation}
+          TextInputComponent={TextInputComponent}
+          onFocus={onFocusTail}
+          testID="editor-location"
+        />
+      </FieldStack>
+      <FieldStack label="Notes" icon={NotesIcon}>
+        <TextField
+          TextInputComponent={TextInputComponent}
+          style={[styles.notes, columns && styles.notesTall]}
+          value={editor.description}
+          onChangeText={editor.setDescription}
+          placeholder="Add notes"
+          onFocus={onFocusTail}
+          multiline
+          testID="editor-notes"
+        />
+      </FieldStack>
+    </View>
+  );
+
+  if (columns) {
+    return (
+      <View style={[styles.fields, styles.columns]}>
+        <View style={styles.column}>{what}</View>
+        <View style={styles.column}>{details}</View>
       </View>
+    );
+  }
+  return (
+    <View style={styles.fields}>
+      {what}
+      {details}
     </View>
   );
 }
@@ -457,6 +478,22 @@ const styles = StyleSheet.create({
   notes: {
     minHeight: 88,
     textAlignVertical: 'top',
+  },
+  // Beside the when-group in the wide dialog: room for real notes.
+  notesTall: {
+    minHeight: 220,
+  },
+  columns: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  column: {
+    flex: 1,
+    minWidth: 0,
+    gap: Spacing.four + Spacing.one,
+  },
+  detailsColumn: {
+    flex: 1,
   },
   row: {
     flexDirection: 'row',

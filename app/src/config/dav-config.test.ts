@@ -5,6 +5,7 @@ import {
   connectFailureMessage,
   normalizeDavUrl,
   type ConnectFailure,
+  webConnectionProblem,
   writeFailureMessage,
 } from './dav-config';
 
@@ -279,5 +280,63 @@ describe('writeFailureMessage', () => {
     expect(
       writeFailureMessage(new Error('CalDAV update failed (HTTP 500)'), 'move')
     ).toBe('Not moved: CalDAV update failed (HTTP 500)');
+  });
+});
+
+describe('webConnectionProblem', () => {
+  it('reads the rethrown discovery 401 as a refused login', () => {
+    const failure = classifyConnectError(
+      new Error('Invalid credentials: PROPFIND https://x/dav/ returned 401')
+    );
+    expect(webConnectionProblem(failure, '').title).toBe(
+      'The calendar server turned down the login'
+    );
+  });
+
+  it('never asks for a username or password', () => {
+    const failures: ConnectFailure[] = [
+      'needs-login',
+      'unauthorized',
+      'forbidden',
+      'not-caldav',
+      'no-calendars',
+      'unreachable',
+    ];
+    for (const failure of failures) {
+      const { body } = webConnectionProblem(failure, '');
+      expect(body).not.toMatch(/username|password/i);
+    }
+  });
+
+  it('uses no em or en dashes', () => {
+    const failures: ConnectFailure[] = [
+      'unauthorized',
+      'not-caldav',
+      'no-calendars',
+      'timeout',
+      'unknown',
+    ];
+    for (const failure of failures) {
+      const { title, body } = webConnectionProblem(failure, 'boom');
+      expect(`${title} ${body}`).not.toMatch(/[\u2013\u2014]/);
+    }
+  });
+
+  it('reads a proxy’s 502 as the server being down', () => {
+    const failure = classifyConnectError(
+      new Error(
+        'Calendar server unavailable: PROPFIND https://x/dav/ returned 502'
+      )
+    );
+    expect(failure).toBe('unreachable');
+    expect(webConnectionProblem(failure, '').title).toBe(
+      'Can’t reach your calendar'
+    );
+  });
+
+  it('keeps the readable end of an unknown failure', () => {
+    expect(
+      webConnectionProblem('unknown', 'fetch failed: something odd').body
+    ).toBe('something odd');
   });
 });

@@ -12,6 +12,7 @@ import { ThemedText } from '@/components/themed-text';
 import { AccentColor, Spacing } from '@/constants/theme';
 import type { BannerPlacement } from '@/utils/calendar-grid';
 import { readableTextColor } from '@/utils/color';
+import { scaled } from '@/components/calendar/grid-scale';
 
 /**
  * An event carries the same two gestures as the day cell beneath it, so
@@ -55,7 +56,11 @@ export function EventChip({ event, titleLines, style, ...press }: ChipProps) {
       {...press}
       accessibilityRole="button"
       accessibilityLabel={event.summary}
-      style={[styles.chip, style]}
+      style={({ hovered }: { hovered?: boolean }) => [
+        styles.chip,
+        style,
+        hovered && styles.hovered,
+      ]}
       testID={`chip-${event.id}`}
     >
       {/* Accent bar tinted by the source calendar (falls back to the theme accent). */}
@@ -118,11 +123,12 @@ export function EventBanner({
       {...press}
       accessibilityRole="button"
       accessibilityLabel={event.summary}
-      style={[
+      style={({ hovered }: { hovered?: boolean }) => [
         styles.banner,
         { backgroundColor: fill },
         continuesRight && styles.bannerContinuesRight,
         style,
+        hovered && styles.hovered,
       ]}
     >
       <ThemedText
@@ -139,8 +145,8 @@ export function EventBanner({
 
 /** Every event's text — chip title, wrapped title, start time, banner title.
  *  week-row's width estimate is derived from this, so the two move together. */
-export const EVENT_FONT_SIZE = 11;
-const EVENT_LINE_HEIGHT = 14;
+export const EVENT_FONT_SIZE = scaled(11);
+export const EVENT_LINE_HEIGHT = scaled(14);
 /**
  * Optical centring, not layout. Satoshi's ascent (1.026em) leaves far more
  * room above the caps than its descent (0.224em) leaves below the baseline, so
@@ -152,6 +158,11 @@ const EVENT_LINE_HEIGHT = 14;
 const EVENT_INK_NUDGE = 0.5;
 
 const styles = StyleSheet.create({
+  // A mouse over an event (react-native-web only): it is its own target,
+  // separate from the day beneath it.
+  hovered: {
+    opacity: 0.8,
+  },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

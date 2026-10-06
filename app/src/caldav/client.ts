@@ -53,8 +53,48 @@ async function connect(): Promise<DAVClient> {
   const config = await ensureDavConfig();
   if (!config) throw new Error('No calendar server configured');
   const client = clientFor(config);
-  await client.login(); // PROPFIND: discovers principal + calendar-home-set
+  await loginExplained(client, config);
   return client;
+}
+
+/**
+ * client.login() (the PROPFIND that discovers the principal and
+ * calendar-home-set) with a refused login named as one. tsdav's discovery
+ * never looks at the status: a 401 comes back as `cannot find principalUrl`,
+ * which reads as "not a calendar server" when the login is what changed. So
+ * on failure the address is asked once more, plainly: a 401/403 is
+ * rethrown in tsdav's own wording for one, which isAuthFailure and
+ * classifyConnectError both recognise, and a 5xx as the server being down.
+ */
+async function loginExplained(
+  client: DAVClient,
+  config: DavConfig
+): Promise<void> {
+  try {
+    await client.login();
+  } catch (err) {
+    const status = await statusOf(config).catch(() => null);
+    if (status === 401 || status === 403)
+      throw new Error(
+        `Invalid credentials: PROPFIND ${config.url} returned ${status}`
+      );
+    // A proxy whose calendar is down answers 502/503/504 itself, and that
+    // reaches tsdav as the same missing principal.
+    if (status !== null && status >= 500)
+      throw new Error(
+        `Calendar server unavailable: PROPFIND ${config.url} returned ${status}`
+      );
+    throw err;
+  }
+}
+
+/** The HTTP status a bare PROPFIND on the server address answers with. */
+async function statusOf(config: DavConfig): Promise<number> {
+  const headers: Record<string, string> = { Depth: '0' };
+  if (config.username)
+    headers.Authorization = `Basic ${btoa(`${config.username}:${config.password}`)}`;
+  const res = await fetch(config.url, { method: 'PROPFIND', headers });
+  return res.status;
 }
 
 /**
@@ -69,7 +109,7 @@ export async function probeConnection(
 ): Promise<DAVCalendar[]> {
   const client = clientFor(config);
   const check = (async () => {
-    await client.login();
+    await loginExplained(client, config);
     const calendars = await client.fetchCalendars();
     if (!calendars.length) throw new NoCalendarsError();
     return calendars;

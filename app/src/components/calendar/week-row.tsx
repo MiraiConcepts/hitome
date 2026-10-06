@@ -20,9 +20,11 @@ import Animated, {
 import type { CalEvent } from '@/caldav/types';
 import {
   EVENT_FONT_SIZE,
+  EVENT_LINE_HEIGHT,
   EventBanner,
   EventChip,
 } from '@/components/calendar/event-chip';
+import { scaled } from '@/components/calendar/grid-scale';
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -31,7 +33,8 @@ import { eventDays, parseDay, toDateString } from '@/utils/date';
 
 /** Height of one banner/chip slot inside a day cell: one line of event text
  *  (EVENT_LINE_HEIGHT), the dp the strip stands proud of it at each end, and
- *  the gap to the strip below — 14 + 2 + 4.
+ *  the gap to the strip below — 14 + 2 + 4 (the line grows with GRID_SCALE
+ *  on a wide web window; the ends and the gap do not).
  *
  *  A strip is sized to the slots it was granted rather than to the lines it
  *  renders, so every gap in a column is EVENT_GAP whatever sits above it. That
@@ -42,7 +45,7 @@ import { eventDays, parseDay, toDateString } from '@/utils/date';
  *  Raising this trades events for room: a slot per cell is roughly five dp of
  *  row height, so 20 shows four events before the "+N" counter where 18 showed
  *  five. */
-export const SLOT_HEIGHT = 20;
+export const SLOT_HEIGHT = EVENT_LINE_HEIGHT + 2 + Spacing.one;
 /** Clear space between one strip and the next — the app's spacing unit, which
  *  is also what separates everything else in the UI. It comes out of the slot,
  *  so raising it makes strips shorter rather than pushing them apart. */
@@ -51,14 +54,14 @@ export const EVENT_GAP = Spacing.one;
  *  bottom edge rather than laid into a slot. */
 const MORE_BOTTOM_INSET = 2;
 /** The counter's own box — its line, nothing more. */
-const COUNTER_HEIGHT = 14;
+const COUNTER_HEIGHT = scaled(14);
 /** What the counter needs beneath the last strip to sit clear of it. Read by
  *  month-grid to decide whether a slot has to be surrendered for it. */
 export const COUNTER_FOOTPRINT = COUNTER_HEIGHT + MORE_BOTTOM_INSET;
 
 /** Height of the day-number line at the top of each cell — the number's own
  *  box plus the gap that holds the first event off it. */
-export const DAY_NUMBER_HEIGHT = 24;
+export const DAY_NUMBER_HEIGHT = scaled(24);
 
 type WeekRowProps = {
   /** Week-start (Monday) dateString — the row's identity. */
@@ -356,14 +359,16 @@ export const WeekRow = memo(function WeekRow({
 
   const dayAt = useCallback((col: number) => toDateString(days[col]), [days]);
 
-  /** Tap: the day's list. An empty day has no list, so it stays inert — the
-   *  cell is still there to be held. */
+  /** Tap: the day's list. An empty day has no list: on the phone it stays
+   *  inert (the cell is still there to be held), and on the web, where a
+   *  mouse has no hold, a click there starts a new event instead. */
   const openDay = useCallback(
     (col: number) => {
       const day = dayAt(col);
       if (daysWithEvents.has(day)) onOpenDay(day);
+      else if (Platform.OS === 'web') onCreateOnDay(day);
     },
-    [dayAt, daysWithEvents, onOpenDay]
+    [dayAt, daysWithEvents, onOpenDay, onCreateOnDay]
   );
 
   /** Hold: a new event on that day. */
@@ -459,9 +464,13 @@ export const WeekRow = memo(function WeekRow({
               onPressOut={pressOut}
               delayLongPress={LONG_PRESS_MS}
               unstable_pressDelay={PRESS_DELAY_MS}
-              style={[
+              // `hovered` is react-native-web's (a mouse over the cell); it
+              // never sets on a phone. Cells are transparent over the row's
+              // ground, so a light wash reads as a highlight on any day.
+              style={({ hovered }: { hovered?: boolean }) => [
                 styles.cell,
                 tint != null && { backgroundColor: tint },
+                hovered && tint == null && styles.cellHover,
                 col < 6 && styles.cellRule,
               ]}
             >
@@ -651,6 +660,9 @@ const styles = StyleSheet.create({
     paddingTop: 2,
     alignItems: 'flex-start',
   },
+  cellHover: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
   cellRule: {
     borderRightWidth: RULE_WIDTH,
     borderRightColor: GRID_RULE,
@@ -662,7 +674,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dayNumber: {
-    fontSize: 14,
+    fontSize: scaled(14),
   },
   inkWell: {
     position: 'absolute',
@@ -691,13 +703,13 @@ const styles = StyleSheet.create({
     pointerEvents: 'box-none',
   },
   more: {
-    fontSize: 12,
+    fontSize: scaled(12),
     // The same weight as the day number: both are the cell's own chrome
     // rather than one of its events, and they sit in opposite corners.
     fontWeight: '700',
     // Explicit, so the text centres in its box rather than inheriting a line
     // box taller than it and drifting low.
-    lineHeight: 14,
+    lineHeight: COUNTER_HEIGHT,
     // Mirrors the day number's own inset on the other side, and clears the
     // cell's right-hand rule.
     paddingRight: 5,

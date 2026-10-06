@@ -2,6 +2,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import type { CalEvent } from '@/caldav/types';
 import { CalendarMark } from '@/components/calendar/calendar-mark';
+import { SettingsButton } from '@/components/settings/settings-parts';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AccentColor, Spacing } from '@/constants/theme';
@@ -14,6 +15,9 @@ type Props = {
   events: CalEvent[];
   onClose: () => void;
   onPressEvent: (event: CalEvent) => void;
+  /** A new event on this day. Given on the web, where a click on a busy day
+   *  lands here and there is no hold to add with; the phone holds the cell. */
+  onAdd?: () => void;
 };
 
 function compareEvents(a: CalEvent, b: CalEvent): number {
@@ -26,18 +30,30 @@ function compareEvents(a: CalEvent, b: CalEvent): number {
  * EventEditor) listing one day's full event set; tapping a row opens the
  * edit editor via onPressEvent.
  */
-export function DayPopover({ day, events, onClose, onPressEvent }: Props) {
+export function DayPopover({
+  day,
+  events,
+  onClose,
+  onPressEvent,
+  onAdd,
+}: Props) {
   const sorted = [...events].sort(compareEvents);
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable
-        style={styles.backdrop}
-        onPress={onClose}
-        accessibilityRole="button"
-        accessibilityLabel="Close"
-      >
-        {/* Nested pressable claims card taps so they don't close the modal. */}
-        <Pressable style={styles.cardWrap} onPress={() => {}}>
+      <View style={styles.backdrop}>
+        {/* The backdrop is a layer behind the card, not around it: wrapped,
+            every row became a button inside a button, which the web
+            rejects as invalid HTML. */}
+        {/* Not a keyboard stop: the dialog focuses its first stop on
+            opening, and a full-screen one wore the focus ring as a frame
+            round the page. Escape closes it from the keyboard. */}
+        <Pressable
+          style={[StyleSheet.absoluteFill, styles.dismiss]}
+          onPress={onClose}
+          focusable={false}
+          accessibilityLabel="Close"
+        />
+        <View style={styles.cardWrap}>
           <ThemedView
             type="backgroundElement"
             style={styles.card}
@@ -55,10 +71,20 @@ export function DayPopover({ day, events, onClose, onPressEvent }: Props) {
                   accessibilityRole="button"
                   accessibilityLabel={event.summary}
                 >
-                  {({ pressed }) => (
+                  {/* `hovered` is react-native-web's; it never sets on a
+                      phone. */}
+                  {({
+                    pressed,
+                    hovered,
+                  }: {
+                    pressed: boolean;
+                    hovered?: boolean;
+                  }) => (
                     <ThemedView
                       type={
-                        pressed ? 'backgroundSelected' : 'backgroundElement'
+                        pressed || hovered
+                          ? 'backgroundSelected'
+                          : 'backgroundElement'
                       }
                       style={styles.row}
                     >
@@ -105,9 +131,18 @@ export function DayPopover({ day, events, onClose, onPressEvent }: Props) {
                 </Pressable>
               ))}
             </ScrollView>
+            {onAdd && (
+              <View style={styles.actions}>
+                <SettingsButton
+                  label="Add event"
+                  onPress={onAdd}
+                  testID="day-popover-add"
+                />
+              </View>
+            )}
           </ThemedView>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -119,6 +154,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.three,
+  },
+  // The dialog still focuses this layer when it opens from the keyboard; it
+  // is the whole screen, so a ring on it would frame the page.
+  dismiss: {
+    outlineWidth: 0,
   },
   cardWrap: {
     width: '100%',
@@ -150,5 +190,9 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     gap: Spacing.half,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
 });

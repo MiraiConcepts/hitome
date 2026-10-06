@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,6 +20,7 @@ import {
 } from '@/data/events';
 import type { CalEvent } from '@/caldav/types';
 import { markCalendarReady } from '@/components/calendar/calendar-ready';
+import { ConnectionProblem } from '@/components/calendar/connection-problem';
 import { DayPopover } from '@/components/calendar/day-popover';
 import {
   EventEditor,
@@ -33,6 +34,11 @@ import { HEADER_GROUND, MonthHeader } from '@/components/calendar/month-header';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AccentColor, Colors, Spacing } from '@/constants/theme';
+import {
+  classifyConnectError,
+  webConnectionProblem,
+} from '@/config/dav-config';
+import { useCalendarKeys } from '@/hooks/use-calendar-keys';
 import { useDeepLink } from '@/hooks/use-deep-link';
 import { useMonthEvents } from '@/hooks/use-month-events';
 import {
@@ -310,10 +316,39 @@ export function MonthScreen() {
     []
   );
 
+  // The header's + on the web starts on the month being looked at: today when
+  // it is in view, else that month's 1st. (The phone keeps today: its + is
+  // usually reached from the widget, about now.)
+  const addDay =
+    Platform.OS === 'web' && !sameMonth(month, monthOfDay(null, new Date()))
+      ? toDateString(new Date(month.year, month.month0, 1))
+      : today;
+
   function goToday() {
     const target = monthOfDay(null, new Date());
     gridRef.current?.scrollToMonth(target.year, target.month0, true);
   }
+
+  // Settings is presented over this screen rather than replacing it, so the
+  // route says whether the grid is what the keyboard is pointed at.
+  const pathname = usePathname();
+  useCalendarKeys({
+    enabled: pathname === '/' && !overlayOpen,
+    onNew: () => setEditor({ mode: 'create', day: addDay }),
+    onToday: goToday,
+    onStepMonth: (step) => {
+      const target = new Date(month.year, month.month0 + step, 1);
+      gridRef.current?.scrollToMonth(
+        target.getFullYear(),
+        target.getMonth(),
+        true
+      );
+    },
+    onShowDay: (day) => {
+      const target = monthOfDay(day, new Date());
+      gridRef.current?.scrollToMonth(target.year, target.month0, true);
+    },
+  });
 
   function onManualRefresh() {
     setManualRefreshing(true);
@@ -373,6 +408,23 @@ export function MonthScreen() {
     }
   }
 
+  // Web says what went wrong in its own terms (there is no login to fix in
+  // the app, only on the server). A calendar that has never loaded gets the
+  // whole screen; one that has keeps its grid and a bar saying it is stale.
+  const problem = useMemo(
+    () =>
+      Platform.OS === 'web' && error
+        ? webConnectionProblem(
+            authFailed
+              ? 'unauthorized'
+              : classifyConnectError(new Error(error)),
+            error
+          )
+        : null,
+    [error, authFailed]
+  );
+  const neverLoaded = problem !== null && !fetchedAt && allEvents.length === 0;
+
   const popoverEvents = useMemo(() => {
     if (!popoverDay) return [];
     return events.filter((event) =>
@@ -420,28 +472,9 @@ export function MonthScreen() {
             fetchedAt={fetchedAt}
             onToday={goToday}
             onRefresh={onManualRefresh}
-            onAdd={() => setEditor({ mode: 'create', day: today })}
+            onAdd={() => setEditor({ mode: 'create', day: addDay })}
             onSettings={() => router.navigate('/settings')}
           />
-
-          {error && (
-            <ThemedView type="backgroundElement" style={styles.errorBanner}>
-              <ThemedText type="small" style={styles.errorText}>
-                {error}
-              </ThemedText>
-              {/* A rejected login is not something retrying fixes. */}
-              <Pressable
-                accessibilityRole="button"
-                onPress={
-                  authFailed ? () => router.navigate('/settings') : refresh
-                }
-              >
-                <ThemedText type="smallBold" style={{ color: AccentColor }}>
-                  {authFailed ? 'Settings' : 'Retry'}
-                </ThemedText>
-              </Pressable>
-            </ThemedView>
-          )}
 
           <View style={styles.weekdays}>
             {weekdayLabels.map((label) => (
@@ -498,24 +531,65 @@ export function MonthScreen() {
         </View>
       </SafeAreaView>
 
-      {snack && (
+      {/* Floating, not in the grid's flow: a bar that arrived in flow
+          resized the grid pane after it had anchored, and the grid re-landed
+          years off (Jul 2022 for an October start). */}
+      {(snack || (error && !neverLoaded)) && (
         <View style={[styles.snackWrapper, { bottom: bottomInset }]}>
-          <View style={styles.snack}>
-            <ThemedText type="small" style={styles.snackText} numberOfLines={2}>
-              {snack.message}
-            </ThemedText>
-            {snack.undo && (
+          {error && !neverLoaded && (
+            <View style={styles.snack} testID="error-banner">
+              <ThemedText
+                type="small"
+                style={styles.snackText}
+                numberOfLines={2}
+              >
+                {problem?.title ?? error}
+              </ThemedText>
+              {/* A rejected login is not something retrying fixes. */}
               <Pressable
                 accessibilityRole="button"
-                onPress={() => undoDelete(snack.undo!)}
+                onPress={
+                  authFailed && !problem
+                    ? () => router.navigate('/settings')
+                    : onManualRefresh
+                }
               >
                 <ThemedText type="smallBold" style={{ color: AccentColor }}>
-                  Undo
+                  {authFailed && !problem ? 'Settings' : 'Retry'}
                 </ThemedText>
               </Pressable>
-            )}
-          </View>
+            </View>
+          )}
+          {snack && (
+            <View style={styles.snack}>
+              <ThemedText
+                type="small"
+                style={styles.snackText}
+                numberOfLines={2}
+              >
+                {snack.message}
+              </ThemedText>
+              {snack.undo && (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => undoDelete(snack.undo!)}
+                >
+                  <ThemedText type="smallBold" style={{ color: AccentColor }}>
+                    Undo
+                  </ThemedText>
+                </Pressable>
+              )}
+            </View>
+          )}
         </View>
+      )}
+
+      {neverLoaded && problem && (
+        <ConnectionProblem
+          problem={problem}
+          busy={manualRefreshing}
+          onRetry={onManualRefresh}
+        />
       )}
 
       {popoverDay && (
@@ -524,6 +598,14 @@ export function MonthScreen() {
           events={popoverEvents}
           onClose={() => setPopoverDay(null)}
           onPressEvent={onPressEvent}
+          onAdd={
+            Platform.OS === 'web'
+              ? () => {
+                  setPopoverDay(null);
+                  setEditor({ mode: 'create', day: popoverDay });
+                }
+              : undefined
+          }
         />
       )}
 
@@ -557,17 +639,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     width: '100%',
-  },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
-    padding: Spacing.three,
-    marginBottom: Spacing.two,
-  },
-  errorText: {
-    flex: 1,
   },
   // Continues the accent bar above it, so the header reads as one block down
   // to the grid. No separator of its own: the grid's first row already draws a
@@ -606,6 +677,7 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
     paddingHorizontal: Spacing.four,
+    gap: Spacing.two,
     pointerEvents: 'box-none',
   },
   snack: {
@@ -614,6 +686,10 @@ const styles = StyleSheet.create({
     gap: Spacing.four,
     // Inverse surface: the snack keeps the dark palette in both schemes.
     backgroundColor: Colors.dark.backgroundSelected,
+    // The settings cards' accent edge, so the bar reads as the app's own
+    // surface rather than a grey cell among the grid's.
+    borderLeftWidth: 3,
+    borderLeftColor: AccentColor,
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,
     maxWidth: 480,

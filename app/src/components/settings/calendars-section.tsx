@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { listCalendars, type CalendarChoice } from '@/data/events';
 import { CalendarMark } from '@/components/calendar/calendar-mark';
@@ -36,6 +36,10 @@ import {
 } from '@/config/week-start';
 import { AccentColor, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+
+/** The web is clicked, has no widget, and its first day comes from the
+ *  browser's language rather than a phone's region. */
+const ON_WEB = Platform.OS === 'web';
 
 /**
  * Which calendar new events go into. Every discovered calendar is read and
@@ -141,10 +145,13 @@ export function CalendarsSection() {
         // itself stays just the calendars.
         <SettingsBlock>
           <SettingsMessage icon={CheckIcon}>
-            Where new events go. Tap a calendar to change.
+            Where new events go. {ON_WEB ? 'Click' : 'Tap'} a calendar to
+            change.
           </SettingsMessage>
           <SettingsMessage icon={EyeIcon}>
-            Shown on the calendar and widget. Tap the eye to hide one.
+            {ON_WEB
+              ? 'Shown on the calendar. Click the eye to hide one.'
+              : 'Shown on the calendar and widget. Tap the eye to hide one.'}
           </SettingsMessage>
         </SettingsBlock>
       )}
@@ -156,7 +163,7 @@ export function CalendarsSection() {
               { value: 'sunday', label: 'Sunday' },
               {
                 value: 'phone',
-                label: `Match phone (${dayName(getPhoneFirstDay())})`,
+                label: `Match ${ON_WEB ? 'browser' : 'phone'} (${dayName(getPhoneFirstDay())})`,
               },
             ]}
             value={weekStart}

@@ -18,6 +18,7 @@ import {
   SettingsButton,
   SettingsBlock,
   SettingsButtonRow,
+  SettingsMessage,
   SettingsOutcomeLine,
   SettingsSection,
   SettingsToggle,
@@ -185,11 +186,22 @@ export function NotificationsSection() {
         </FieldStack>
       </SettingsBlock>
 
-      <SettingsBlock>
-        <FieldStack label="What a reminder looks like" icon={EyeIcon}>
-          <ReminderPreview />
-        </FieldStack>
-      </SettingsBlock>
+      {Platform.OS === 'web' ? (
+        // The preview is an Android notification, Join and Snooze included;
+        // a browser's looks like the browser's, and arrives only while the
+        // page is open (alarms/scheduler.web.ts), which is worth saying.
+        <SettingsBlock>
+          <SettingsMessage icon={BellIcon}>
+            Reminders arrive only while this page is open in a tab.
+          </SettingsMessage>
+        </SettingsBlock>
+      ) : (
+        <SettingsBlock>
+          <FieldStack label="What a reminder looks like" icon={EyeIcon}>
+            <ReminderPreview />
+          </FieldStack>
+        </SettingsBlock>
+      )}
 
       <SettingsBlock>
         <SettingsOutcomeLine

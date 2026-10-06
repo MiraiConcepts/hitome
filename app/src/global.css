@@ -12,3 +12,19 @@
     'MS PGothic', sans-serif;
   --font-serif: Satoshi, Georgia, 'Times New Roman', serif;
 }
+
+/* Keyboard focus on the web. The browser's own ring ("auto") is drawn with
+   rounded corners, and the UI is square; inset so a ring on a day cell is
+   not clipped by its neighbours. Controls only: a dialog focuses its own
+   container when it opens, and that must not frame the page. Fields draw
+   their own focused border. */
+button:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible,
+[role='link']:focus-visible,
+[role='switch']:focus-visible,
+[role='checkbox']:focus-visible,
+[role='radio']:focus-visible {
+  outline: 2px solid #ffbd4f;
+  outline-offset: -2px;
+}

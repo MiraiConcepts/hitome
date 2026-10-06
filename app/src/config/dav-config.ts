@@ -144,6 +144,7 @@ export function classifyConnectError(
     return 'insecure';
   if (
     lower.includes('network request failed') ||
+    lower.includes('server unavailable') ||
     lower.includes('connectexception') ||
     lower.includes('noroutetohostexception') ||
     lower.includes('sockettimeoutexception') ||
@@ -191,6 +192,55 @@ export function connectFailureMessage(
       return 'The browser blocked this request. A server on another address has to send CORS headers for the web app to reach it.';
     case 'unknown':
       return `Couldn’t connect: ${plainReason(fallback)}`;
+  }
+}
+
+/** A connection failure as the web app explains it: a heading and a line. */
+export type ConnectionProblem = { title: string; body: string };
+
+/**
+ * What the web app says when it cannot load the calendar. Not
+ * connectFailureMessage: that one answers a form someone just typed into,
+ * and the web has no form. Its calendar lives at /dav/ on the address the
+ * page came from, and the server there signs in for it, so each cause is
+ * put in those terms.
+ */
+export function webConnectionProblem(
+  failure: ConnectFailure,
+  fallback: string
+): ConnectionProblem {
+  switch (failure) {
+    case 'needs-login':
+    case 'unauthorized':
+    case 'forbidden':
+      return {
+        title: 'The calendar server turned down the login',
+        body: 'The server this page comes from signs in to your calendar for you, and that login was refused. It has probably changed: update it on the server, then try again.',
+      };
+    case 'not-caldav':
+      return {
+        title: 'No calendar server here',
+        body: 'This address answered, but not as a calendar server. The calendar should be at /dav/ on the address this page was opened from.',
+      };
+    case 'no-calendars':
+      return {
+        title: 'No calendars yet',
+        body: 'Signed in, but this account has no calendars. Create one on the server, then try again.',
+      };
+    case 'no-such-host':
+    case 'unreachable':
+    case 'timeout':
+    case 'insecure':
+    case 'blocked-by-browser':
+      return {
+        title: 'Can’t reach your calendar',
+        body: 'The calendar server didn’t answer. Check that this device is on the network or VPN the server is on, then try again.',
+      };
+    default:
+      return {
+        title: 'Couldn’t load your calendar',
+        body: plainReason(fallback),
+      };
   }
 }
 
