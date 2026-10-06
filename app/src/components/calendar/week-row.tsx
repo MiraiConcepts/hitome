@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   Platform,
   Pressable,
@@ -157,6 +157,11 @@ const INK_RELEASE_MS = 150;
 /** How fast the ink reaches full strength. Short: the colour arrives at once,
  *  and it is the spreading circle, not the tint, that reports the hold. */
 const INK_FADE_MS = 90;
+/** How long a press on an event lasts before the day's ink starts. A tap
+ *  opens the event, and lights the event; only a press held past this is
+ *  turning into a hold, which creates on the day, so only then does the day
+ *  ink — the rest of LONG_PRESS_MS, so it still fills as the hold fires. */
+const EVENT_INK_DELAY_MS = 150;
 /** The ink itself. Fixed rather than a palette token, for the same reason as
  *  the fills above: it has to read on the bare background, on a neighbouring
  *  month's grey AND on today's blue, and one value does all three — the dark
@@ -270,9 +275,9 @@ export const WeekRow = memo(function WeekRow({
 
   // Ink: a circle spreading from the point touched until it has filled the
   // cell. One per row rather than one per cell, moved to whichever column is
-  // under the finger — a press that starts on a chip or banner inks the cell
-  // beneath it, which is the point: the gestures belong to the cell, so the
-  // feedback has to as well.
+  // under the finger — a press held on a chip or banner inks the cell beneath
+  // it, because the hold creates on that day; a tap on one lights the event
+  // instead (event-chip), since the tap opens the event.
   const inkCol = useSharedValue(-1);
   const inkX = useSharedValue(0);
   const inkY = useSharedValue(0);
@@ -283,7 +288,7 @@ export const WeekRow = memo(function WeekRow({
   // The overspill is clipped away by the well around it.
   const inkRadius = Math.hypot(cellWidth, rowHeight);
   const pressIn = useCallback(
-    (col: number, x: number, y: number) => {
+    (col: number, x: number, y: number, growMs: number = LONG_PRESS_MS) => {
       inkCol.value = col;
       inkX.value = Number.isFinite(x) ? x : cellWidth / 2;
       inkY.value = Number.isFinite(y) ? y : rowHeight / 2;
@@ -293,7 +298,7 @@ export const WeekRow = memo(function WeekRow({
       // finished long before the press fires.
       inkGrow.value = 0.12;
       inkGrow.value = withTiming(1, {
-        duration: LONG_PRESS_MS,
+        duration: growMs,
         easing: Easing.linear,
       });
       inkFade.value = withTiming(1, { duration: INK_FADE_MS });
@@ -303,6 +308,31 @@ export const WeekRow = memo(function WeekRow({
   const pressOut = useCallback(() => {
     inkFade.value = withTiming(0, { duration: INK_RELEASE_MS });
   }, [inkFade]);
+
+  // An event's press: the cell's ink, held back until the press outlasts a
+  // tap (see EVENT_INK_DELAY_MS).
+  const eventInk = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressInEvent = useCallback(
+    (col: number, x: number, y: number) => {
+      if (eventInk.current) clearTimeout(eventInk.current);
+      eventInk.current = setTimeout(
+        () => pressIn(col, x, y, LONG_PRESS_MS - EVENT_INK_DELAY_MS),
+        EVENT_INK_DELAY_MS
+      );
+    },
+    [pressIn]
+  );
+  const pressOutEvent = useCallback(() => {
+    if (eventInk.current) clearTimeout(eventInk.current);
+    eventInk.current = null;
+    pressOut();
+  }, [pressOut]);
+  useEffect(
+    () => () => {
+      if (eventInk.current) clearTimeout(eventInk.current);
+    },
+    []
+  );
 
   // Flash a day the app was sent to, so dismissing whatever opened over it
   // leaves you knowing which cell you came from. Keyed on the nonce, not the
@@ -548,7 +578,7 @@ export const WeekRow = memo(function WeekRow({
             }
             onPressIn={(e) => {
               const col = bannerCol(e, banner.startCol, banner.span);
-              pressIn(
+              pressInEvent(
                 col,
                 e.nativeEvent.locationX - (col - banner.startCol) * cellWidth,
                 DAY_NUMBER_HEIGHT +
@@ -556,7 +586,7 @@ export const WeekRow = memo(function WeekRow({
                   e.nativeEvent.locationY
               );
             }}
-            onPressOut={pressOut}
+            onPressOut={pressOutEvent}
             delayLongPress={LONG_PRESS_MS}
             unstable_pressDelay={PRESS_DELAY_MS}
             style={{
@@ -584,7 +614,7 @@ export const WeekRow = memo(function WeekRow({
             onPress={() => pressEvent(chip.event, chip.col)}
             onLongPress={() => createOn(chip.col)}
             onPressIn={(e) =>
-              pressIn(
+              pressInEvent(
                 chip.col,
                 e.nativeEvent.locationX,
                 DAY_NUMBER_HEIGHT +
@@ -592,7 +622,7 @@ export const WeekRow = memo(function WeekRow({
                   e.nativeEvent.locationY
               )
             }
-            onPressOut={pressOut}
+            onPressOut={pressOutEvent}
             delayLongPress={LONG_PRESS_MS}
             unstable_pressDelay={PRESS_DELAY_MS}
             style={{

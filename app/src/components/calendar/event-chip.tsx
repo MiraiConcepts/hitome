@@ -19,8 +19,10 @@ import { scaled } from '@/components/calendar/grid-scale';
  * nothing the cell offers is lost by covering a strip of it: tap opens (the
  * event, or the day's list when the cell overflows), hold creates on the day
  * under the finger. The week row decides all of that — it knows the column and
- * the overflow count — so the handlers here are opaque pass-throughs, and the
- * press-in/out pair only exists to drive the cell's ink.
+ * the overflow count — so the handlers here are opaque pass-throughs. A press
+ * lights the event itself (what a tap opens); the press-in/out pair drives the
+ * cell's ink, which the row starts only once the press is turning into a hold
+ * (what creates on that day).
  */
 type PressProps = {
   onPress: (e: GestureResponderEvent) => void;
@@ -56,11 +58,13 @@ export function EventChip({ event, titleLines, style, ...press }: ChipProps) {
       {...press}
       accessibilityRole="button"
       accessibilityLabel={event.summary}
-      style={({ hovered }: { hovered?: boolean }) => [
-        styles.chip,
-        style,
-        hovered && styles.hovered,
-      ]}
+      style={({
+        hovered,
+        pressed,
+      }: {
+        hovered?: boolean;
+        pressed: boolean;
+      }) => [styles.chip, style, (hovered || pressed) && styles.hovered]}
       testID={`chip-${event.id}`}
     >
       {/* Accent bar tinted by the source calendar (falls back to the theme accent). */}
@@ -123,12 +127,18 @@ export function EventBanner({
       {...press}
       accessibilityRole="button"
       accessibilityLabel={event.summary}
-      style={({ hovered }: { hovered?: boolean }) => [
+      style={({
+        hovered,
+        pressed,
+      }: {
+        hovered?: boolean;
+        pressed: boolean;
+      }) => [
         styles.banner,
         { backgroundColor: fill },
         continuesRight && styles.bannerContinuesRight,
         style,
-        hovered && styles.hovered,
+        pressed ? styles.pressed : hovered && styles.hovered,
       ]}
     >
       <ThemedText
@@ -162,6 +172,11 @@ const styles = StyleSheet.create({
   // separate from the day beneath it.
   hovered: {
     opacity: 0.8,
+  },
+  // A banner's fill is the event's whole face, so a press dims it further
+  // than a hover: it has to read under a thumb.
+  pressed: {
+    opacity: 0.6,
   },
   chip: {
     flexDirection: 'row',
