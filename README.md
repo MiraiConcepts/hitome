@@ -1,6 +1,6 @@
 # <img src="app/assets/images/icon.png" alt="" width="40" height="40" align="absmiddle"> hitome
 
-hitome is a calendar for me.
+hitome is a calendar for watching one's life pass.
 
 <img src="docs/screenshots/widget.png" alt="The home-screen agenda widget" width="18%"> &nbsp; <img src="docs/screenshots/month.png" alt="The month grid" width="18%"> &nbsp; <img src="docs/screenshots/day.png" alt="A day's events in a popover over the grid" width="18%"> &nbsp; <img src="docs/screenshots/editor.png" alt="Editing an event" width="18%"> &nbsp; <img src="docs/screenshots/settings.png" alt="Settings" width="18%">
 
