@@ -2,7 +2,7 @@
 
 hitome is a calendar for me.
 
-<img src="docs/screenshots/month.png" alt="The month grid" width="32%" align="top"> <img src="docs/screenshots/day.png" alt="A day's events in a popover over the grid" width="32%" align="top"> <img src="docs/screenshots/editor.png" alt="The event editor" width="32%" align="top"> <img src="docs/screenshots/widget.png" alt="The home-screen agenda widget" width="32%" align="top"> <img src="docs/screenshots/settings-sync.png" alt="Settings: sync and calendars" width="32%" align="top"> <img src="docs/screenshots/settings-notifications.png" alt="Settings: notifications and reminder preview" width="32%" align="top">
+<img src="docs/screenshots/widget.png" alt="The home-screen agenda widget" width="18%"> &nbsp; <img src="docs/screenshots/month.png" alt="The month grid" width="18%"> &nbsp; <img src="docs/screenshots/day.png" alt="A day's events in a popover over the grid" width="18%"> &nbsp; <img src="docs/screenshots/editor.png" alt="Editing an event" width="18%"> &nbsp; <img src="docs/screenshots/settings.png" alt="Settings" width="18%">
 
 # Capabilities
 
