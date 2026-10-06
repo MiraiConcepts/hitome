@@ -5,7 +5,9 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: '.',
   globalSetup: './seed.mjs',
-  timeout: 90_000,
+  // One long test per file walks the whole flow; CI runners take about
+  // twice as long as a laptop, so the per-test budget is generous.
+  timeout: 180_000,
   fullyParallel: false,
   reporter: [['list']],
   outputDir: './test-results',
