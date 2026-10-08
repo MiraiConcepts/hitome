@@ -5,6 +5,7 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 import {
   FlatList,
@@ -349,7 +350,9 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   // until then. Viewability recomputes on cell layout and list updates, not
   // just user scrolls, so this fires shortly after mount. The callback must
   // keep a stable identity (the list rejects a changing onViewableItemsChanged),
-  // so it reads the moving parts from a ref.
+  // so it reads the moving parts from a ref. Held in state rather than
+  // useCallback: a dev Fast Refresh re-runs every useCallback, deps or not,
+  // and the list threw on the new identity after any edit beneath it.
   const anchoredFired = useRef(false);
   const anchorContext = useRef<{ key: string; onAnchored: () => void } | null>(
     null
@@ -360,16 +363,16 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
       onAnchored,
     };
   });
-  const handleViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      const ctx = anchorContext.current;
-      if (anchoredFired.current || !ctx) return;
-      if (viewableItems.some((token) => token.key === ctx.key)) {
-        anchoredFired.current = true;
-        ctx.onAnchored();
+  const [handleViewableItemsChanged] = useState(
+    () =>
+      ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+        const ctx = anchorContext.current;
+        if (anchoredFired.current || !ctx) return;
+        if (viewableItems.some((token) => token.key === ctx.key)) {
+          anchoredFired.current = true;
+          ctx.onAnchored();
+        }
       }
-    },
-    []
   );
 
   // Android hardening: initialScrollIndex can land at 0 in edge cases; one

@@ -25,6 +25,7 @@ import {
   EventChip,
 } from '@/components/calendar/event-chip';
 import { scaled } from '@/components/calendar/grid-scale';
+import { titleWidth as measureTitle } from '@/components/calendar/title-width';
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -101,40 +102,39 @@ type WeekRowProps = {
 
 const pct = (n: number) => `${(n / 7) * 100}%` as const;
 
-// Chip title wrap heuristic: slot layout runs before text renders, so fit is
-// estimated from an averaged glyph width of the 11px title font. A title that
-// fits beside its inline time keeps the one-slot form; an overflowing one
-// takes the stacked form (time line, then the title wrapping to two lines).
-// Satoshi averages ~0.56em/glyph in mixed case; estimating slightly wide
-// biases borderline titles toward wrapping (an extra slot) instead of
-// ellipsizing, which is the failure users actually notice. Derived from the
-// event font size rather than hard-coded, because an estimate left behind by a
-// larger font silently clips the second line of every wrapped title.
-const CHIP_CHAR_PX = EVENT_FONT_SIZE * 0.56;
-/** Horizontal chrome inside a chip: 3px bar + 3px gap + 3px right padding. */
-const CHIP_CHROME_PX = 9;
+// Chip title wrap: slot layout runs before text renders, so whether a title
+// fits on one line is worked out ahead of it (title-width.ts). Measured on
+// the web: estimated, a title that fits got a two-line strip with one line in
+// it at widths inside the estimate's margin, which a resized window swept
+// straight through.
+/** Horizontal chrome inside a chip: 4px stand-off + 3px bar + 3px gap + 3px
+ *  right padding. */
+const CHIP_CHROME_PX = 13;
+/** Horizontal chrome inside a banner: 4px padding each side + hairline. */
+const BANNER_CHROME_PX = 9;
+
+const titleWidth = (title: string) => measureTitle(title, EVENT_FONT_SIZE);
 
 /** Title lines a chip needs against the full cell width (time, when shown,
  *  sits on its own line and never competes with the title). */
 function chipTitleLines(summary: string, cellWidth: number): number {
-  const title = summary || '(untitled)';
-  return title.length * CHIP_CHAR_PX > cellWidth - CHIP_CHROME_PX ? 2 : 1;
+  return titleWidth(summary || '(untitled)') > cellWidth - CHIP_CHROME_PX
+    ? 2
+    : 1;
 }
 
-/** Horizontal chrome inside a banner: 4px padding each side + hairline. */
-const BANNER_CHROME_PX = 9;
-
-/** Same glyph-width estimate for banner titles, over the banner's full width. */
+/** Title lines a banner needs over its full width. */
 function bannerTitleLines(summary: string, widthPx: number): number {
-  const title = summary || '(untitled)';
-  return title.length * CHIP_CHAR_PX > widthPx - BANNER_CHROME_PX ? 2 : 1;
+  return titleWidth(summary || '(untitled)') > widthPx - BANNER_CHROME_PX
+    ? 2
+    : 1;
 }
 
 // Cell fills, solid rather than translucent washes so each cell renders
 // exactly its stated color whatever sits behind it. Today outranks the
 // neighbouring months — it keeps the blue even when it falls on their page —
 // and every other day, weekend included, is left to the screen's background.
-const TODAY_FILL = '#0060E0';
+export const TODAY_FILL = '#0060E0';
 const OTHER_MONTH_FILL = '#2E3135';
 
 /** How long a neighbouring month's shading takes to settle in or out. */
@@ -407,6 +407,30 @@ export const WeekRow = memo(function WeekRow({
     [dayAt, onCreateOnDay]
   );
 
+  /** A hold reaching its threshold. On a phone that is the gesture: the
+   *  editor rises under the finger. With a mouse, the hold only arms it —
+   *  the ink stays full — and letting go is what creates, as a click acts on
+   *  release; a cancelled pointer (the browser taking the gesture) creates
+   *  nothing. */
+  const holdOn = useCallback(
+    (col: number) => {
+      if (Platform.OS !== 'web') {
+        createOn(col);
+        return;
+      }
+      const finish = (create: boolean) => () => {
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onCancel);
+        if (create) createOn(col);
+      };
+      const onUp = finish(true);
+      const onCancel = finish(false);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onCancel);
+    },
+    [createOn]
+  );
+
   /** Tap on an event. Once a cell holds more than it can show, its chips are
    *  an arbitrary few of the day's events and singling one out is misleading —
    *  so an overflowing cell answers every tap with the whole day's list, the
@@ -487,20 +511,18 @@ export const WeekRow = memo(function WeekRow({
                 if (e.nativeEvent.actionName === 'longpress') createOn(col);
               }}
               onPress={() => openDay(col)}
-              onLongPress={() => createOn(col)}
+              onLongPress={() => holdOn(col)}
               onPressIn={(e) =>
                 pressIn(col, e.nativeEvent.locationX, e.nativeEvent.locationY)
               }
               onPressOut={pressOut}
               delayLongPress={LONG_PRESS_MS}
               unstable_pressDelay={PRESS_DELAY_MS}
-              // `hovered` is react-native-web's (a mouse over the cell); it
-              // never sets on a phone. Cells are transparent over the row's
-              // ground, so a light wash reads as a highlight on any day.
-              style={({ hovered }: { hovered?: boolean }) => [
+              // A mouse over the grid lights it from grid-spotlight.web.ts,
+              // a glow that follows the pointer across the cells.
+              style={[
                 styles.cell,
                 tint != null && { backgroundColor: tint },
-                hovered && tint == null && styles.cellHover,
                 col < 6 && styles.cellRule,
               ]}
             >
@@ -574,7 +596,7 @@ export const WeekRow = memo(function WeekRow({
               )
             }
             onLongPress={(e) =>
-              createOn(bannerCol(e, banner.startCol, banner.span))
+              holdOn(bannerCol(e, banner.startCol, banner.span))
             }
             onPressIn={(e) => {
               const col = bannerCol(e, banner.startCol, banner.span);
@@ -612,7 +634,7 @@ export const WeekRow = memo(function WeekRow({
             event={chip.event}
             titleLines={Math.min(2, chip.span)}
             onPress={() => pressEvent(chip.event, chip.col)}
-            onLongPress={() => createOn(chip.col)}
+            onLongPress={() => holdOn(chip.col)}
             onPressIn={(e) =>
               pressInEvent(
                 chip.col,
@@ -689,9 +711,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 2,
     alignItems: 'flex-start',
-  },
-  cellHover: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   cellRule: {
     borderRightWidth: RULE_WIDTH,

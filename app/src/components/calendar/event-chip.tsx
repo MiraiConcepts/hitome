@@ -1,5 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import {
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -54,21 +55,28 @@ type ChipProps = PressProps & {
  * when granted extra lines.
  */
 export function EventChip({ event, titleLines, style, ...press }: ChipProps) {
+  const title = event.summary || '(untitled)';
+  const dimmed = hoveredOccurrence.useDimmed(event.id);
   return (
     <Pressable
       {...press}
+      onHoverIn={() => hoveredOccurrence.set(event.id)}
+      onHoverOut={() => {
+        if (hoveredOccurrence.get() === event.id) hoveredOccurrence.set(null);
+      }}
       accessibilityRole="button"
       accessibilityLabel={event.summary}
-      style={({
-        hovered,
-        pressed,
-      }: {
-        hovered?: boolean;
-        pressed: boolean;
-      }) => [styles.chip, style, (hovered || pressed) && styles.hovered]}
+      style={({ pressed }: { pressed: boolean }) => [
+        styles.chip,
+        style,
+        FOCUS_MOTION,
+        dimmed && styles.unfocused,
+        pressed && styles.chipPressed,
+      ]}
       testID={`chip-${event.id}`}
     >
-      {/* Accent bar tinted by the source calendar (falls back to the theme accent). */}
+      {/* Accent bar tinted by the source calendar (falls back to the
+          theme accent). */}
       <View
         style={[
           styles.chipBar,
@@ -83,7 +91,7 @@ export function EventChip({ event, titleLines, style, ...press }: ChipProps) {
             textBreakStrategy="simple"
             style={styles.chipTitleWrapped}
           >
-            {event.summary || '(untitled)'}
+            {title}
           </ThemedText>
         </View>
       ) : (
@@ -93,7 +101,7 @@ export function EventChip({ event, titleLines, style, ...press }: ChipProps) {
           textBreakStrategy="simple"
           style={styles.chipTitle}
         >
-          {event.summary || '(untitled)'}
+          {title}
         </ThemedText>
       )}
     </Pressable>
@@ -122,23 +130,40 @@ type BannerProps = PressProps & {
  * occurrence of the same series beside it does not light up too; a selector
  * per strip means a press re-renders only that event's strips, not the grid.
  */
-let pressedId: string | null = null;
-const pressListeners = new Set<() => void>();
-function setPressed(id: string | null) {
-  if (pressedId === id) return;
-  pressedId = id;
-  for (const listener of pressListeners) listener();
-}
-function subscribePressed(listener: () => void) {
-  pressListeners.add(listener);
-  return () => {
-    pressListeners.delete(listener);
+function sharedOccurrence() {
+  let current: string | null = null;
+  const listeners = new Set<() => void>();
+  const subscribe = (listener: () => void) => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+  return {
+    get: () => current,
+    set(id: string | null) {
+      if (current === id) return;
+      current = id;
+      for (const listener of listeners) listener();
+    },
+    /** Whether this occurrence is the one; re-renders only its strips. */
+    useIs(id: string): boolean {
+      const get = useCallback(() => current === id, [id]);
+      return useSyncExternalStore(subscribe, get, get);
+    },
+    /** Whether another occurrence is the one (and this one is not). */
+    useDimmed(id: string): boolean {
+      const get = useCallback(() => current !== null && current !== id, [id]);
+      return useSyncExternalStore(subscribe, get, get);
+    },
   };
 }
-function useIsPressed(id: string): boolean {
-  const get = useCallback(() => pressedId === id, [id]);
-  return useSyncExternalStore(subscribePressed, get, get);
-}
+
+const pressedOccurrence = sharedOccurrence();
+/** The occurrence under the mouse (web), shared the same way. Hovering an
+ *  event brings it into focus: every other event dims, and every strip of a
+ *  multi-day one stays lit, in every week it crosses. */
+const hoveredOccurrence = sharedOccurrence();
 
 export function EventBanner({
   placement,
@@ -149,27 +174,34 @@ export function EventBanner({
   const { event, continuesRight } = placement;
   // Fill by source calendar; title contrasts against whatever that fill is.
   const fill = event.color ?? AccentColor;
-  const pressed = useIsPressed(event.id);
+  const pressed = pressedOccurrence.useIs(event.id);
+  const dimmed = hoveredOccurrence.useDimmed(event.id);
   const { onPressIn, onPressOut } = press;
   return (
     <Pressable
       {...press}
       onPressIn={(e) => {
-        setPressed(event.id);
+        pressedOccurrence.set(event.id);
         onPressIn(e);
       }}
       onPressOut={() => {
-        if (pressedId === event.id) setPressed(null);
+        if (pressedOccurrence.get() === event.id) pressedOccurrence.set(null);
         onPressOut();
+      }}
+      onHoverIn={() => hoveredOccurrence.set(event.id)}
+      onHoverOut={() => {
+        if (hoveredOccurrence.get() === event.id) hoveredOccurrence.set(null);
       }}
       accessibilityRole="button"
       accessibilityLabel={event.summary}
-      style={({ hovered }: { hovered?: boolean }) => [
+      style={[
         styles.banner,
         { backgroundColor: fill },
         continuesRight && styles.bannerContinuesRight,
         style,
-        pressed ? styles.pressed : hovered && styles.hovered,
+        FOCUS_MOTION,
+        dimmed && styles.unfocused,
+        pressed && styles.pressed,
       ]}
     >
       <ThemedText
@@ -198,11 +230,34 @@ export const EVENT_LINE_HEIGHT = scaled(14);
  */
 const EVENT_INK_NUDGE = 0.5;
 
+/** A chip's geometry: the bar stands off the cell's left edge by PAD_LEFT,
+ *  is BAR wide and GAP from the title, which stops PAD_RIGHT short of the
+ *  cell's right. */
+const CHIP_PAD_LEFT = 4;
+const CHIP_PAD_RIGHT = 3;
+const CHIP_BAR = 3;
+const CHIP_GAP = 3;
+
+/** The other events' strength while one is hovered (web only: nothing
+ *  hovers on a phone), and how fast they dim and return. */
+const UNFOCUSED = 0.4;
+const FOCUS_MOTION =
+  Platform.OS === 'web'
+    ? ({
+        transitionProperty: 'opacity',
+        transitionDuration: '120ms',
+        transitionTimingFunction: 'ease-out',
+      } as object)
+    : null;
+
 const styles = StyleSheet.create({
-  // A mouse over an event (react-native-web only): it is its own target,
-  // separate from the day beneath it.
-  hovered: {
+  // A press on a timed event: a lighter dim than a banner's, as before.
+  chipPressed: {
     opacity: 0.8,
+  },
+  // Every event but the hovered one, while one is.
+  unfocused: {
+    opacity: UNFOCUSED,
   },
   // A banner's fill is the event's whole face, so a press dims it further
   // than a hover: it has to read under a thumb.
@@ -212,14 +267,14 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: CHIP_GAP,
     // The bar is not flush with the cell edge: it stands off it by 4, so a
     // column of chips reads as a column rather than as a second grid rule.
-    paddingLeft: 4,
-    paddingRight: 3,
+    paddingLeft: CHIP_PAD_LEFT,
+    paddingRight: CHIP_PAD_RIGHT,
   },
   chipBar: {
-    width: 3,
+    width: CHIP_BAR,
     alignSelf: 'stretch',
     // Fills the chip's slot exactly, which already stands a dp proud of the
     // title at each end (see SLOT_HEIGHT in week-row) — so a timed event's

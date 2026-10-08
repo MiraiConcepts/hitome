@@ -253,7 +253,12 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
     );
     await cancelEditor(page);
 
-    await cell.click(HOLD);
+    // A mouse hold arms the create; letting go is what opens the editor.
+    await cell.hover();
+    await page.mouse.down();
+    await page.waitForTimeout(HOLD.delay);
+    await expect(page.getByTestId("event-editor")).toHaveCount(0);
+    await page.mouse.up();
     await expect(page.getByTestId("event-editor")).toBeVisible();
     // Native date input: value is locale-independent ISO.
     await expect(page.getByTestId("editor-start-date")).toHaveValue(

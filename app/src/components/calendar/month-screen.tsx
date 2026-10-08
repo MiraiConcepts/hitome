@@ -25,6 +25,7 @@ import { LARGE_SPINNER } from '@/components/boot-screen';
 import { markCalendarReady } from '@/components/calendar/calendar-ready';
 import { ConnectionProblem } from '@/components/calendar/connection-problem';
 import { DayPopover } from '@/components/calendar/day-popover';
+import { GridSpotlight } from '@/components/calendar/grid-spotlight';
 import {
   EventEditor,
   type EditorResult,
@@ -561,6 +562,7 @@ export function MonthScreen() {
                 onCreateOnDay={onCreateOnDay}
               />
             )}
+            <GridSpotlight />
             {(!gridAnchored || !gridSize) && (
               // The spinner only shows if anchoring is actually slow.
               <ThemedView style={styles.gridCover}>
