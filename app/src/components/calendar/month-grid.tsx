@@ -122,14 +122,28 @@ const WEB_SNAP_CONTAINER =
     ? ({ scrollSnapType: WEB_SNAP_TYPE } as unknown as ViewStyle)
     : null;
 
-/** Long enough for a jump's destination rows to mount before snapping is
- *  handed back to the browser (see `jumpTo`). */
+/** The soonest snapping is handed back after a jump, and how often it asks
+ *  again while the destination rows are still not on screen (see `jumpTo`),
+ *  up to SNAP_RESTORE_TRIES times. */
 const SNAP_RESTORE_MS = 300;
+const SNAP_RETRY_MS = 50;
+const SNAP_RESTORE_TRIES = 40;
 
 /** The scroller's DOM node on web (RNW), null on native. */
 function scrollerNode(list: FlatList<string> | null): HTMLElement | null {
   if (Platform.OS !== 'web' || !list) return null;
   return (list.getScrollableNode() as HTMLElement | null) ?? null;
+}
+
+/** Is a day cell showing at the middle of the scroller? False while the rows
+ *  of a far jump have not mounted yet and only empty space is there. */
+function showsCell(node: HTMLElement): boolean {
+  const box = node.getBoundingClientRect();
+  const hit = document.elementFromPoint(
+    box.left + box.width / 2,
+    box.top + box.height / 2
+  );
+  return !!hit && hit !== node && !!hit.closest('[role="button"]');
 }
 
 /** Defensive cap on the week walk for one event — a malformed far-future end
@@ -294,11 +308,23 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     if (node) {
       node.style.scrollSnapType = 'none';
       if (snapRestore.current) clearTimeout(snapRestore.current);
-      snapRestore.current = setTimeout(() => {
+      // Snapping returns once the destination is on screen. A fixed delay
+      // lost the race after a window resize, when the list is slow to mount
+      // a far row: the browser snapped to the nearest row it had, years away.
+      const restore = (tries: number) => {
         snapRestore.current = null;
         const restored = scrollerNode(listRef.current);
-        if (restored) restored.style.scrollSnapType = WEB_SNAP_TYPE;
-      }, SNAP_RESTORE_MS);
+        if (!restored) return;
+        if (tries < SNAP_RESTORE_TRIES && !showsCell(restored)) {
+          snapRestore.current = setTimeout(
+            () => restore(tries + 1),
+            SNAP_RETRY_MS
+          );
+          return;
+        }
+        restored.style.scrollSnapType = WEB_SNAP_TYPE;
+      };
+      snapRestore.current = setTimeout(() => restore(0), SNAP_RESTORE_MS);
     }
     listRef.current?.scrollToOffset({ offset, animated });
   }, []);
