@@ -186,6 +186,27 @@ export function EventEditorSheet({
     sheetRef.current?.present();
   }, []);
 
+  // Web: the library's sheet box runs past the bottom of the window inside a
+  // clipped (overflow: hidden) host, and a browser still scrolls a clipped
+  // box to keep a caret in view. Typing in Notes slid the whole sheet up,
+  // its header cut off at the top and a gap left below, and nothing slid it
+  // back. The host never means to scroll, so it is held at the top.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const pin = (e: Event) => {
+      const box = e.target;
+      if (
+        box instanceof HTMLElement &&
+        box.scrollTop !== 0 &&
+        getComputedStyle(box).overflowY === 'hidden' &&
+        box.querySelector('[data-testid="event-editor"]')
+      )
+        box.scrollTop = 0;
+    };
+    document.addEventListener('scroll', pin, true);
+    return () => document.removeEventListener('scroll', pin, true);
+  }, []);
+
   // The sheet lifts for the keyboard but does not scroll to the focused
   // input, so the fields at the tail of the form (location, notes) would sit
   // under it. Focusing one scrolls the form to its end once the keyboard is
@@ -317,10 +338,14 @@ export function EventEditorSheet({
           onFocusTail={revealTail}
         />
         {Platform.OS === 'web' && (
-          <EventEditorActions
-            editor={editor}
-            onClose={() => sheetRef.current?.dismiss()}
-          />
+          // Stuck to the bottom of the form while it scrolls, as the native
+          // footer is: on a long event Save had scrolled out of sight.
+          <View style={styles.webActions}>
+            <EventEditorActions
+              editor={editor}
+              onClose={() => sheetRef.current?.dismiss()}
+            />
+          </View>
         )}
       </BottomSheetScrollView>
     </BottomSheetModal>
@@ -331,6 +356,11 @@ export function EventEditorSheet({
 const RESETTLE_DELAY_MS = 400;
 
 const styles = StyleSheet.create({
+  // A web-only position; React Native's style types do not list it.
+  webActions: {
+    position: 'sticky' as 'relative',
+    bottom: 0,
+  },
   // The library's default handle box: 10 above and below the indicator.
   handle: {
     backgroundColor: HEADER_GROUND,
