@@ -94,11 +94,16 @@ function whenLabel(editor: EventEditorController): string {
  */
 export function EventEditorHeader({
   editor,
+  roomy = false,
 }: {
   editor: EventEditorController;
+  /** The centred dialog's header, with no grab handle above it to lend it
+   *  height: a roomier bar, so the day does not sit hard against the card's
+   *  top edge. */
+  roomy?: boolean;
 }) {
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, roomy && styles.headerRoomy]}>
       <ThemedText style={styles.headerTitle} testID="editor-title">
         {dayLabel(editor.headerDay)}
       </ThemedText>
@@ -499,6 +504,10 @@ const styles = StyleSheet.create({
     paddingTop: Bar.paddingTop,
     paddingBottom: Bar.paddingBottom,
     gap: Bar.labelGap,
+  },
+  headerRoomy: {
+    paddingTop: Spacing.four,
+    paddingBottom: Spacing.four - Spacing.one,
   },
   headerTitle: {
     fontFamily: FontFamilyBold,

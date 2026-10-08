@@ -29,6 +29,19 @@ export function rgbHex(hex: string): string {
   return `#${rgb.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/**
+ * `hex` taken `amount` (0..1) of the way toward `toward`, as #RRGGBB: a solid
+ * colour that looks like `hex` faded over `toward`, without being see-through.
+ * Returns `hex` unchanged when either isn't recognizable hex.
+ */
+export function mixHex(hex: string, toward: string, amount: number): string {
+  const from = parseHex(hex);
+  const to = parseHex(toward);
+  if (!from || !to) return hex;
+  const mixed = from.map((c, i) => Math.round(c + (to[i] - c) * amount));
+  return `#${mixed.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+}
+
 /** [r, g, b] 0–255 from a hex string, or null when it isn't valid hex. */
 function parseHex(hex: string): [number, number, number] | null {
   if (typeof hex !== 'string') return null;

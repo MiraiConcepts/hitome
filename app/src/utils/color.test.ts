@@ -1,4 +1,4 @@
-import { readableTextColor, rgbHex } from './color';
+import { mixHex, readableTextColor, rgbHex } from './color';
 
 describe('readableTextColor', () => {
   it('picks light text on dark fills', () => {
@@ -59,5 +59,22 @@ describe('non-string input', () => {
 
   it('rgbHex returns the input unchanged rather than throwing', () => {
     for (const v of junk) expect(() => rgbHex(v)).not.toThrow();
+  });
+});
+
+describe('mixHex', () => {
+  it('runs from the colour to the other one', () => {
+    expect(mixHex('#FFBD4F', '#1C1B22', 0)).toBe('#ffbd4f');
+    expect(mixHex('#FFBD4F', '#1C1B22', 1)).toBe('#1c1b22');
+    expect(mixHex('#000000', '#FFFFFF', 0.5)).toBe('#808080');
+  });
+
+  it('reads shorthand and drops alpha', () => {
+    expect(mixHex('#fff', '#00000080', 0.5)).toBe('#808080');
+  });
+
+  it('returns the colour unchanged when either is not hex', () => {
+    expect(mixHex('red', '#000000', 0.5)).toBe('red');
+    expect(mixHex('#FFBD4F', 'nope', 0.5)).toBe('#FFBD4F');
   });
 });

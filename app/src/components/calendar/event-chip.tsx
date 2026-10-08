@@ -12,8 +12,9 @@ import {
 import type { CalEvent } from '@/caldav/types';
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import type { BannerPlacement } from '@/utils/calendar-grid';
-import { readableTextColor } from '@/utils/color';
+import { mixHex, readableTextColor } from '@/utils/color';
 import { scaled } from '@/components/calendar/grid-scale';
 
 /**
@@ -174,8 +175,14 @@ export function EventBanner({
   const { event, continuesRight } = placement;
   // Fill by source calendar; title contrasts against whatever that fill is.
   const fill = event.color ?? AccentColor;
+  const ink = readableTextColor(fill);
   const pressed = pressedOccurrence.useIs(event.id);
   const dimmed = hoveredOccurrence.useDimmed(event.id);
+  // Out of focus, a banner fades by blending toward the grid's ground rather
+  // than turning see-through: it crosses the grid's rules (the weekend line
+  // among them), which showed through a translucent fill.
+  const ground = useTheme().background;
+  const fade = (color: string) => mixHex(color, ground, 1 - UNFOCUSED);
   const { onPressIn, onPressOut } = press;
   return (
     <Pressable
@@ -196,11 +203,10 @@ export function EventBanner({
       accessibilityLabel={event.summary}
       style={[
         styles.banner,
-        { backgroundColor: fill },
+        { backgroundColor: dimmed ? fade(fill) : fill },
         continuesRight && styles.bannerContinuesRight,
         style,
-        FOCUS_MOTION,
-        dimmed && styles.unfocused,
+        BANNER_FOCUS_MOTION,
         pressed && styles.pressed,
       ]}
     >
@@ -208,7 +214,11 @@ export function EventBanner({
         type="small"
         numberOfLines={titleLines}
         textBreakStrategy="simple"
-        style={[styles.bannerTitle, { color: readableTextColor(fill) }]}
+        style={[
+          styles.bannerTitle,
+          TITLE_FOCUS_MOTION,
+          { color: dimmed ? fade(ink) : ink },
+        ]}
       >
         {event.summary || '(untitled)'}
       </ThemedText>
@@ -241,14 +251,17 @@ const CHIP_GAP = 3;
 /** The other events' strength while one is hovered (web only: nothing
  *  hovers on a phone), and how fast they dim and return. */
 const UNFOCUSED = 0.4;
-const FOCUS_MOTION =
+const focusMotion = (property: string) =>
   Platform.OS === 'web'
     ? ({
-        transitionProperty: 'opacity',
+        transitionProperty: property,
         transitionDuration: '120ms',
         transitionTimingFunction: 'ease-out',
       } as object)
     : null;
+const FOCUS_MOTION = focusMotion('opacity');
+const BANNER_FOCUS_MOTION = focusMotion('background-color');
+const TITLE_FOCUS_MOTION = focusMotion('color');
 
 const styles = StyleSheet.create({
   // A press on a timed event: a lighter dim than a banner's, as before.

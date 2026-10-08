@@ -81,7 +81,7 @@ function EventEditorDialog({ event, defaultDay, onClose, onDone }: Props) {
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <ThemedView style={styles.card} testID="event-editor">
-          <EventEditorHeader editor={editor} />
+          <EventEditorHeader editor={editor} roomy />
           <ScrollView keyboardShouldPersistTaps="handled">
             <EventEditorFields
               editor={editor}
