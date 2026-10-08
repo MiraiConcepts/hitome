@@ -565,8 +565,9 @@ const styles = StyleSheet.create({
     flex: 2,
   },
   actions: {
+    // The same all round, so the buttons sit evenly in their bar.
     paddingHorizontal: Bar.paddingHorizontal,
-    paddingVertical: Spacing.two,
+    paddingVertical: Bar.paddingHorizontal,
     gap: Spacing.two,
     borderTopWidth: StyleSheet.hairlineWidth,
   },

@@ -2,7 +2,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import type { CalEvent } from '@/caldav/types';
 import { CalendarMark } from '@/components/calendar/calendar-mark';
-import { SettingsButton } from '@/components/settings/settings-parts';
+import { AddIcon } from '@/components/icons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
@@ -73,6 +73,17 @@ export function DayPopover({
                 rather than one more dark cell. */}
             <View style={styles.header}>
               <ThemedText style={styles.headerText}>{dayLabel(day)}</ThemedText>
+              {onAdd && (
+                <Pressable
+                  onPress={onAdd}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add event"
+                  testID="day-popover-add"
+                >
+                  <AddIcon size={28} color={OnAccentColor} />
+                </Pressable>
+              )}
             </View>
             <ScrollView contentContainerStyle={styles.list}>
               {sorted.map((event) => (
@@ -136,15 +147,6 @@ export function DayPopover({
                 </Pressable>
               ))}
             </ScrollView>
-            {onAdd && (
-              <View style={styles.actions}>
-                <SettingsButton
-                  label="Add event"
-                  onPress={onAdd}
-                  testID="day-popover-add"
-                />
-              </View>
-            )}
           </ThemedView>
         </View>
       </View>
@@ -175,10 +177,13 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: Spacing.two,
-    paddingBottom: Spacing.three,
+    paddingBottom: Spacing.two,
     maxHeight: '100%',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: AccentColor,
     paddingHorizontal: Spacing.three,
     // A point higher than even: centres the capitals (measured on device),
@@ -221,10 +226,5 @@ const styles = StyleSheet.create({
   // Title and place sit under the time, past the mark.
   indent: {
     paddingLeft: MARK_SIZE + Spacing.two,
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: Spacing.three,
   },
 });
