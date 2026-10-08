@@ -33,7 +33,9 @@ type Props<T extends string> = {
   onChange: (next: T) => void;
   /** One line, never wrapping: compact chips that scroll sideways if they
    *  still do not fit (narrow screen, large text). For short option sets
-   *  that read best as a single strip — repeat preset, alert offset. */
+   *  that read best as a single strip — repeat preset, alert offset. Native
+   *  only: on the web a mouse has no way to scroll the strip, and the
+   *  options past the edge were cut off unreachable, so there it wraps. */
   singleLine?: boolean;
   testID?: string;
 };
@@ -53,9 +55,10 @@ export function ChipRow<T extends string>({
   options,
   value,
   onChange,
-  singleLine = false,
+  singleLine: singleLineAsked = false,
   testID,
 }: Props<T>) {
+  const singleLine = singleLineAsked && Platform.OS !== 'web';
   const theme = useTheme();
   // A tap only moves the highlight; what it sets off (a settings write, the
   // widget redrawn, the grid re-laid for a new week start) runs once that is
@@ -79,8 +82,11 @@ export function ChipRow<T extends string>({
       <Pressable
         key={option.value}
         testID={testID ? `${testID}-${option.value}` : undefined}
-        accessibilityRole="button"
-        accessibilityState={{ selected }}
+        // One choice of a set: a radio, checked when chosen. aria-* rather
+        // than accessibilityState, which the web drops.
+        accessibilityRole="radio"
+        aria-checked={selected}
+        accessibilityLabel={option.label}
         onPress={() => setPending(option.value)}
         // 28pt chips, reached as 48pt: the margin is invisible and stops
         // short of the 6pt gap's middle, so neighbours never overlap.
@@ -146,13 +152,14 @@ export function ChipRow<T extends string>({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={[styles.row, styles.rowSingle]}
+        accessibilityRole="radiogroup"
         testID={testID}
       >
         {chips}
       </ScrollView>
     );
   return (
-    <View style={styles.row} testID={testID}>
+    <View style={styles.row} accessibilityRole="radiogroup" testID={testID}>
       {chips}
     </View>
   );

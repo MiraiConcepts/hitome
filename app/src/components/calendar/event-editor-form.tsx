@@ -170,6 +170,7 @@ export function EventEditorFields({
             value={summary}
             onChangeText={setSummary}
             placeholder="Add a title"
+            accessibilityLabel="Title"
             autoFocus={autoFocusTitle}
             returnKeyType="done"
             submitBehavior="blurAndSubmit"
@@ -203,6 +204,7 @@ export function EventEditorFields({
               <DateField
                 value={startDay}
                 onChange={(d) => moveStart(d, startTime)}
+                label="Start date"
                 testID="editor-start-date"
               />
             </View>
@@ -211,6 +213,7 @@ export function EventEditorFields({
                 <TimeField
                   value={startTime}
                   onChange={(t) => moveStart(startDay, t)}
+                  label="Start time"
                   testID="editor-start-time"
                 />
               </View>
@@ -224,6 +227,7 @@ export function EventEditorFields({
                 value={endDay}
                 min={startDay}
                 onChange={setEndDay}
+                label="End date"
                 testID="editor-end-date"
               />
             </View>
@@ -232,6 +236,7 @@ export function EventEditorFields({
                 <TimeField
                   value={endTime}
                   onChange={setEndTime}
+                  label="End time"
                   testID="editor-end-time"
                 />
               </View>
@@ -282,6 +287,7 @@ export function EventEditorFields({
           value={editor.description}
           onChangeText={editor.setDescription}
           placeholder="Add notes"
+          accessibilityLabel="Notes"
           onFocus={onFocusTail}
           multiline
           testID="editor-notes"

@@ -73,6 +73,7 @@ export function LoginFields({ form }: { form: LoginFormState }) {
           value={form.username}
           onChangeText={form.setUsername}
           autoComplete="username"
+          accessibilityLabel="Username"
           returnKeyType="next"
           onSubmitEditing={() => passwordRef.current?.focus()}
           submitBehavior="submit"
@@ -87,6 +88,7 @@ export function LoginFields({ form }: { form: LoginFormState }) {
           onChangeText={form.setPassword}
           secureTextEntry
           autoComplete="current-password"
+          accessibilityLabel="Password"
           returnKeyType="go"
           onSubmitEditing={form.submit}
           testID="login-password"

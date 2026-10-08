@@ -65,7 +65,7 @@ async function create(
     });
   }).toPass({ timeout: 20_000 });
   await page.getByTestId("editor-summary").fill(title);
-  await page.getByRole("button", { name: "test/e2e", exact: true }).click();
+  await page.getByRole("radio", { name: "test/e2e", exact: true }).click();
   if (repeat) {
     await page.getByTestId("editor-repeat-preset-daily").click();
     await page.getByTestId("editor-repeat-end-count").click();
@@ -229,7 +229,7 @@ test("writes reach the server: create, edit, delete, undo, move, conflict", asyn
     await create(page, 15, "🧪 W Move");
     await expect(chips(page, "🧪 W Move")).toHaveCount(1, { timeout: 30_000 });
     await chips(page, "🧪 W Move").click();
-    await page.getByRole("button", { name: "e2e-other", exact: true }).click();
+    await page.getByRole("radio", { name: "e2e-other", exact: true }).click();
     await page.getByTestId("editor-save").click();
     await expect(page.getByTestId("event-editor")).toHaveCount(0, {
       timeout: SHEET_CLOSE_MS,

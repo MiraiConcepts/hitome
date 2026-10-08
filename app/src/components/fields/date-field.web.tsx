@@ -13,6 +13,7 @@ export function DateField({
   onChange,
   min,
   max,
+  label,
   testID,
 }: DateFieldProps) {
   const theme = useTheme();
@@ -24,6 +25,7 @@ export function DateField({
       type="date"
       className="hitome-field-input"
       data-testid={testID}
+      aria-label={label}
       value={value}
       min={min}
       max={max}

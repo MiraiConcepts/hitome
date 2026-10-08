@@ -8,7 +8,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { FieldChrome, type TimeFieldProps } from './field-chrome';
 import { ensureFieldCss } from './web-input-css';
 
-export function TimeField({ value, onChange, testID }: TimeFieldProps) {
+export function TimeField({ value, onChange, label, testID }: TimeFieldProps) {
   const theme = useTheme();
   const scheme = useColorScheme() ?? 'light';
   ensureFieldCss();
@@ -18,6 +18,7 @@ export function TimeField({ value, onChange, testID }: TimeFieldProps) {
       type="time"
       className="hitome-field-input"
       data-testid={testID}
+      aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onClick={(e) => {

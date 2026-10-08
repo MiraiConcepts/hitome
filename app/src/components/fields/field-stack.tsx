@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from 'react';
+import { useId, type ComponentType, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { FieldLabel } from '@/components/fields/field-label';
@@ -23,11 +23,21 @@ const ICON_SIZE = 14;
  * side-by-side counterpart. Captions are in the accent, glyph included.
  */
 export function FieldStack({ label, icon: Icon, children, testID }: Props) {
+  // The caption names the group, so a screen reader entering a row of
+  // chips or a pair of date and time boxes hears what they are for.
+  const captionId = useId();
   return (
-    <View style={styles.stack} testID={testID}>
+    <View
+      style={styles.stack}
+      role="group"
+      aria-labelledby={captionId}
+      testID={testID}
+    >
       <View style={styles.caption}>
         {Icon && <Icon size={ICON_SIZE} color={AccentColor} />}
-        <FieldLabel style={styles.label}>{label}</FieldLabel>
+        <FieldLabel style={styles.label} nativeID={captionId}>
+          {label}
+        </FieldLabel>
       </View>
       {children}
     </View>

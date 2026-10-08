@@ -235,6 +235,7 @@ const Toggle = {
 export function SettingsToggle({
   on,
   label,
+  name,
   onPress,
   disabled = false,
   testID,
@@ -242,6 +243,9 @@ export function SettingsToggle({
   on: boolean;
   /** The state in words, e.g. 'Allowed' / 'Off'. */
   label: string;
+  /** What the switch is, for screen readers, when the label is only its
+   *  state ('Off' alone says nothing). Defaults to the label. */
+  name?: string;
   onPress: () => void;
   disabled?: boolean;
   testID?: string;
@@ -266,7 +270,7 @@ export function SettingsToggle({
       // and the web's switch and radio require them.
       aria-checked={on}
       aria-disabled={disabled}
-      accessibilityLabel={label}
+      accessibilityLabel={name ?? label}
       style={({ pressed }) => [
         styles.toggleRow,
         (pressed || disabled) && styles.togglePressed,
@@ -477,7 +481,8 @@ export function SettingsButton({
       // Named as a button for screen readers, and on the web for the
       // keyboard: without it the label was announced as plain text.
       accessibilityRole="button"
-      accessibilityState={{ busy, disabled: disabled || busy || cooling }}
+      aria-busy={busy}
+      aria-disabled={disabled || busy || cooling}
       hitSlop={8}
       style={({ pressed }) => [
         filled ? styles.filledButton : styles.textButton,

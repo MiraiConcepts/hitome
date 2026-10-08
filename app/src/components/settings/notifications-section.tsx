@@ -51,6 +51,10 @@ async function backgroundAllowed(): Promise<boolean | null> {
 
 const PERMISSION_OFF =
   'Notifications are off. Turn on Permission to send a test.';
+// Blocked in a browser, the switch cannot ask again: only the site's own
+// settings can, so pointing at the switch sent people to a dead end.
+const PERMISSION_BLOCKED_WEB =
+  'Notifications are blocked for this site. Allow them in the browser’s site settings, then try again.';
 const TEST_SENT =
   TEST_DELAY_SECONDS > 0
     ? `Sent. It should arrive in about ${TEST_DELAY_SECONDS} seconds. Leave the app to check it rings in the background.`
@@ -144,11 +148,15 @@ export function NotificationsSection() {
    */
   async function sendTest() {
     const fresh = await permissionSnapshot();
-    if (permissionState(fresh) !== 'granted') {
+    const freshState = permissionState(fresh);
+    if (freshState !== 'granted') {
       setSnapshot(fresh);
       setOutcome({
         tone: 'problem',
-        text: PERMISSION_OFF,
+        text:
+          freshState === 'blocked' && !CAN_OPEN_SYSTEM_SETTINGS
+            ? PERMISSION_BLOCKED_WEB
+            : PERMISSION_OFF,
         kind: 'permission-off',
       });
       return;
@@ -176,6 +184,7 @@ export function NotificationsSection() {
             <SettingsToggle
               on={state === 'granted'}
               label={copy.label}
+              name="Notification permission"
               // Not held by `busy`: dimmed for the length of a test send,
               // the toggles flickered. Only the prompt can be shown from
               // here where there are no system settings to open (web).
@@ -214,6 +223,7 @@ export function NotificationsSection() {
               <SettingsToggle
                 on={background}
                 label={background ? 'Allowed' : 'Restricted'}
+                name="Background activity"
                 // Changed only in the system's page for this app (Battery);
                 // the section re-reads on the way back.
                 onPress={() => run(() => Linking.openSettings())}

@@ -69,8 +69,10 @@ export function LoadingBar({ visible }: { visible: boolean }) {
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       accessibilityRole="progressbar"
       accessibilityLabel="Loading the calendar"
-      accessibilityState={{ busy: visible }}
-      accessibilityElementsHidden={!visible}
+      // aria-* so the web hears it too: there the native-only props were
+      // dropped, and an idle bar was announced as still loading.
+      aria-busy={visible}
+      aria-hidden={!visible}
     >
       <View style={styles.clip}>
         <Animated.View

@@ -164,7 +164,10 @@ export function MonthHeader({
             testID="calendar-today"
             onPress={onToday}
             hitSlop={8}
-            accessibilityLabel="Go to today"
+            // A button, named with the month it shows: "Go to today" alone
+            // hid which month a screen reader was on.
+            accessibilityRole="button"
+            accessibilityLabel={`${shown.label}, go to today`}
           >
             <Animated.View style={labelStyle}>
               <ThemedText
