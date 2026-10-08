@@ -17,6 +17,7 @@ import {
 import { LoadingBar } from '@/components/loading-bar';
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, FontFamilyBold, Spacing } from '@/constants/theme';
+import { useIsWide } from '@/hooks/use-is-wide';
 import { agoLabel, longDayLabel } from '@/utils/date';
 
 type Props = {
@@ -153,8 +154,9 @@ export function MonthHeader({
     transform: [{ translateY: labelShift.value }],
   }));
 
+  const wide = useIsWide();
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, wide && styles.headerWide]}>
       {/* Progress along the very top of the screen: the first fetch, and a
           refresh asked for with the button (the icon itself stays still). */}
       <LoadingBar visible={loading || refreshing} />
@@ -252,6 +254,11 @@ const styles = StyleSheet.create({
     paddingVertical: Bar.paddingVertical,
     gap: Bar.paddingHorizontal,
     backgroundColor: HEADER_GROUND,
+  },
+  // A desktop window has the room: more air round the bar than a phone's.
+  headerWide: {
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Bar.paddingVertical + Spacing.one,
   },
   label: {
     fontFamily: FontFamilyBold,

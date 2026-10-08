@@ -24,7 +24,7 @@ import {
   EventBanner,
   EventChip,
 } from '@/components/calendar/event-chip';
-import { scaled } from '@/components/calendar/grid-scale';
+import { GRID_SCALE, scaled } from '@/components/calendar/grid-scale';
 import { titleWidth as measureTitle } from '@/components/calendar/title-width';
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, Spacing } from '@/constants/theme';
@@ -62,7 +62,11 @@ export const COUNTER_FOOTPRINT = COUNTER_HEIGHT + MORE_BOTTOM_INSET;
 
 /** Height of the day-number line at the top of each cell — the number's own
  *  box plus the gap that holds the first event off it. */
-export const DAY_NUMBER_HEIGHT = scaled(24);
+/** A wide window's cells have room to spare: the number sits a little further
+ *  from the corner there, and the strip below moves down by the same. */
+const NUMBER_INSET_TOP = GRID_SCALE > 1 ? 2 : 0;
+const NUMBER_INSET_LEFT = GRID_SCALE > 1 ? 2 : 0;
+export const DAY_NUMBER_HEIGHT = scaled(24) + NUMBER_INSET_TOP;
 
 type WeekRowProps = {
   /** Week-start (Monday) dateString — the row's identity. */
@@ -709,7 +713,7 @@ const styles = StyleSheet.create({
   },
   cell: {
     flex: 1,
-    paddingTop: 2,
+    paddingTop: 2 + NUMBER_INSET_TOP,
     alignItems: 'flex-start',
   },
   cellRule: {
@@ -719,7 +723,7 @@ const styles = StyleSheet.create({
   dayNumberWrap: {
     minWidth: DAY_NUMBER_HEIGHT - 4,
     paddingHorizontal: Spacing.one,
-    marginLeft: 2,
+    marginLeft: 2 + NUMBER_INSET_LEFT,
     alignItems: 'center',
   },
   dayNumber: {
