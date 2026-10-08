@@ -4,7 +4,6 @@
 import { useSyncExternalStore } from 'react';
 import { AppState, PermissionsAndroid } from 'react-native';
 
-import { clearLastConfig, clearStoredConfig } from '@/config/dav-storage';
 import {
   isStoreDisconnected,
   setStoreDisconnected,
@@ -62,13 +61,7 @@ async function check(): Promise<boolean> {
 }
 
 export function ensureSource(): Promise<boolean> {
-  if (!checking) {
-    // hitome no longer holds a server login on Android — DAVx⁵ does. A login
-    // saved by an earlier version is erased, not left in the keystore.
-    clearStoredConfig().catch(() => {});
-    clearLastConfig().catch(() => {});
-    checking = check();
-  }
+  if (!checking) checking = check();
   return checking;
 }
 

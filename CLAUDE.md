@@ -91,8 +91,9 @@ helper scripts.
     phone's calendar store (`src/store/`, native bridge in
     `app/modules/calendar-store`), which DAVx⁵ or another sync app keeps in
     step with the server — DAVx⁵ holds the login, and offline edits wait in
-    the store for it. A login saved by an earlier version is erased at launch
-    (`src/config/source.android.ts`). Screens import events from
+    the store for it. `src/config/dav-storage.ts` is a stub that holds
+    nothing (the keystore login and its erase-at-launch are gone since
+    v0.7.2). Screens import events from
     `src/data/events` (CalDAV on web, the store on Android).
   - Never reintroduce credential baking, and never store a credential anywhere
     a browser can read it.

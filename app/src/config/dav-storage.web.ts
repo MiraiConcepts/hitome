@@ -5,7 +5,7 @@
 // and the proxy in front supplies the credentials. Nothing to type, nothing to
 // store, and no cross-origin request for a browser to block.
 //
-// Native twin: dav-storage.ts (typed-in address + login in the OS keystore).
+// Native twin: dav-storage.ts (Android holds no login at all).
 import type { DavConfig } from './dav-config';
 
 export async function readStoredConfig(): Promise<DavConfig | null> {
@@ -23,16 +23,8 @@ export async function writeStoredConfig(): Promise<void> {
   // Derived, so there is nothing to persist.
 }
 
-export async function clearStoredConfig(): Promise<void> {
-  // Derived, so there is nothing to clear.
-}
-
 export async function readLastConfig(): Promise<DavConfig | null> {
   return null;
-}
-
-export async function writeLastConfig(): Promise<void> {
-  // Nothing is typed on web, so there is nothing to remember.
 }
 
 export async function clearLastConfig(): Promise<void> {
