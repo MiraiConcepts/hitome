@@ -117,6 +117,11 @@ const SETTLE_MS = 150;
  * find-in-page — which used to leave the grid parked between months.
  */
 const WEB_SNAP_TYPE = 'y mandatory';
+/** What snapping is loosened to while a jump lands. Not 'none': Firefox, once
+ *  snapping has been off, re-snaps to a row years away the moment it is turned
+ *  back to mandatory. Proximity only pulls when a row is close, and the far
+ *  destination has none until its rows mount. */
+const WEB_SNAP_HELD = 'y proximity';
 const WEB_SNAP_CONTAINER =
   Platform.OS === 'web'
     ? ({ scrollSnapType: WEB_SNAP_TYPE } as unknown as ViewStyle)
@@ -135,15 +140,18 @@ function scrollerNode(list: FlatList<string> | null): HTMLElement | null {
   return (list.getScrollableNode() as HTMLElement | null) ?? null;
 }
 
-/** Is a day cell showing at the middle of the scroller? False while the rows
- *  of a far jump have not mounted yet and only empty space is there. */
+/** Is a day cell mounted in the visible part of the scroller? False while the
+ *  rows of a far jump have not mounted yet and only empty space is there; the
+ *  rows that are mounted then sit off screen, around where the grid was.
+ *  Read from the cells' own boxes: a hit test answers differently from one
+ *  browser to the next, and in Firefox never named a cell. */
 function showsCell(node: HTMLElement): boolean {
   const box = node.getBoundingClientRect();
-  const hit = document.elementFromPoint(
-    box.left + box.width / 2,
-    box.top + box.height / 2
-  );
-  return !!hit && hit !== node && !!hit.closest('[role="button"]');
+  for (const cell of node.querySelectorAll('[role="button"]')) {
+    const { top, bottom } = cell.getBoundingClientRect();
+    if (bottom > box.top && top < box.bottom) return true;
+  }
+  return false;
 }
 
 /** Defensive cap on the week walk for one event — a malformed far-future end
@@ -306,7 +314,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   const jumpTo = useCallback((offset: number, animated: boolean) => {
     const node = scrollerNode(listRef.current);
     if (node) {
-      node.style.scrollSnapType = 'none';
+      node.style.scrollSnapType = WEB_SNAP_HELD;
       if (snapRestore.current) clearTimeout(snapRestore.current);
       // Snapping returns once the destination is on screen. A fixed delay
       // lost the race after a window resize, when the list is slow to mount
