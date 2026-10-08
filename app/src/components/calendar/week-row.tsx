@@ -63,8 +63,9 @@ export const COUNTER_FOOTPRINT = COUNTER_HEIGHT + MORE_BOTTOM_INSET;
 /** Height of the day-number line at the top of each cell — the number's own
  *  box plus the gap that holds the first event off it. */
 /** A wide window's cells have room to spare: the day number is set in from the
- *  corner by the digit's own ink, 4px each way, not by its box (which carries
- *  padding, and centres a single digit in a wider space). */
+ *  corner by the digit's own ink, about 8px each way (the phone's is 6.5), not
+ *  by its box (which carries padding, and centres a single digit in a wider
+ *  space). */
 const WIDE = GRID_SCALE > 1;
 export const DAY_NUMBER_HEIGHT = scaled(24);
 
@@ -713,7 +714,7 @@ const styles = StyleSheet.create({
   },
   cell: {
     flex: 1,
-    paddingTop: WIDE ? 0 : 2,
+    paddingTop: WIDE ? 4 : 2,
     alignItems: 'flex-start',
   },
   cellRule: {
@@ -722,9 +723,9 @@ const styles = StyleSheet.create({
   },
   dayNumberWrap: WIDE
     ? {
-        // Left-aligned, no padding: the box hugs the digits, and the line
-        // box's own air above the capitals makes up the 4px from the top.
-        marginLeft: 4,
+        // Left-aligned, no padding: the box hugs the digits. The line box's
+        // own air above the capitals is part of the top inset.
+        marginLeft: 8,
         alignItems: 'flex-start',
       }
     : {
