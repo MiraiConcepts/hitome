@@ -4,6 +4,9 @@
 /** How long a login check may take before the server counts as unreachable. */
 const CHECK_TIMEOUT_MS = 15_000;
 
+/** How long the calendar server may take over one passed-through request. */
+const FORWARD_TIMEOUT_MS = 60_000;
+
 export type LoginCheck = 'ok' | 'bad-login' | 'not-caldav' | 'unreachable';
 
 export function basicAuth(username: string, password: string): string {
@@ -106,6 +109,7 @@ export async function forward(
     headers,
     body: hasBody ? await req.arrayBuffer() : undefined,
     redirect: 'manual',
+    signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS),
   });
   const out = new Headers();
   for (const [name, value] of upstream.headers) {

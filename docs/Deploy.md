@@ -96,6 +96,23 @@ the calendar appears. If the login screen says the address *doesn't answer
 like a calendar server*, check `CALDAV_URL` (the trailing path matters:
 it is the address you would give a CalDAV app).
 
+## What to know about security
+
+- **Sessions last until you log out.** The server never expires one; the
+  cookie lasts 400 days and renews whenever the app opens. Use "log out
+  everywhere" if a browser is lost.
+- **The login is stored on the server.** It sits in `sessions.enc` in the data
+  volume, encrypted, with its key beside it in the same volume. That protects
+  a copied or backed-up file, not a stolen volume. Keep the volume private.
+- **Guessing is slowed, not stopped.** After five wrong passwords the login
+  waits 30 seconds, doubling to 15 minutes, for everyone: anyone who can
+  reach the page can also lock you out for a while. Put the page behind a
+  VPN or your front door's own rate limit if it is open to the internet.
+- **Use HTTPS.** The session cookie is marked Secure only when the request
+  came over HTTPS (or your front door says so with `X-Forwarded-Proto`).
+- **Location suggestions** (event editor) send what you type to
+  photon.komoot.io. Nothing else leaves your server and your devices.
+
 ## Moving from the old setup (before v0.7)
 
 Earlier versions had no login: the host Caddy added the calendar login to

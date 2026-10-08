@@ -12,7 +12,7 @@
 //   DEV_UPSTREAM  development only: proxy the app to Metro at this address
 //                 instead of serving STATIC_DIR (e.g. http://localhost:8082)
 import { mkdirSync } from 'node:fs';
-import { normalize, join } from 'node:path';
+import { normalize, join, sep } from 'node:path';
 
 import { cacheControl } from './caching';
 import { basicAuth, checkLogin, forward, upstreamUrl } from './caldav';
@@ -41,6 +41,13 @@ function caldavBase(raw: string): string {
 }
 
 const CALDAV_URL = caldavBase(requireEnv('CALDAV_URL'));
+/** The address shown in Settings: never a login embedded in it. */
+const CALDAV_SHOWN = (() => {
+  const url = new URL(CALDAV_URL);
+  url.username = '';
+  url.password = '';
+  return url.href;
+})();
 const PORT = Number(process.env.PORT ?? 3000);
 const DATA_DIR = process.env.DATA_DIR ?? '/data';
 const STATIC_DIR = process.env.STATIC_DIR ?? '/srv';
@@ -160,7 +167,7 @@ function session(req: Request): Response {
   if (!current) return json({ error: 'signed-out' }, 401);
   // Checking in renews the cookie, so "until you log out" holds for anyone
   // who opens the app at least once a year.
-  return json({ username: current.username, server: CALDAV_URL }, 200, {
+  return json({ username: current.username, server: CALDAV_SHOWN }, 200, {
     'Set-Cookie': sessionCookie(req, token!, COOKIE_MAX_AGE_S),
   });
 }
@@ -203,6 +210,8 @@ async function dav(req: Request, url: URL): Promise<Response> {
       'Set-Cookie': sessionCookie(req, '', 0),
     });
   }
+  // Calendar data is for this page now, not for a shared computer's cache.
+  res.headers.set('Cache-Control', 'no-store');
   return res;
 }
 
@@ -231,7 +240,7 @@ async function staticFile(req: Request, url: URL): Promise<Response> {
   ];
   for (const candidate of candidates) {
     const path = normalize(join(root, candidate));
-    if (!path.startsWith(root)) continue;
+    if (path !== root && !path.startsWith(root + sep)) continue;
     const file = Bun.file(path);
     if (!(await file.exists())) continue;
     const headers = new Headers({
@@ -281,8 +290,12 @@ async function devUpstream(req: Request, url: URL): Promise<Response> {
 type Frame = string | Uint8Array<ArrayBuffer>;
 type WsData = { path: string; upstream?: WebSocket; queue: Frame[] };
 
+/** A calendar event is a few kilobytes; nothing here needs more than this. */
+const MAX_BODY_BYTES = 16 * 1024 * 1024;
+
 const server = Bun.serve<WsData>({
   port: PORT,
+  maxRequestBodySize: MAX_BODY_BYTES,
   async fetch(req, srv) {
     const url = new URL(req.url);
     const path = url.pathname;
