@@ -17,6 +17,14 @@ try {
   initWeekStart(calendar?.firstWeekday ? calendar.firstWeekday - 1 : 1);
   if (typeof calendar?.uses24hourClock === 'boolean')
     setClock24(calendar.uses24hourClock);
+  else {
+    // The web build asks Intl for a format with no hour in it, which has no
+    // hour cycle, so it never knows; asking with an hour does.
+    const cycle = new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+    }).resolvedOptions().hourCycle;
+    if (cycle) setClock24(cycle === 'h23' || cycle === 'h24');
+  }
   // The widget writes its own date lines; give it the phone's language.
   setNameLocale(getLocales()[0]?.languageTag);
   // New events are written in the phone's zone (see caldav/ics).

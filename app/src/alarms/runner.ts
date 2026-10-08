@@ -2,8 +2,11 @@
 // the platform's scheduled set in line. Runs on app start, foreground, and
 // after every editor write — the "reconcile on open" cadence is also the
 // safety net against ColorOS force-stops wiping AlarmManager registrations.
-import { fetchMonth } from '@/data/events';
+import { Platform } from 'react-native';
+
 import type { CalEvent } from '@/caldav/types';
+import { ensureSource } from '@/config/source';
+import { fetchMonth } from '@/data/events';
 import { cacheKey } from '@/hooks/use-month-events';
 import { reviveEvents } from '@/utils/event-snapshot';
 import { monthKeyOf } from '@/utils/month-events-store';
@@ -45,6 +48,9 @@ export function runAlarmReconcile(): Promise<void> {
   if (running) return running;
   running = (async () => {
     try {
+      // Logged out on the web there is nothing to remind of, and asking the
+      // calendar anyway only drew refusals from the server.
+      if (Platform.OS === 'web' && !(await ensureSource())) return;
       await ensureSetup();
       const now = new Date();
       const end = new Date(now.getTime() + HORIZON_MS);
