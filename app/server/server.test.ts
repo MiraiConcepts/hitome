@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { cacheControl } from './caching';
 import { basicAuth, checkLogin, upstreamUrl } from './caldav';
 import { createLimiter } from './limiter';
 import { openSessions } from './sessions';
@@ -141,5 +142,29 @@ describe('checkLogin', () => {
     expect(await checkLogin('http://localhost:1/', 'sam', 'right')).toBe(
       'unreachable'
     );
+  });
+});
+
+describe('cacheControl', () => {
+  const KEEP = 'public, max-age=31536000, immutable';
+  const font =
+    '/assets/assets/fonts/Satoshi.177a4dda04b52dedbd966942e932c5dc.otf';
+  const bundle =
+    '/_expo/static/js/web/index-72494d5aeabf56a4b2557c14120cafaa.js';
+
+  it('keeps hashed bundles and assets', () => {
+    expect(cacheControl(bundle, bundle)).toBe(KEEP);
+    expect(cacheControl(font, font)).toBe(KEEP);
+  });
+
+  it('revalidates the HTML, version.json and unhashed files', () => {
+    expect(cacheControl('/', '/index.html')).toBe('no-cache');
+    expect(cacheControl('/version.json', '/version.json')).toBe('no-cache');
+    expect(cacheControl('/favicon.png', '/favicon.png')).toBe('no-cache');
+  });
+
+  it('never keeps the shell served in place of a missing bundle', () => {
+    expect(cacheControl(bundle, '/index.html')).toBe('no-cache');
+    expect(cacheControl(font, '/index.html')).toBe('no-cache');
   });
 });

@@ -1,16 +1,16 @@
 // Pure iCalendar (RFC 5545) logic — NO tsdav / expo-crypto imports, so this module
 // is unit-testable offline (the property-preservation test is the plan's #1 risk).
-import IcalExpander from 'ical-expander';
 import ICAL from 'ical.js';
 import { tzlib_get_ical_block } from 'timezones-ical-library';
 
+import { expandBetween } from './expand';
 import { applyRecurrence, masterVevent } from './rrule';
 import type { CalEvent, EventChanges, EventInput, EventSource } from './types';
 import { applyAlarm } from './valarm';
 
 /**
  * Expand one calendar object's ICS into concrete CalEvents overlapping [start, end).
- * Handles single and recurring events uniformly via ical-expander. `source` carries
+ * Handles single and recurring events uniformly (expand.ts). `source` carries
  * the calendar's rendering hints (color + marker icon) as plain data, so this module
  * stays tsdav-free.
  */
@@ -22,8 +22,7 @@ export function expandEvents(
   rangeEnd: Date,
   source: EventSource = {}
 ): CalEvent[] {
-  const expander = new IcalExpander({ ics, maxIterations: 1000 });
-  const { events, occurrences } = expander.between(rangeStart, rangeEnd);
+  const { events, occurrences } = expandBetween(ics, rangeStart, rangeEnd);
 
   const map = (
     event: any,

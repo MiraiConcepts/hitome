@@ -14,6 +14,7 @@
 import { mkdirSync } from 'node:fs';
 import { normalize, join } from 'node:path';
 
+import { cacheControl } from './caching';
 import { basicAuth, checkLogin, forward, upstreamUrl } from './caldav';
 import { createLimiter } from './limiter';
 import { openSessions } from './sessions';
@@ -229,11 +230,7 @@ async function staticFile(req: Request, url: URL): Promise<Response> {
     if (!(await file.exists())) continue;
     const headers = new Headers({
       'Content-Type': file.type,
-      // Hashed bundles never change; everything else (the HTML, version.json
-      // for the silent-reload check) revalidates so a new release is seen.
-      'Cache-Control': url.pathname.startsWith('/_expo/static/')
-        ? 'public, max-age=31536000, immutable'
-        : 'no-cache',
+      'Cache-Control': cacheControl(pathname, candidate),
     });
     if (
       COMPRESSIBLE.test(path) &&
