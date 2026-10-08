@@ -16,7 +16,7 @@
 # On the build machine's own platform even when making an ARM image: the
 # exported app is plain JavaScript and assets, the same on every machine, so
 # only the small serve stage below is built per architecture.
-FROM --platform=$BUILDPLATFORM oven/bun:1 AS build
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.2 AS build
 WORKDIR /app
 COPY package.json bun.lock ./
 # patchedDependencies (bun patch) must be present at install time
@@ -30,7 +30,7 @@ RUN bunx expo export --platform web
 RUN bun --eval 'require("fs").writeFileSync("dist/version.json", JSON.stringify({ version: require("./app.json").expo.version }))'
 
 # ---- serve ----
-FROM oven/bun:1-alpine
+FROM oven/bun:1.4.2-alpine
 WORKDIR /app
 COPY server ./server
 COPY --from=build /app/dist /srv

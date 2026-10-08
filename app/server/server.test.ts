@@ -62,6 +62,14 @@ describe('sessions', () => {
 });
 
 describe('limiter', () => {
+  it('checks one guess at a time', () => {
+    const limiter = createLimiter();
+    expect(limiter.begin()).toBe(true);
+    expect(limiter.begin()).toBe(false);
+    limiter.end();
+    expect(limiter.begin()).toBe(true);
+  });
+
   it('lets a few mistakes through, then makes each try wait longer', () => {
     let now = 0;
     const limiter = createLimiter(() => now);

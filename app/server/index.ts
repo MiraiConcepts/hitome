@@ -135,7 +135,13 @@ async function login(req: Request): Promise<Response> {
   const password = typeof body.password === 'string' ? body.password : '';
   if (!username || !password) return json({ error: 'missing' }, 400);
 
-  const result = await checkLogin(CALDAV_URL, username, password);
+  if (!limiter.begin()) return json({ error: 'too-many', retryAfter: 1 }, 429);
+  let result: Awaited<ReturnType<typeof checkLogin>>;
+  try {
+    result = await checkLogin(CALDAV_URL, username, password);
+  } finally {
+    limiter.end();
+  }
   if (result === 'bad-login') {
     limiter.fail();
     return json({ error: 'bad-login' }, 401);

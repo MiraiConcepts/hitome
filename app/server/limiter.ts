@@ -14,8 +14,21 @@ export type Limiter = ReturnType<typeof createLimiter>;
 export function createLimiter(now: () => number = Date.now) {
   let failures: number[] = [];
   let lockedUntil = 0;
+  let trying = false;
 
   return {
+    /** One guess at a time: the wait only grows once a guess has failed, so
+     *  guesses sent together would all be checked before any counted.
+     *  False when one is already being checked. */
+    begin(): boolean {
+      if (trying) return false;
+      trying = true;
+      return true;
+    },
+    /** The guess begun has been answered. */
+    end(): void {
+      trying = false;
+    },
     /** Milliseconds until another attempt is allowed; 0 when it is. */
     wait(): number {
       return Math.max(0, lockedUntil - now());
