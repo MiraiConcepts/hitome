@@ -1,7 +1,6 @@
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import type { CalEvent } from '@/caldav/types';
-import { CalendarMark } from '@/components/calendar/calendar-mark';
 import { EventTags } from '@/components/calendar/event-tags';
 import { TrashIcon } from '@/components/icons';
 import {
@@ -14,15 +13,12 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BACKDROP_BLUR } from '@/constants/backdrop';
-import { AccentColor, DangerColor, Spacing } from '@/constants/theme';
+import { DangerColor, Spacing } from '@/constants/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, formatTime } from '@/utils/date';
 import { durationLabel } from '@/utils/duration';
 
-/** The calendar's mark, in front of the title. */
-const MARK_SIZE = 16;
-/** The title's line height, so the mark centres on its first line. */
 const TITLE_LINE = 24;
 const TITLE_LINE_COMPACT = 21;
 /** The time column: a start time and a duration are short, so it is narrow,
@@ -145,31 +141,15 @@ export function DayPopover({
                         </View>
                       }
                       value={
-                        <View>
-                          <View style={styles.titleRow}>
-                            <View
-                              style={{
-                                height: compact
-                                  ? TITLE_LINE_COMPACT
-                                  : TITLE_LINE,
-                                justifyContent: 'center',
-                              }}
-                            >
-                              <CalendarMark
-                                icon={event.icon}
-                                color={event.color ?? AccentColor}
-                                size={MARK_SIZE}
-                              />
-                            </View>
-                            <ThemedText
-                              style={[
-                                styles.title,
-                                compact && styles.titleCompact,
-                              ]}
-                            >
-                              {event.summary || '(untitled)'}
-                            </ThemedText>
-                          </View>
+                        <View style={styles.valueInset}>
+                          <ThemedText
+                            style={[
+                              styles.title,
+                              compact && styles.titleCompact,
+                            ]}
+                          >
+                            {event.summary || '(untitled)'}
+                          </ThemedText>
                           <EventTags event={event} compact={compact} />
                         </View>
                       }
@@ -230,13 +210,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.one + Spacing.half,
+  // A little more air between the time column's rule and the title.
+  valueInset: {
+    paddingLeft: Spacing.one + 1,
   },
   title: {
-    flexShrink: 1,
     lineHeight: TITLE_LINE,
   },
   titleCompact: {

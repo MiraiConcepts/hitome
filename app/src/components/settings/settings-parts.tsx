@@ -216,6 +216,11 @@ export function SettingsValue({
 }) {
   const theme = useTheme();
   const passThrough = onPress ? styles.passThrough : null;
+  // Lit while hovered or pressed, on the value cell alone: the time column,
+  // the rules and the delete beside it keep their ground.
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const lit = hovered || pressed;
   return (
     <View testID={testID}>
       <DashedLine />
@@ -225,18 +230,11 @@ export function SettingsValue({
             onPress={onPress}
             accessibilityRole="button"
             accessibilityLabel={pressLabel}
-            style={({
-              pressed,
-              hovered,
-            }: {
-              pressed: boolean;
-              hovered?: boolean;
-            }) => [
-              StyleSheet.absoluteFill,
-              (pressed || hovered) && {
-                backgroundColor: theme.backgroundSelected,
-              },
-            ]}
+            onHoverIn={() => setHovered(true)}
+            onHoverOut={() => setHovered(false)}
+            onPressIn={() => setPressed(true)}
+            onPressOut={() => setPressed(false)}
+            style={StyleSheet.absoluteFill}
           />
         )}
         <View
@@ -262,7 +260,13 @@ export function SettingsValue({
             <DashedLine vertical />
           </View>
         </View>
-        <View style={[styles.valueCell, passThrough]}>
+        <View
+          style={[
+            styles.valueCell,
+            passThrough,
+            lit && { backgroundColor: theme.backgroundSelected },
+          ]}
+        >
           {typeof value === 'string' ? (
             <ThemedText type="small">{value}</ThemedText>
           ) : (
