@@ -225,7 +225,11 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   /** The same rows as a lookup — what marks a row as web's snap target. */
   const monthStartRows = useMemo(() => new Set(snapRows), [snapRows]);
 
-  const rowHeight = height / 6;
+  // Whole pixels: a row of 82.333px is laid out by the browser at the nearest
+  // 1/64px, 261 rows down that is more than a pixel off the offsets worked out
+  // here, and the browser's snapping then settles on a month years away. The
+  // few pixels left over at the bottom are the grid's own ground.
+  const rowHeight = Math.floor(height / 6);
   const snapOffsets = useMemo(
     () => snapRows.map((row) => row * rowHeight),
     [snapRows, rowHeight]
