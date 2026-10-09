@@ -36,6 +36,13 @@ echo "==> verify signature"
 docker run --rm -v "$PWD/dist-apk:/w" -w /w eclipse-temurin:17-jre \
   java -jar apksigner.jar verify --print-certs "hitome-$TAG.apk" > dist-apk/verify.txt
 head -3 dist-apk/verify.txt
+# The same key as every earlier release (Android refuses an update signed by
+# another, and the key cannot be rotated): stop before publishing otherwise.
+EXPECTED_CERT_SHA256=37ba82efa8b49ca541d39ec343987ae4be0c65b7f1de8811c262571b73676d36
+grep -qi "certificate SHA-256 digest: $EXPECTED_CERT_SHA256" dist-apk/verify.txt || {
+  echo "signed with a different certificate than the earlier releases" >&2
+  exit 1
+}
 
 echo "==> publishing release $TAG"
 gh release create "$TAG" "dist-apk/hitome-$TAG.apk" \

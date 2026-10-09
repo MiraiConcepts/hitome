@@ -106,11 +106,22 @@ jobs:
       # The signature is real. (The companion check — that a server URL got
       # baked into the APK — is gone with the baking: the app is configured on
       # the device now, so a release with no URL in it is the correct outcome.)
+      # ...and it is the same key as every earlier release: Android only installs
+      # an update signed by the key the app was installed with, and the key
+      # cannot be rotated (docs/Release.md). A swapped KEYSTORE_BASE64 secret
+      # would otherwise publish a release no phone can update to.
       - name: Verify signature
         if: startsWith(github.ref, 'refs/tags/')
         env:
           TAG: ${{ github.ref_name }}
-        run: java -jar apksigner.jar verify --print-certs "hitome-$TAG.apk" | head -3
+          EXPECTED_CERT_SHA256: 37ba82efa8b49ca541d39ec343987ae4be0c65b7f1de8811c262571b73676d36
+        run: |
+          java -jar apksigner.jar verify --print-certs "hitome-$TAG.apk" > verify.txt
+          head -3 verify.txt
+          grep -qi "certificate SHA-256 digest: $EXPECTED_CERT_SHA256" verify.txt || {
+            echo "::error::signed with a different certificate than the earlier releases"
+            exit 1
+          }
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')
