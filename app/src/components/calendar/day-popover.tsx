@@ -12,7 +12,7 @@ import {
 import type { CalEvent } from '@/caldav/types';
 import { BlurBackdrop } from '@/components/blur-backdrop';
 import { EventTags } from '@/components/calendar/event-tags';
-import { TrashIcon } from '@/components/icons';
+import { ShareIcon, TrashIcon } from '@/components/icons';
 import {
   SettingsBlock,
   SettingsButton,
@@ -23,7 +23,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BACKDROP_BLUR, MODAL_ANIMATION } from '@/constants/backdrop';
-import { DangerColor, Spacing } from '@/constants/theme';
+import { AccentColor, DangerColor, Spacing } from '@/constants/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, formatTime } from '@/utils/date';
@@ -43,6 +43,8 @@ const ROW_LINE_COMPACT = 20;
 const WHEN_COLUMN = 108;
 /** The phone's: a notch smaller type, so the column follows. */
 const WHEN_COLUMN_COMPACT = 94;
+/** The column holding Share and Delete: two 48 px targets side by side. */
+const ACTIONS_WIDTH = 96;
 
 type Props = {
   /** The day (dateString) whose events are listed. */
@@ -53,9 +55,11 @@ type Props = {
   onPressEvent: (event: CalEvent) => void;
   /** Delete an event from the list: one tap, with the Undo bar to follow. */
   onDelete: (event: CalEvent) => void;
-  /** A new event on this day. Given on the web, where a click on a busy day
-   *  lands here and there is no hold to add with; the phone holds the cell. */
-  onAdd?: () => void;
+  /** Share an event as text (the system sheet, or the clipboard on the web). */
+  onShare: (event: CalEvent) => void;
+  /** A new event on this day. A hold on a cell does it too, but nothing says
+   *  so: a busy day's list is where a person looks for the button. */
+  onAdd: () => void;
 };
 
 /**
@@ -121,6 +125,7 @@ export function DayPopover({
   onClose,
   onPressEvent,
   onDelete,
+  onShare,
   onAdd,
 }: Props) {
   const theme = useTheme();
@@ -161,30 +166,56 @@ export function DayPopover({
                       centerValue
                       onPress={() => onPressEvent(event)}
                       pressLabel={event.summary || '(untitled)'}
+                      trailingWidth={ACTIONS_WIDTH}
                       trailing={
-                        <Pressable
-                          onPress={() => onDelete(event)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Delete ${event.summary || 'event'}`}
-                          testID={`day-popover-delete-${event.id}`}
-                          style={({
-                            pressed,
-                            hovered,
-                          }: {
-                            pressed: boolean;
-                            hovered?: boolean;
-                          }) => [
-                            styles.delete,
-                            (pressed || hovered) && {
-                              backgroundColor: theme.backgroundSelected,
-                            },
-                          ]}
-                        >
-                          <TrashIcon
-                            size={compact ? 18 : 20}
-                            color={DangerColor}
-                          />
-                        </Pressable>
+                        <View style={styles.actions}>
+                          <Pressable
+                            onPress={() => onShare(event)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Share ${event.summary || 'event'}`}
+                            testID={`day-popover-share-${event.id}`}
+                            style={({
+                              pressed,
+                              hovered,
+                            }: {
+                              pressed: boolean;
+                              hovered?: boolean;
+                            }) => [
+                              styles.action,
+                              (pressed || hovered) && {
+                                backgroundColor: theme.backgroundSelected,
+                              },
+                            ]}
+                          >
+                            <ShareIcon
+                              size={compact ? 18 : 20}
+                              color={AccentColor}
+                            />
+                          </Pressable>
+                          <Pressable
+                            onPress={() => onDelete(event)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Delete ${event.summary || 'event'}`}
+                            testID={`day-popover-delete-${event.id}`}
+                            style={({
+                              pressed,
+                              hovered,
+                            }: {
+                              pressed: boolean;
+                              hovered?: boolean;
+                            }) => [
+                              styles.action,
+                              (pressed || hovered) && {
+                                backgroundColor: theme.backgroundSelected,
+                              },
+                            ]}
+                          >
+                            <TrashIcon
+                              size={compact ? 18 : 20}
+                              color={DangerColor}
+                            />
+                          </Pressable>
+                        </View>
                       }
                       label={
                         // When: the start, and how long it runs.
@@ -228,18 +259,16 @@ export function DayPopover({
                     />
                   );
                 })}
-                {onAdd && (
-                  <SettingsBlock>
-                    <SettingsButtonRow>
-                      <SettingsButton
-                        label="Add event"
-                        variant="filled"
-                        onPress={onAdd}
-                        testID="day-popover-add"
-                      />
-                    </SettingsButtonRow>
-                  </SettingsBlock>
-                )}
+                <SettingsBlock>
+                  <SettingsButtonRow>
+                    <SettingsButton
+                      label="Add event"
+                      variant="filled"
+                      onPress={onAdd}
+                      testID="day-popover-add"
+                    />
+                  </SettingsButtonRow>
+                </SettingsBlock>
               </SettingsSection>
             </ScrollView>
           </ThemedView>
@@ -277,7 +306,11 @@ const styles = StyleSheet.create({
     maxHeight: '100%',
     boxShadow: '4px 4px 0px rgba(0, 0, 0, 0.75)',
   },
-  delete: {
+  actions: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  action: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',

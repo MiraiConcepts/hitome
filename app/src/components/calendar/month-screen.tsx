@@ -67,6 +67,7 @@ import {
 } from '@/config/calendar-visibility';
 import { getFirstDayOfWeek, type MonthAnchor } from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
+import { shareEvent } from '@/utils/share-event';
 import { refreshAgendaWidget } from '@/widget/app-refresh';
 
 type EditorState =
@@ -79,7 +80,7 @@ type EditorState =
  * happened (a glyph, then a sentence), and when there is something to do
  * about it, a ruled cell for that beside it.
  */
-function SnackBar({
+export function SnackBar({
   icon: Icon,
   message,
   action,
@@ -100,10 +101,12 @@ function SnackBar({
       <CardFrame style={styles.snackCard}>
         <View style={styles.snackRow}>
           <View style={styles.snackBody}>
-            <Icon
-              size={18}
-              color={Icon === TrashIcon ? DangerColor : AccentColor}
-            />
+            <View style={styles.snackIcon}>
+              <Icon
+                size={18}
+                color={Icon === TrashIcon ? DangerColor : AccentColor}
+              />
+            </View>
             <ThemedText type="small" style={styles.snackText} numberOfLines={2}>
               {message}
             </ThemedText>
@@ -427,6 +430,22 @@ export function MonthScreen() {
     }
   }, []);
 
+  // The day list's share. The system sheet needs no word from us; the clipboard
+  // does (the list closes first, since it would cover the toast).
+  const onShareEvent = useCallback(async (event: CalEvent) => {
+    const result = await shareEvent(event);
+    if (result === 'copied') {
+      setPopoverDay(null);
+      setSnack({ message: 'Copied to clipboard', icon: CheckIcon });
+    } else if (result === 'failed') {
+      setPopoverDay(null);
+      setSnack({
+        message: 'Couldn’t share this event',
+        icon: AlertCircleIcon,
+      });
+    }
+  }, []);
+
   // Hold a cell anywhere, its events included — a new event on that day.
   const onCreateOnDay = useCallback(
     (day: string) => setEditor({ mode: 'create', day }),
@@ -713,14 +732,11 @@ export function MonthScreen() {
           onClose={() => setPopoverDay(null)}
           onPressEvent={onPressEvent}
           onDelete={onDeleteEvent}
-          onAdd={
-            Platform.OS === 'web'
-              ? () => {
-                  setPopoverDay(null);
-                  setEditor({ mode: 'create', day: popoverDay });
-                }
-              : undefined
-          }
+          onShare={onShareEvent}
+          onAdd={() => {
+            setPopoverDay(null);
+            setEditor({ mode: 'create', day: popoverDay });
+          }}
         />
       )}
 
@@ -801,9 +817,11 @@ const styles = StyleSheet.create({
     maxWidth: 480,
   },
   // The card's own ground in both schemes: the toast keeps the dark palette.
+  // No shadow: the card frame's own is switched off (it floats over the grid,
+  // which is edge enough).
   snackCard: {
     backgroundColor: Colors.dark.background,
-    boxShadow: '4px 4px 0px rgba(0, 0, 0, 0.75)',
+    boxShadow: '0px 0px 0px rgba(0, 0, 0, 0)',
   },
   snackRow: {
     flexDirection: 'row',
@@ -816,6 +834,13 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     paddingVertical: Spacing.three - Spacing.one,
     paddingHorizontal: Spacing.three - Spacing.one,
+  },
+  // Its own size, whatever the message: a long one wraps beside it and must
+  // not squeeze the glyph.
+  snackIcon: {
+    width: 18,
+    height: 18,
+    flexShrink: 0,
   },
   snackText: {
     color: Colors.dark.text,

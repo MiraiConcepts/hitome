@@ -267,6 +267,7 @@ export function SettingsValue({
   onPress,
   pressLabel,
   trailing,
+  trailingWidth,
 }: {
   /** Text, or something of your own (the day list's mark and time). */
   label: ReactNode;
@@ -294,6 +295,9 @@ export function SettingsValue({
    *  list's delete). It stays a button of its own above the row's, so give it
    *  the whole cell to be pressed in. */
   trailing?: ReactNode;
+  /** The trailing column's width, where one control does not fill it (the day
+   *  list's share and delete sit side by side). */
+  trailingWidth?: number;
 }) {
   const theme = useTheme();
   // Lit while hovered or pressed, on the value cell alone: the time column,
@@ -366,7 +370,14 @@ export function SettingsValue({
                 <DashedLine vertical />
               </View>
             </View>
-            <View style={styles.trailingCell}>{trailing}</View>
+            <View
+              style={[
+                styles.trailingCell,
+                trailingWidth ? { width: trailingWidth } : null,
+              ]}
+            >
+              {trailing}
+            </View>
           </>
         ) : null}
       </View>
@@ -835,6 +846,8 @@ const styles = StyleSheet.create({
   // icon beside the opening words.
   messageGlyph: {
     height: Message.lineHeight,
+    width: Message.icon,
+    flexShrink: 0,
     justifyContent: 'center',
     // Optical, not layout: Satoshi's lowercase sits about 1.6px below the
     // line's centre (its ascent leaves far more room above the letters than

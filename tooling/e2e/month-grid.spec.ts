@@ -220,7 +220,9 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
       .click({ position: { x: 10, y: 6 } });
     await expect(popover).toBeVisible();
     await expect(popover.getByText(/🧪 Busy/)).toHaveCount(10);
-    await popover.getByRole("button", { name: "🧪 Busy 5", exact: true }).click();
+    await popover
+      .getByRole("button", { name: "🧪 Busy 5", exact: true })
+      .click();
     await expect(page.getByTestId("event-editor")).toBeVisible();
     await expect(page.getByTestId("editor-summary")).toHaveValue("🧪 Busy 5");
     await expect(page.getByTestId("editor-title")).toHaveText(
@@ -237,7 +239,9 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
       .click();
     await expect(popover).toBeVisible();
     await expect(popover.getByText(/🧪 Busy/)).toHaveCount(10);
-    await popover.getByRole("button", { name: "🧪 Busy 5", exact: true }).click();
+    await popover
+      .getByRole("button", { name: "🧪 Busy 5", exact: true })
+      .click();
     await expect(page.getByTestId("editor-summary")).toHaveValue("🧪 Busy 5");
     await cancelEditor(page);
   });
@@ -439,4 +443,55 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
     await shot(page, "12-wide-dialog");
     await cancelEditor(page);
   });
+});
+
+test("share from the day list copies the event as text, and the list has Add event", async ({
+  page,
+}) => {
+  await page.goto(`/?day=${dateString(target(1))}`);
+  await expect(page.getByTestId("calendar-header-label")).toHaveText(
+    monthTitle(target(1)),
+    { timeout: 30_000 },
+  );
+  const day = grid(page).getByTestId(`day-cell-${dateString(target(27))}`);
+  // The counter shows once the day's events have loaded.
+  await expect(
+    grid(page).getByTestId(`more-${dateString(target(27))}`),
+  ).toHaveText(/\+\d+/, { timeout: 30_000 });
+  await day.click({ position: { x: 10, y: 6 } });
+  const popover = page.getByTestId("day-popover");
+  await expect(popover.getByText(/🧪 Busy/)).toHaveCount(10);
+  await expect(page.getByTestId("day-popover-add")).toBeVisible();
+
+  // The browser here has no share sheet, so the app copies: through the
+  // clipboard API where the page may use it, else through a selection. Record
+  // whichever happens.
+  await page.evaluate(() => {
+    const record = (text: string) => {
+      (window as unknown as { __copied: string }).__copied = text;
+    };
+    const exec = document.execCommand.bind(document);
+    document.execCommand = (command: string, ...rest: [boolean?, string?]) => {
+      if (command === "copy")
+        record(
+          document.querySelector<HTMLTextAreaElement>("textarea[readonly]")
+            ?.value ?? "",
+        );
+      return exec(command, ...rest);
+    };
+    if (navigator.clipboard)
+      navigator.clipboard.writeText = async (text: string) => record(text);
+  });
+  await popover
+    .getByRole("button", { name: "Share 🧪 Busy 5", exact: true })
+    .click();
+  await expect(page.getByText("Copied to clipboard")).toBeVisible();
+  const copied = await page.evaluate(
+    () => (window as unknown as { __copied: string }).__copied,
+  );
+  const lines = copied.split("\n");
+  expect(lines[0]).toBe("🧪 Busy 5");
+  // Busy n starts at 8 + n - 1 and runs 45 minutes; locale and zone are pinned.
+  expect(lines[1]).toContain("12:00 to 12:45");
+  expect(lines[1]).toContain(`${target(27).getFullYear()}`);
 });
