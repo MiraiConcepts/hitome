@@ -20,6 +20,10 @@ hitome added: `placeholder`, and `rule`/`ruleStrong` for the settings card).
   the session's login. Ships in the same image (`app/Dockerfile`).
 - `docs/` — `Deploy.md` (web image, login, front door), `Release.md`
   (Android APK pipeline).
+- `app/src/gallery/` + `app/src/app/gallery/` — a development-only components
+  page (`/gallery` on the dev server): every UI piece on sample data, at a phone's
+  or desktop's width. Not in release builds (see its README); keep its
+  specimens in step when a component's props change.
 - `tooling/` — `e2e/` (dockerized Playwright + throwaway Radicale + the
   server), `android-builder/` (local sign + release scripts),
   `dev-phone/`.
