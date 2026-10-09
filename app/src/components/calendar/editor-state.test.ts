@@ -1,6 +1,11 @@
 import type { CalEvent } from '@/caldav/types';
 
-import { endDayForAllDay, initialFormState, isDirty } from './editor-state';
+import {
+  endDayForAllDay,
+  initialFormState,
+  isDirty,
+  scopesFor,
+} from './editor-state';
 
 const NOW = new Date(2026, 6, 19, 14, 20); // local 2026-07-19 14:20
 
@@ -249,5 +254,43 @@ describe('isDirty', () => {
     expect(
       isDirty({ ...base, calendarUrl: '/a/' }, { ...base, calendarUrl: '/b/' })
     ).toBe(true);
+  });
+});
+
+describe('scopesFor', () => {
+  const ALL = ['this', 'following', 'all'];
+  const custom = initialFormState(
+    makeEvent({}, ['RRULE:FREQ=WEEKLY;BYDAY=WE']),
+    '2026-07-20',
+    NOW
+  ).recurrence;
+
+  it('reads a BYDAY weekly rule as custom', () => {
+    expect(custom).toEqual({ kind: 'custom' });
+  });
+
+  it('offers only this occurrence for a change of day on a custom rule', () => {
+    expect(scopesFor(custom, true)).toEqual(['this']);
+  });
+
+  it('keeps all three for a change of time on a custom rule', () => {
+    expect(scopesFor(custom, false)).toEqual(ALL);
+  });
+
+  it('keeps all three for a preset rule or no rule, day moved or not', () => {
+    const preset = initialFormState(
+      makeEvent({}, ['RRULE:FREQ=DAILY;COUNT=4']),
+      '2026-07-20',
+      NOW
+    ).recurrence;
+    expect(preset.kind).toBe('preset');
+    expect(scopesFor(preset, true)).toEqual(ALL);
+    expect(scopesFor(preset, false)).toEqual(ALL);
+    expect(scopesFor({ kind: 'none' }, true)).toEqual(ALL);
+  });
+
+  it('keeps all three for a delete (no day moves) of a custom series', () => {
+    // The editor's delete path asks with dayChanged false.
+    expect(scopesFor(custom, false)).toEqual(ALL);
   });
 });

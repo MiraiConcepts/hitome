@@ -30,11 +30,13 @@ import type {
 } from '@/caldav/types';
 import type { AlarmState } from '@/components/calendar/alarm-field';
 import {
+  CUSTOM_DAY_NOTE,
   endDayForAllDay,
   alarmEqual,
   initialFormState,
   isDirty,
   recurEqual,
+  scopesFor,
 } from '@/components/calendar/editor-state';
 import type { RecurrenceState } from '@/components/calendar/recurrence-field';
 import {
@@ -70,10 +72,17 @@ export type EditorField = 'title' | 'times' | 'repeat';
  *  field when it is that field's to fix, so it can show beside it. */
 type EditorProblem = { field?: EditorField; text: string } | null;
 
-/** The pending question for a repeating event: which action it is for, and
- *  whether "this event" is on offer (not when the repeat rule itself changed —
- *  one occurrence has no rule of its own). */
-type ScopeAsk = { action: 'save' | 'delete'; allowThis: boolean };
+/** The pending question for a repeating event: which action it is for, the
+ *  answers on offer (no "this event" when the repeat rule itself changed, as
+ *  one occurrence has no rule of its own; only "this event" for a change of
+ *  day on a custom rule, see scopesFor), and a line saying why, if narrowed. */
+type ScopeAsk = {
+  action: 'save' | 'delete';
+  scopes: EditScope[];
+  note?: string;
+};
+
+const ALL_SCOPES: EditScope[] = ['this', 'following', 'all'];
 
 export function useEventEditor({
   event,
@@ -102,7 +111,8 @@ export function useEventEditor({
   // A repeating event's Save or Delete waiting on "which occurrences?".
   const [scopeAsk, setScopeAsk] = useState<ScopeAsk | null>(() =>
     askDeleteFirst && event?.recurring
-      ? { action: 'delete', allowThis: true }
+      ? // A delete moves no day: every answer stays on offer.
+        { action: 'delete', scopes: scopesFor(initial.recurrence, false) }
       : null
   );
   // A dismissal (Escape, a click or tap outside, Back, a drag) met a form
@@ -361,9 +371,14 @@ export function useEventEditor({
         return;
       }
       if (event.recurring && !scope) {
+        const scopes =
+          changes.recurrence !== undefined
+            ? ALL_SCOPES.filter((s) => s !== 'this')
+            : scopesFor(initial.recurrence, startDay !== initial.startDay);
         setScopeAsk({
           action: 'save',
-          allowThis: changes.recurrence === undefined,
+          scopes,
+          note: scopes.includes('all') ? undefined : CUSTOM_DAY_NOTE,
         });
         return;
       }
@@ -404,7 +419,10 @@ export function useEventEditor({
   async function remove(scope?: EditScope) {
     if (!event) return;
     if (event.recurring && !scope) {
-      setScopeAsk({ action: 'delete', allowThis: true });
+      setScopeAsk({
+        action: 'delete',
+        scopes: scopesFor(initial.recurrence, false),
+      });
       return;
     }
     setBusy(true);

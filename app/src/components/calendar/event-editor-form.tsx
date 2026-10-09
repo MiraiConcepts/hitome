@@ -501,15 +501,17 @@ function ScopeChoice({
   const theme = useTheme();
   const deleting = ask.action === 'delete';
   // The narrowest reach on offer, so the default is the least that can go.
-  const [scope, setScope] = useState<EditScope>(
-    ask.allowThis ? 'this' : 'following'
-  );
+  const [scope, setScope] = useState<EditScope>(ask.scopes[0]);
   const tint = deleting ? DangerColor : AccentColor;
-  const options = [
-    ...(ask.allowThis ? [{ value: 'this' as const, label: 'This event' }] : []),
-    { value: 'following' as const, label: 'This and following' },
-    { value: 'all' as const, label: 'All events' },
-  ].map((option) => ({ ...option, color: tint, noMark: true }));
+  const options = (
+    [
+      { value: 'this', label: 'This event' },
+      { value: 'following', label: 'This and following' },
+      { value: 'all', label: 'All events' },
+    ] as const
+  )
+    .filter((option) => ask.scopes.includes(option.value))
+    .map((option) => ({ ...option, color: tint, noMark: true }));
   return (
     <View style={styles.scope}>
       <SettingsMessage icon={RepeatIcon}>
@@ -523,6 +525,9 @@ function ScopeChoice({
         onChange={setScope}
         testID="editor-scope"
       />
+      {ask.note && (
+        <SettingsMessage testID="editor-scope-note">{ask.note}</SettingsMessage>
+      )}
       <View style={styles.actionRow}>
         <View
           style={styles.scopeReach}

@@ -1,5 +1,6 @@
 // Pure editor-form state logic (no React/RN imports — bun-testable): prefill
 // from a CalEvent and the equality checks the diff-based save relies on.
+import type { EditScope } from '@/caldav/ics';
 import { readRecurrence } from '@/caldav/rrule';
 import type { CalEvent } from '@/caldav/types';
 import { readAlarm } from '@/caldav/valarm';
@@ -176,4 +177,26 @@ export function isDirty(initial: DraftState, current: DraftState): boolean {
       current.calendarUrl !== undefined &&
       current.calendarUrl !== initial.calendarUrl)
   );
+}
+
+/** Said above the "which occurrences?" answers when scopesFor narrowed them
+ *  to this one occurrence. */
+export const CUSTOM_DAY_NOTE =
+  'This repeating event follows a custom schedule, so a change of day applies to this occurrence only.';
+
+/**
+ * The answers "which occurrences?" offers for a Save. A custom rule (one the
+ * editor cannot express, kept as is) is usually pinned to weekdays or dates
+ * (BYDAY, BYMONTHDAY), and moving the series start by a day would leave the
+ * rule behind: the series stays on its old days, the first occurrence goes
+ * and a deleted one comes back. So a change of day on such a series reaches
+ * this occurrence only; a change of time on the same day reaches as far as
+ * any other edit.
+ */
+export function scopesFor(
+  recurrence: RecurrenceState,
+  dayChanged: boolean
+): EditScope[] {
+  if (recurrence.kind === 'custom' && dayChanged) return ['this'];
+  return ['this', 'following', 'all'];
 }

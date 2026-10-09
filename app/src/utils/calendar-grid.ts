@@ -299,8 +299,8 @@ function dayDiff(weekStart: Date, d: Date): number {
  * entirely; a banner hidden in any covered column hides row-wide, which can
  * cascade "+N more" into columns that previously fit — the hide pass iterates
  * to a fixpoint. Hidden occupants are not re-packed (an occasional empty slot
- * beats layout jumps). slotCount ≤ 0 hides everything; callers only render
- * "+N more" when slotCount ≥ 1.
+ * beats layout jumps). slotCount ≤ 0 hides everything and counts every
+ * event as hidden; see counterSpot for where the "+N more" then goes.
  */
 export function layoutWeek<T extends GridEventLike>(
   weekStart: Date,
@@ -471,4 +471,13 @@ export function layoutWeek<T extends GridEventLike>(
     chips: chips.filter((chip) => !hiddenChips.has(chip)),
     overflow,
   };
+}
+
+/** Where a cell's "+N more" counter goes. Normally under the strips, against
+ *  the cell's bottom edge. A row too short for even one slot (a short window,
+ *  or a browser zoomed to 200 % and more) has no room under the day number,
+ *  so the counter moves up beside it, in the row's trailing corner: a busy
+ *  day must never look empty. */
+export function counterSpot(slotCount: number): 'bottom' | 'dayNumberRow' {
+  return slotCount >= 1 ? 'bottom' : 'dayNumberRow';
 }

@@ -2,6 +2,7 @@ import {
   addDays,
   buildMonthRange,
   buildWeekRange,
+  counterSpot,
   gridFetchRange,
   landingIndex,
   isBanner,
@@ -639,6 +640,27 @@ describe('layoutWeek', () => {
     expect(layout.banners).toEqual([]);
     expect(layout.chips).toEqual([]);
     expect(layout.overflow).toEqual([0, 1, 1, 2, 0, 0, 0]);
+  });
+
+  it('puts a zero-slot cell\'s "+N" beside the day number', () => {
+    // A row too short for one slot still counts every event as hidden, and
+    // the counter moves up beside the day number so the day never looks empty.
+    const layout = layoutWeek(
+      WEEK,
+      [
+        ev('a', new Date(2026, 6, 9, 9), new Date(2026, 6, 9, 10)),
+        ev('b', new Date(2026, 6, 9, 11), new Date(2026, 6, 9, 12)),
+        ev('c', new Date(2026, 6, 9, 13), new Date(2026, 6, 9, 14)),
+      ],
+      0
+    );
+    expect(layout.overflow[3]).toBe(3);
+    expect(counterSpot(0)).toBe('dayNumberRow');
+  });
+
+  it('keeps the "+N" against the cell\'s bottom at normal heights', () => {
+    expect(counterSpot(1)).toBe('bottom');
+    expect(counterSpot(4)).toBe('bottom');
   });
 
   it('grants a banner extra rows and stacks chips below the run', () => {

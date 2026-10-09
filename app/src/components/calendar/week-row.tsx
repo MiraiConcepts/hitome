@@ -29,7 +29,12 @@ import { titleWidth as measureTitle } from '@/components/calendar/title-width';
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { addDays, layoutWeek, weekendBoundaries } from '@/utils/calendar-grid';
+import {
+  addDays,
+  counterSpot,
+  layoutWeek,
+  weekendBoundaries,
+} from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
 import { dayCellLabel } from '@/utils/day-cell-label';
 
@@ -76,7 +81,8 @@ type WeekRowProps = {
   rowHeight: number;
   /** Day-cell width in px — drives the chip title wrap estimate. */
   cellWidth: number;
-  /** Visible event slots per cell (from row height); ≤0 renders numbers only. */
+  /** Visible event slots per cell (from row height); ≤0 renders numbers only,
+   *  with a busy day's "+N" beside its number. */
   slotCount: number;
   /** Whether the overflow counter has to take the last slot, or fits in the
    *  space left beneath it (see month-grid). */
@@ -669,38 +675,40 @@ export const WeekRow = memo(function WeekRow({
             }}
           />
         ))}
-        {slotCount >= 1 &&
-          layout.overflow.map((count, col) =>
-            count > 0 ? (
-              // A label, not a target: the cell underneath owns both the tap
-              // and the long press, so the counter must not swallow either.
-              // Hidden from screen readers, which hear the count in the
-              // cell's own name instead.
-              <View
-                key={`more-${col}`}
-                testID={`more-${toDateString(days[col])}`}
-                pointerEvents="none"
-                aria-hidden
-                importantForAccessibility="no-hide-descendants"
-                style={{
+        {layout.overflow.map((count, col) =>
+          count > 0 ? (
+            // A label, not a target: the cell underneath owns both the tap
+            // and the long press, so the counter must not swallow either.
+            // Hidden from screen readers, which hear the count in the
+            // cell's own name instead.
+            <View
+              key={`more-${col}`}
+              testID={`more-${toDateString(days[col])}`}
+              pointerEvents="none"
+              aria-hidden
+              importantForAccessibility="no-hide-descendants"
+              style={[
+                {
                   position: 'absolute',
                   left: pct(col),
                   width: pct(1),
-                  bottom: MORE_BOTTOM_INSET,
-                  height: COUNTER_HEIGHT,
                   justifyContent: 'center',
                   // Trailing corner: the day number holds the leading one, and
                   // every strip is left-aligned, so the count sits where
                   // nothing else in the cell does.
                   alignItems: 'flex-end',
-                }}
-              >
-                <ThemedText numberOfLines={1} style={styles.more}>
-                  +{count}
-                </ThemedText>
-              </View>
-            ) : null
-          )}
+                },
+                counterSpot(slotCount) === 'bottom'
+                  ? { bottom: MORE_BOTTOM_INSET, height: COUNTER_HEIGHT }
+                  : styles.moreBesideDayNumber,
+              ]}
+            >
+              <ThemedText numberOfLines={1} style={styles.more}>
+                +{count}
+              </ThemedText>
+            </View>
+          ) : null
+        )}
       </View>
     </View>
   );
@@ -771,6 +779,14 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     pointerEvents: 'box-none',
+  },
+  /** No slot under the day number: the counter shares its line instead, in
+   *  the opposite corner (the overlay starts under the day number, so it is
+   *  pulled back up by that much, then set down by the cell's top inset). */
+  moreBesideDayNumber: {
+    top: -DAY_NUMBER_HEIGHT + (WIDE ? 4 : 2),
+    // The day number's line (the `small` type's).
+    height: 20,
   },
   more: {
     // The event strips' own size: one step for the grid's small type.
