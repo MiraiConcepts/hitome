@@ -230,3 +230,69 @@ describe('moved occurrences and the window', () => {
     expect(expand(ics, ...DEC)).toHaveLength(0);
   });
 });
+
+describe('cancelled events', () => {
+  // Mondays 2, 9, 16, 23 and 30 November 2026, as an organiser's server
+  // writes them after cancelling one meeting of the series.
+  const SERIES = cal(
+    'BEGIN:VEVENT',
+    'UID:cancel-1',
+    'DTSTAMP:20261001T000000Z',
+    'DTSTART:20261102T090000Z',
+    'DTEND:20261102T100000Z',
+    'RRULE:FREQ=WEEKLY;COUNT=5',
+    'SUMMARY:Standup',
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'UID:cancel-1',
+    'DTSTAMP:20261005T000000Z',
+    'RECURRENCE-ID:20261116T090000Z',
+    'DTSTART:20261116T090000Z',
+    'DTEND:20261116T100000Z',
+    'SUMMARY:Standup',
+    'STATUS:CANCELLED',
+    'SEQUENCE:1',
+    'END:VEVENT'
+  );
+  const NOV = [
+    new Date('2026-11-01T00:00:00Z'),
+    new Date('2026-12-01T00:00:00Z'),
+  ] as const;
+
+  it('leaves out a cancelled occurrence, as an EXDATE would', () => {
+    const occ = expand(SERIES, ...NOV);
+    expect(occ.map((o) => o.start.getUTCDate())).toEqual([2, 9, 23, 30]);
+  });
+
+  it('leaves out a cancelled occurrence that was also moved', () => {
+    const ics = SERIES.replace(
+      'DTSTART:20261116T090000Z\r\nDTEND:20261116T100000Z',
+      'DTSTART:20261117T090000Z\r\nDTEND:20261117T100000Z'
+    );
+    expect(expand(ics, ...NOV).map((o) => o.start.getUTCDate())).toEqual([
+      2, 9, 23, 30,
+    ]);
+  });
+
+  it('leaves out a cancelled series', () => {
+    const ics = SERIES.replace('STATUS:CONFIRMED', 'STATUS:CANCELLED');
+    expect(expand(ics, ...NOV)).toHaveLength(0);
+  });
+
+  it('leaves out a cancelled single event', () => {
+    const single = (status: string) =>
+      cal(
+        'BEGIN:VEVENT',
+        'UID:cancel-2',
+        'DTSTAMP:20261001T000000Z',
+        'DTSTART:20261014T120000Z',
+        'DTEND:20261014T130000Z',
+        'SUMMARY:Lunch',
+        `STATUS:${status}`,
+        'END:VEVENT'
+      );
+    expect(expand(single('CANCELLED'))).toHaveLength(0);
+    expect(expand(single('TENTATIVE'))).toHaveLength(1);
+  });
+});

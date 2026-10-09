@@ -116,3 +116,45 @@ describe('isFresh', () => {
     expect(isFresh(fetched, JUL, 1000 + 59_999, 60_000)).toBe(true);
   });
 });
+
+describe('a fetch that lands after a newer one', () => {
+  // Stamps are when each request was issued: the late one went out first.
+  it('does not put back an event the newer fetch of its month lacks', () => {
+    const deleted = ev('gone', day(2026, 6, 8, 10), day(2026, 6, 8, 11));
+    let store = applyFetch(empty, JUL, julRange, [deleted], 1000);
+    // Issued at 3000, after the delete; lands first.
+    store = applyFetch(store, JUL, julRange, [], 3000);
+    // Issued at 2000, before the delete; lands last.
+    const late = applyFetch(store, JUL, julRange, [deleted], 2000);
+    expect(mergeEvents(late)).toEqual([]);
+    expect(late).toBe(store);
+  });
+
+  it('does not put back an event a newer fetch of another month lacks', () => {
+    // In both windows (Jul 28), deleted between the two requests.
+    const deleted = ev('gone', day(2026, 6, 28, 9), day(2026, 6, 28, 10));
+    let store = applyFetch(empty, JUL, julRange, [deleted], 1000);
+    store = applyFetch(store, AUG, augRange, [deleted], 1000);
+    // The refresh after the delete: July, issued at 3000.
+    store = applyFetch(store, JUL, julRange, [], 3000);
+    expect(mergeEvents(store)).toEqual([]);
+    // A prefetch of August issued at 2000 lands now.
+    store = applyFetch(store, AUG, augRange, [deleted], 2000);
+    expect(mergeEvents(store)).toEqual([]);
+  });
+
+  it('keeps its events outside the newer fetch', () => {
+    const augOnly = ev('aug-only', day(2026, 7, 20, 9), day(2026, 7, 20, 10));
+    let store = applyFetch(empty, JUL, julRange, [], 3000);
+    store = applyFetch(store, AUG, augRange, [augOnly], 2000);
+    expect(mergeEvents(store).map((e) => e.id)).toEqual(['aug-only']);
+  });
+
+  it('does not prune what a newer fetch of another month found', () => {
+    // Created between the two requests, in both windows.
+    const created = ev('new', day(2026, 6, 28, 9), day(2026, 6, 28, 10));
+    let store = applyFetch(empty, JUL, julRange, [created], 3000);
+    store = applyFetch(store, AUG, augRange, [], 2000);
+    expect(mergeEvents(store).map((e) => e.id)).toEqual(['new']);
+  });
+});

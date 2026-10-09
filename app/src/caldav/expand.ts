@@ -22,6 +22,13 @@ for (const [tzid, body] of Object.entries(zones as Record<string, string>)) {
     ICAL.TimezoneService.register(new ICAL.Timezone(vtimezone), tzid);
 }
 
+/** STATUS:CANCELLED: the organiser called it off. Not shown, as on
+ *  Android, whose calendar store hides cancelled rows. */
+function cancelled(event: ICAL.Event): boolean {
+  const status = event.component.getFirstPropertyValue('status');
+  return String(status ?? '').toUpperCase() === 'CANCELLED';
+}
+
 /** Start and end in ms; an all-day end (next midnight) pulled back by 1. */
 function times(item: { startDate: ICAL.Time; endDate: ICAL.Time }) {
   const start = item.startDate.toJSDate().getTime();
@@ -84,7 +91,8 @@ function startNear(event: ICAL.Event, from: number): ICAL.Time | undefined {
 /**
  * The events and occurrences of `ics` overlapping [after, before]: a
  * moved or edited occurrence (a RECURRENCE-ID exception) stands in for the
- * one it replaces, wherever it was moved to, and EXDATEs are left out. Each
+ * one it replaces, wherever it was moved to, and EXDATEs are left out, as
+ * are cancelled events and occurrences (STATUS:CANCELLED). Each
  * repeating event gives at most `maxOccurrences` in the range, and its rule
  * is walked at most `maxSteps` times: a series that cannot start near the
  * range (see startNear) is walked from its DTSTART, which once cut off a
@@ -107,7 +115,7 @@ export function expandBetween(
 
   const result: Expansion = { events: [], occurrences: [] };
   for (const event of all) {
-    if (event.isRecurrenceException()) continue;
+    if (event.isRecurrenceException() || cancelled(event)) continue;
     if (!event.isRecurring()) {
       const { start, end } = times(event);
       if (inRange(start, end)) result.events.push(event);
@@ -125,6 +133,8 @@ export function expandBetween(
       if (!ex.isRecurrenceException() || ex.uid !== event.uid) continue;
       const at = ex.recurrenceId.toJSDate().getTime();
       replaced.add(at);
+      // Cancelled: the occurrence is gone, like an EXDATE.
+      if (cancelled(ex)) continue;
       const { start, end } = times(ex);
       if (!inRange(start, end)) continue;
       moved.set(at, ex);

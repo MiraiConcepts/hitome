@@ -3,6 +3,8 @@
 // has no web support in SDK 56; Notification Triggers never shipped; Web Push
 // would route through a third-party push service). Android is the real
 // delivery path. Geometry/behavior twin: scheduler.ts.
+import { getSessionStatus, subscribeSession } from '@/config/session';
+
 import { ALARM_ID_PREFIX, type DesiredAlarm } from './occurrences';
 import type { PermissionSnapshot } from './status';
 
@@ -152,3 +154,10 @@ export function onAlarmTap(
     if (tapCb === cb) tapCb = null;
   };
 }
+
+// Queued reminders carry the titles and places of the login that fetched
+// them: when it ends (Log out, or the server ending the session), none may
+// ring over the login screen.
+subscribeSession(() => {
+  if (getSessionStatus() !== 'signed-in') scheduled.clear();
+});

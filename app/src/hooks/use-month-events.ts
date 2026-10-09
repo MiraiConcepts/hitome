@@ -123,9 +123,13 @@ export function useMonthEvents(visibleMonth: Date) {
       inflight.current.add(monthKey);
       try {
         const range = gridFetchRange(y, m0);
+        // Stamped when asked, not when answered: a poll or prefetch that
+        // went out before a save or delete and lands after the refresh that
+        // followed it is older, and applyFetch keeps it from undoing that.
+        const requestedAt = Date.now();
         const result = await fetchMonth(range.start, range.end);
         setStore((prev) =>
-          applyFetch(prev, monthKey, range, result, Date.now())
+          applyFetch(prev, monthKey, range, result, requestedAt)
         );
         setFetchedAt(new Date());
         if (primary && seq.current === ticket) {

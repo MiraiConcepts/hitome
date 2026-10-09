@@ -9,8 +9,11 @@ export type StoreEventLike = { id: string; start: Date; end: Date };
 
 export type MonthBucket<T extends StoreEventLike> = {
   events: T[];
-  /** Epoch ms of the fetch that produced this bucket; 0 = snapshot seed. */
+  /** Epoch ms the fetch that produced this bucket was issued (not when it
+   *  landed); 0 = snapshot seed. */
   fetchedAt: number;
+  /** The window that fetch covered; none for a seed. */
+  range?: { start: Date; end: Date };
 };
 
 export type MonthStore<T extends StoreEventLike> = ReadonlyMap<
@@ -56,6 +59,12 @@ export function applySeed<T extends StoreEventLike>(
  * bucket of events that intersect the fetched range but are absent from the
  * result — a CalDAV time-range report is authoritative for its whole window,
  * so anything missing was deleted (or moved away) on the server.
+ *
+ * `fetchedAt` is when the request was issued, and a fetch only speaks for
+ * the server as it was then: one that lands after a newer fetch of its month
+ * is dropped, it prunes only buckets older than itself, and it brings back
+ * nothing a newer bucket's window shows is gone (a poll that went out before
+ * a delete must not put the event back).
  */
 export function applyFetch<T extends StoreEventLike>(
   store: MonthStore<T>,
@@ -64,10 +73,27 @@ export function applyFetch<T extends StoreEventLike>(
   events: T[],
   fetchedAt: number
 ): MonthStore<T> {
-  const ids = new Set(events.map((event) => event.id));
+  const current = store.get(key);
+  if (current && current.fetchedAt > fetchedAt) return store;
+  const newer = [...store]
+    .filter(([otherKey, b]) => otherKey !== key && b.fetchedAt > fetchedAt)
+    .map(([, b]) => ({
+      range: b.range,
+      ids: new Set(b.events.map((e) => e.id)),
+    }));
+  const landed = events.filter((event) =>
+    newer.every(
+      (b) => !b.range || b.ids.has(event.id) || !intersects(event, b.range)
+    )
+  );
+  const ids = new Set(landed.map((event) => event.id));
   const next = new Map<string, MonthBucket<T>>();
   for (const [otherKey, bucket] of store) {
     if (otherKey === key) continue;
+    if (bucket.fetchedAt > fetchedAt) {
+      next.set(otherKey, bucket);
+      continue;
+    }
     const kept = bucket.events.filter(
       (event) => ids.has(event.id) || !intersects(event, range)
     );
@@ -75,10 +101,10 @@ export function applyFetch<T extends StoreEventLike>(
       otherKey,
       kept.length === bucket.events.length
         ? bucket
-        : { events: kept, fetchedAt: bucket.fetchedAt }
+        : { ...bucket, events: kept }
     );
   }
-  next.set(key, { events, fetchedAt });
+  next.set(key, { events: landed, fetchedAt, range });
   return next;
 }
 

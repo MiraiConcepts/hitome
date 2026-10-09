@@ -23,6 +23,48 @@ let calendarsPromise: Promise<DAVCalendar[]> | null = null;
 // holds.
 const BIRTHDAY_NAME = /birthday/i;
 
+/** How long one CalDAV read (PROPFIND, REPORT) may wait for an answer. */
+export const READ_TIMEOUT_MS = 30_000;
+/** How long one CalDAV write (PUT, DELETE) may wait for an answer. */
+export const WRITE_TIMEOUT_MS = 30_000;
+
+const WRITE_METHODS = new Set(['PUT', 'DELETE', 'POST', 'MOVE', 'COPY']);
+
+/**
+ * `fetchImpl` with a time limit, for every request a client makes: React
+ * Native's fetch has none, so a proxy that takes a request and never
+ * answers would leave the editor busy for good and the polls piling up.
+ * Past the limit the request is aborted and the call fails in the words of
+ * a server that cannot be reached ("timed out"), which the banner and the
+ * editor already explain.
+ */
+export function timedFetch(
+  fetchImpl: typeof fetch = (input, init) => fetch(input, init),
+  readMs = READ_TIMEOUT_MS,
+  writeMs = WRITE_TIMEOUT_MS
+): typeof fetch {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const method = (init?.method ?? 'GET').toUpperCase();
+    const ms = WRITE_METHODS.has(method) ? writeMs : readMs;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error(`CalDAV ${method} timed out after ${ms / 1000} s`));
+      }, ms);
+    });
+    try {
+      return await Promise.race([
+        fetchImpl(input, { ...init, signal: controller.signal }),
+        timeout,
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }) as typeof fetch;
+}
+
 /**
  * A client for one connection. The login is optional: a reverse proxy that
  * injects Authorization on /dav/* (the web deployment, and an Android build
@@ -47,6 +89,7 @@ function clientFor(config: DavConfig): DAVClient {
       ? { authMethod: 'Basic' as const }
       : { authMethod: 'Custom' as const, authFunction: async () => ({}) }),
     defaultAccountType: 'caldav',
+    fetch: timedFetch(),
   });
 }
 
@@ -94,7 +137,7 @@ async function statusOf(config: DavConfig): Promise<number> {
   const headers: Record<string, string> = { Depth: '0' };
   if (config.username)
     headers.Authorization = `Basic ${btoa(`${config.username}:${config.password}`)}`;
-  const res = await fetch(config.url, { method: 'PROPFIND', headers });
+  const res = await timedFetch()(config.url, { method: 'PROPFIND', headers });
   return res.status;
 }
 
