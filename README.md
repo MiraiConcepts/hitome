@@ -4,6 +4,10 @@ hitome is a calendar for witnessing one's days.
 
 <img src="docs/screenshots/widget.png" alt="The home-screen agenda widget" width="18%"> &nbsp; <img src="docs/screenshots/month.png" alt="The month grid" width="18%"> &nbsp; <img src="docs/screenshots/day.png" alt="A day's events in a popover over the grid" width="18%"> &nbsp; <img src="docs/screenshots/editor.png" alt="Editing an event" width="18%"> &nbsp; <img src="docs/screenshots/settings.png" alt="Settings" width="18%">
 
+<img src="docs/screenshots/web-login.png" alt="The web login" width="32%"> &nbsp; <img src="docs/screenshots/web-month.png" alt="The month grid on the web" width="32%"> &nbsp; <img src="docs/screenshots/web-day.png" alt="A busy day's events, with share and delete on each" width="32%">
+
+<img src="docs/screenshots/web-editor.png" alt="Editing an event on the web" width="32%"> &nbsp; <img src="docs/screenshots/web-settings.png" alt="Settings on the web" width="32%">
+
 # Capabilities
 
 hitome draws a self-hosted calendar as one continuous grid of weeks on the web
