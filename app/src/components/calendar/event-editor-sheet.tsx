@@ -31,6 +31,7 @@ import {
   type EditorResult,
 } from '@/components/calendar/event-editor-form';
 import { HEADER_GROUND } from '@/components/calendar/month-header';
+import { BlurBackdrop } from '@/components/blur-backdrop';
 import { Card, DashedLine } from '@/components/settings/settings-parts';
 import {
   useEventEditor,
@@ -66,6 +67,7 @@ function Backdrop({ animatedIndex, style }: BottomSheetBackdropProps) {
   }));
   return (
     <Animated.View style={[style, styles.backdrop, shown, BACKDROP_BLUR]}>
+      <BlurBackdrop />
       <Pressable
         style={StyleSheet.absoluteFill}
         onPress={() => dismiss()}

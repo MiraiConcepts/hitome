@@ -14,6 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { BlurTargetProvider } from '@/components/blur-backdrop';
 import { BootScreen } from '@/components/boot-screen';
 import { onCalendarReady } from '@/components/calendar/calendar-ready';
 import { SetupScreen } from '@/components/settings/setup-screen';
@@ -92,35 +93,37 @@ export default function RootLayout() {
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         {/* Bottom sheets (event editor on narrow layouts) portal here, above
             the router content. */}
-        <BottomSheetModalProvider>
-          {ready ? (
-            <DeepLinkProvider value={link}>
-              {/* Nothing in this app works without a server, so setup is a gate
+        <BlurTargetProvider>
+          <BottomSheetModalProvider>
+            {ready ? (
+              <DeepLinkProvider value={link}>
+                {/* Nothing in this app works without a server, so setup is a gate
                   rather than a route — a deep link into the calendar has
                   nothing to show either. */}
-              {/* After Allow the calendar mounts underneath, and the setup
+                {/* After Allow the calendar mounts underneath, and the setup
                   screen stays on top until the grid has drawn, then fades
                   (SetupOverlay) — one dissolve, not a cut to a header over
                   an empty grid. */}
-              {davStatus !== 'unconfigured' && (
-                /* A stack, not a Slot: settings is a pushed screen, so
+                {davStatus !== 'unconfigured' && (
+                  /* A stack, not a Slot: settings is a pushed screen, so
                    Android's back press and the browser's back button both pop
                    it for free. No headers: every screen draws its own bar (the
                    month view's is part of the calendar's chrome, not navigation
                    furniture). */
-                <Stack screenOptions={{ headerShown: false }} />
-              )}
-              {setupShown && (
-                <SetupOverlay
-                  leaving={davStatus !== 'unconfigured'}
-                  onGone={hideSetup}
-                />
-              )}
-            </DeepLinkProvider>
-          ) : (
-            <BootScreen />
-          )}
-        </BottomSheetModalProvider>
+                  <Stack screenOptions={{ headerShown: false }} />
+                )}
+                {setupShown && (
+                  <SetupOverlay
+                    leaving={davStatus !== 'unconfigured'}
+                    onGone={hideSetup}
+                  />
+                )}
+              </DeepLinkProvider>
+            ) : (
+              <BootScreen />
+            )}
+          </BottomSheetModalProvider>
+        </BlurTargetProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );

@@ -24,6 +24,7 @@ import {
   requestSync,
 } from '@/data/events';
 import type { CalEvent } from '@/caldav/types';
+import { BlurTarget } from '@/components/blur-backdrop';
 import { LARGE_SPINNER } from '@/components/boot-screen';
 import { markCalendarReady } from '@/components/calendar/calendar-ready';
 import { ConnectionProblem } from '@/components/calendar/connection-problem';
@@ -580,125 +581,127 @@ export function MonthScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      {/* No bottom edge: the grid runs to the screen's bottom and the last row
+      <BlurTarget>
+        {/* No bottom edge: the grid runs to the screen's bottom and the last row
           sits under the gesture bar, which is the trade taken deliberately —
           insetting it cost every row height and shortened every scroll. The
           snackbar and the version badge sit outside this and apply the inset
           themselves, so they stay clear of the bar regardless. */}
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <View style={styles.content}>
-          <MonthHeader
-            label={monthLabel}
-            monthIndex={month.year * 12 + month.month0}
-            loading={loading && events.length === 0}
-            refreshing={manualRefreshing}
-            today={today}
-            offline={Boolean(error)}
-            authFailed={authFailed}
-            fetchedAt={fetchedAt}
-            onToday={goToday}
-            onRefresh={onManualRefresh}
-            onAdd={() => setEditor({ mode: 'create', day: addDay })}
-            onSettings={() => router.navigate('/settings')}
-          />
+        <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+          <View style={styles.content}>
+            <MonthHeader
+              label={monthLabel}
+              monthIndex={month.year * 12 + month.month0}
+              loading={loading && events.length === 0}
+              refreshing={manualRefreshing}
+              today={today}
+              offline={Boolean(error)}
+              authFailed={authFailed}
+              fetchedAt={fetchedAt}
+              onToday={goToday}
+              onRefresh={onManualRefresh}
+              onAdd={() => setEditor({ mode: 'create', day: addDay })}
+              onSettings={() => router.navigate('/settings')}
+            />
 
-          <View style={styles.weekdays}>
-            {weekdayLabels.map((label) => (
-              // The column is the View, as in the grid's own rows. Putting flex
-              // on the Text instead sizes each label to its own word plus an
-              // equal share of the slack, which spaces the labels evenly from
-              // each other rather than aligning them to the columns beneath.
-              <View key={label} style={styles.weekdayCell}>
-                <ThemedText type="small" style={styles.weekday}>
-                  {label}
-                </ThemedText>
-              </View>
-            ))}
+            <View style={styles.weekdays}>
+              {weekdayLabels.map((label) => (
+                // The column is the View, as in the grid's own rows. Putting flex
+                // on the Text instead sizes each label to its own word plus an
+                // equal share of the slack, which spaces the labels evenly from
+                // each other rather than aligning them to the columns beneath.
+                <View key={label} style={styles.weekdayCell}>
+                  <ThemedText type="small" style={styles.weekday}>
+                    {label}
+                  </ThemedText>
+                </View>
+              ))}
+            </View>
+
+            <View
+              style={styles.gridWrap}
+              onLayout={(e) => {
+                const { width, height } = e.nativeEvent.layout;
+                setGridSize((prev) =>
+                  prev && prev.width === width && prev.height === height
+                    ? prev
+                    : { width, height }
+                );
+              }}
+            >
+              {gridSize && (
+                <MonthGrid
+                  ref={gridRef}
+                  width={gridSize.width}
+                  height={gridSize.height}
+                  events={events}
+                  today={today}
+                  initialMonth={initialMonth}
+                  focusedMonth={settledMonth}
+                  onMonthChange={onMonthChange}
+                  onMonthSettled={onMonthSettled}
+                  onAnchored={onGridAnchored}
+                  pulse={pulse}
+                  onOpenDay={onOpenDay}
+                  onPressEvent={onPressEvent}
+                  onCreateOnDay={onCreateOnDay}
+                />
+              )}
+              <GridSpotlight />
+              {(!gridAnchored || !gridSize) && (
+                // The spinner only shows if anchoring is actually slow.
+                <ThemedView style={styles.gridCover}>
+                  {coverSpinner && (
+                    <Spinner color={AccentColor} size={LARGE_SPINNER} />
+                  )}
+                </ThemedView>
+              )}
+            </View>
           </View>
+        </SafeAreaView>
 
-          <View
-            style={styles.gridWrap}
-            onLayout={(e) => {
-              const { width, height } = e.nativeEvent.layout;
-              setGridSize((prev) =>
-                prev && prev.width === width && prev.height === height
-                  ? prev
-                  : { width, height }
-              );
-            }}
-          >
-            {gridSize && (
-              <MonthGrid
-                ref={gridRef}
-                width={gridSize.width}
-                height={gridSize.height}
-                events={events}
-                today={today}
-                initialMonth={initialMonth}
-                focusedMonth={settledMonth}
-                onMonthChange={onMonthChange}
-                onMonthSettled={onMonthSettled}
-                onAnchored={onGridAnchored}
-                pulse={pulse}
-                onOpenDay={onOpenDay}
-                onPressEvent={onPressEvent}
-                onCreateOnDay={onCreateOnDay}
-              />
-            )}
-            <GridSpotlight />
-            {(!gridAnchored || !gridSize) && (
-              // The spinner only shows if anchoring is actually slow.
-              <ThemedView style={styles.gridCover}>
-                {coverSpinner && (
-                  <Spinner color={AccentColor} size={LARGE_SPINNER} />
-                )}
-              </ThemedView>
-            )}
-          </View>
-        </View>
-      </SafeAreaView>
-
-      {/* Floating, not in the grid's flow: a bar that arrived in flow
+        {/* Floating, not in the grid's flow: a bar that arrived in flow
           resized the grid pane after it had anchored, and the grid re-landed
           years off (Jul 2022 for an October start). */}
-      {/* Always mounted (it lays out nothing when empty), so a bar leaving
+        {/* Always mounted (it lays out nothing when empty), so a bar leaving
           can fade out rather than vanish with its parent. */}
-      <View style={[styles.snackWrapper, { bottom: bottomInset }]}>
-        {error && !neverLoaded && (
-          <SnackBar
-            icon={authFailed ? AlertCircleIcon : WifiOffIcon}
-            message={problem?.title ?? error}
-            // A rejected login is not something retrying fixes.
-            action={{
-              label: authFailed && !problem ? 'Settings' : 'Retry',
-              onPress:
-                authFailed && !problem
-                  ? () => router.navigate('/settings')
-                  : onManualRefresh,
-            }}
-            testID="error-banner"
-          />
-        )}
-        {snack && (
-          <SnackBar
-            icon={snack.icon}
-            message={snack.message}
-            action={
-              snack.undo
-                ? { label: 'Undo', onPress: () => undoDelete(snack.undo!) }
-                : undefined
-            }
-          />
-        )}
-      </View>
+        <View style={[styles.snackWrapper, { bottom: bottomInset }]}>
+          {error && !neverLoaded && (
+            <SnackBar
+              icon={authFailed ? AlertCircleIcon : WifiOffIcon}
+              message={problem?.title ?? error}
+              // A rejected login is not something retrying fixes.
+              action={{
+                label: authFailed && !problem ? 'Settings' : 'Retry',
+                onPress:
+                  authFailed && !problem
+                    ? () => router.navigate('/settings')
+                    : onManualRefresh,
+              }}
+              testID="error-banner"
+            />
+          )}
+          {snack && (
+            <SnackBar
+              icon={snack.icon}
+              message={snack.message}
+              action={
+                snack.undo
+                  ? { label: 'Undo', onPress: () => undoDelete(snack.undo!) }
+                  : undefined
+              }
+            />
+          )}
+        </View>
 
-      {neverLoaded && problem && (
-        <ConnectionProblem
-          problem={problem}
-          busy={manualRefreshing}
-          onRetry={onManualRefresh}
-        />
-      )}
+        {neverLoaded && problem && (
+          <ConnectionProblem
+            problem={problem}
+            busy={manualRefreshing}
+            onRetry={onManualRefresh}
+          />
+        )}
+      </BlurTarget>
 
       {popoverDay && (
         <DayPopover

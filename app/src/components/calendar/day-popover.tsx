@@ -1,6 +1,16 @@
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, type ReactNode } from 'react';
+import {
+  BackHandler,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import type { CalEvent } from '@/caldav/types';
+import { BlurBackdrop } from '@/components/blur-backdrop';
 import { EventTags } from '@/components/calendar/event-tags';
 import { TrashIcon } from '@/components/icons';
 import {
@@ -48,6 +58,51 @@ type Props = {
   onAdd?: () => void;
 };
 
+/**
+ * The dialog's layer. A Modal everywhere but Android, where it is a layer over
+ * the month screen in the app's own window instead: a Modal is a window of its
+ * own there, and the blur behind the popover can only reach what is in this
+ * one. It sits outside the screen's blur target, as a sibling after it.
+ */
+function Overlay({
+  onClose,
+  children,
+}: {
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  if (Platform.OS === 'android')
+    return <AndroidOverlay onClose={onClose}>{children}</AndroidOverlay>;
+  return (
+    <Modal
+      visible
+      transparent
+      animationType={MODAL_ANIMATION}
+      onRequestClose={onClose}
+    >
+      {children}
+    </Modal>
+  );
+}
+
+function AndroidOverlay({
+  onClose,
+  children,
+}: {
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  // The back button closes it, as it does a Modal.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onClose]);
+  return <View style={StyleSheet.absoluteFill}>{children}</View>;
+}
+
 function compareEvents(a: CalEvent, b: CalEvent): number {
   if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
   return a.start.getTime() - b.start.getTime();
@@ -72,13 +127,9 @@ export function DayPopover({
   const compact = !useIsWide();
   const sorted = [...events].sort(compareEvents);
   return (
-    <Modal
-      visible
-      transparent
-      animationType={MODAL_ANIMATION}
-      onRequestClose={onClose}
-    >
+    <Overlay onClose={onClose}>
       <View style={[styles.backdrop, BACKDROP_BLUR]}>
+        <BlurBackdrop />
         {/* The backdrop is a layer behind the card, not around it: wrapped,
             every row became a button inside a button, which the web
             rejects as invalid HTML. */}
@@ -194,7 +245,7 @@ export function DayPopover({
           </ThemedView>
         </View>
       </View>
-    </Modal>
+    </Overlay>
   );
 }
 
