@@ -114,8 +114,7 @@ async function remove(
   });
 }
 
-const undo = (page: Page) =>
-  page.getByRole("button", { name: "Undo" }).click();
+const undo = (page: Page) => page.getByRole("button", { name: "Undo" }).click();
 
 test.beforeAll(async ({ request }) => {
   // A second calendar, so moving has somewhere to go.
@@ -221,7 +220,12 @@ test("writes reach the server: create, edit, delete, undo, move, conflict", asyn
     await remove(page, "🧪 W All", 0, "all");
     for (const title of ["🧪 W All", "🧪 W This", "🧪 W Following"])
       await expect(chips(page, title)).toHaveCount(0, { timeout: 30_000 });
-    for (const title of ["🧪 W Series", "🧪 W All", "🧪 W This", "🧪 W Following"])
+    for (const title of [
+      "🧪 W Series",
+      "🧪 W All",
+      "🧪 W This",
+      "🧪 W Following",
+    ])
       expect(await countOnServer(page, title)).toBe(0);
   });
 
@@ -289,14 +293,18 @@ test("writes reach the server: create, edit, delete, undo, move, conflict", asyn
     await page.getByTestId("editor-summary").fill("🧪 W Offline");
     // The server vanishes for writes.
     await page.route("**/dav/**", (route) =>
-      route.request().method() === "PUT" ? route.abort("internetdisconnected") : route.continue(),
+      route.request().method() === "PUT"
+        ? route.abort("internetdisconnected")
+        : route.continue(),
     );
     await page.getByTestId("editor-save").click();
     await expect(page.getByText(/^Not saved. Can’t reach/)).toBeVisible({
       timeout: 30_000,
     });
     await expect(page.getByTestId("event-editor")).toBeVisible();
-    await expect(page.getByTestId("editor-summary")).toHaveValue("🧪 W Offline");
+    await expect(page.getByTestId("editor-summary")).toHaveValue(
+      "🧪 W Offline",
+    );
 
     // Back online: the same editor saves.
     await page.unrouteAll();
@@ -349,12 +357,24 @@ test("the day list's trash updates the month on screen, not the one the page ope
     const monthLabel = (d: Date) =>
       d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
     await expect(label).toHaveText(monthLabel(now), { timeout: 30_000 });
+    // The grid answers keys only once it has settled, which a slow runner takes
+    // a while to do: press again until the month changes (never when it
+    // already has, so a late press cannot skip one).
+    await expect(
+      grid(page).getByTestId(`day-cell-${dateString(now)}`),
+    ).toBeVisible({ timeout: 30_000 });
     for (let i = 1; i <= 6; i++) {
-      await page.keyboard.press("PageDown");
-      await expect(label).toHaveText(
-        monthLabel(new Date(now.getFullYear(), now.getMonth() + i, 1)),
-        { timeout: 10_000 },
+      const before = monthLabel(
+        new Date(now.getFullYear(), now.getMonth() + i - 1, 1),
       );
+      const next = monthLabel(
+        new Date(now.getFullYear(), now.getMonth() + i, 1),
+      );
+      await expect(async () => {
+        if ((await label.innerText()) === before)
+          await page.keyboard.press("PageDown");
+        await expect(label).toHaveText(next, { timeout: 2_000 });
+      }).toPass({ timeout: 30_000 });
     }
 
     const more = grid(page).getByTestId(`more-${dateString(day(27))}`);
