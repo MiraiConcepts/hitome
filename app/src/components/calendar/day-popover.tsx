@@ -154,7 +154,7 @@ export function DayPopover({
                           >
                             {event.summary || '(untitled)'}
                           </ThemedText>
-                          <EventTags event={event} compact={compact} />
+                          <EventTags event={event} />
                         </View>
                       }
                     />

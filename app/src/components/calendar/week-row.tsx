@@ -764,7 +764,8 @@ const styles = StyleSheet.create({
     pointerEvents: 'box-none',
   },
   more: {
-    fontSize: scaled(12),
+    // The event strips' own size: one step for the grid's small type.
+    fontSize: EVENT_FONT_SIZE,
     // The same weight as the day number: both are the cell's own chrome
     // rather than one of its events, and they sit in opposite corners.
     fontWeight: '700',

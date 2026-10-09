@@ -32,7 +32,7 @@ import {
   OnAccentColor,
   type ThemeColor,
 } from '@/constants/theme';
-import { LOCATION_FILL } from '@/constants/tags';
+import { LOCATION_FILL, TAG } from '@/constants/tags';
 import { rgbHex } from '@/utils/color';
 import { formatTime } from '@/utils/date';
 
@@ -142,8 +142,8 @@ function Chip({
         flexDirection: 'row',
         alignItems: 'center',
         marginTop: 3,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
+        paddingHorizontal: TAG.paddingHorizontal,
+        paddingVertical: TAG.paddingVertical,
         backgroundColor: hex(background),
       }}
     >
@@ -152,7 +152,7 @@ function Chip({
         maxLines={1}
         truncate="END"
         style={{
-          fontSize: 11,
+          fontSize: TAG.fontSize,
           fontFamily: FontFamily,
           color: hex(color),
         }}
