@@ -3,7 +3,7 @@
 > Releases are **symmetric** (decided 2026-07-07): pushes to `main` only run CI
 > checks; a `v*` tag fires BOTH the web image and the Android APK from the same
 > commit, so both platforms always carry the same version (visible in the
-> in-app version badge, bottom-right). Android lands as a signed arm64-v8a APK
+> Settings, About). Android lands as a signed arm64-v8a APK
 > on a GitHub Release, tracked by
 > [Obtainium](https://github.com/ImranR98/Obtainium); web lands as
 > `ghcr.io/miraiconcepts/hitome:latest`, deployed by Watchtower.
@@ -38,14 +38,14 @@
   app) keeps in step with the server. DAVx⁵ holds the address and login, so a
   URL, port or password change never needs a release. First run asks only for
   calendar access. (v0.4 kept a typed address and login in the keystore; v0.5
-  erases that on first launch.)
+  stopped using it, and nothing erases a copy a phone left over from v0.4.)
 - **Signing keystore**: `~/.hitome-keys/` (`release.keystore` + `keystore.properties`),
   NEVER in git. ⚠️ **Back it up** — Android only installs updates signed by the same
   key; losing it means uninstall/reinstall + Obtainium re-add.
 - APKs contain **no credentials and no server URL**, and hitome on Android
-  holds none either: the login is DAVx⁵'s. Web is unchanged: it derives
-  `/dav/` from its own origin and the host Caddy injects Authorization
-  (`docs/Deploy.md`).
+  holds none either: the login is DAVx⁵'s. On the web the login is on the page:
+  hitome's own server checks it, keeps it, and passes `/dav/` requests on to the
+  calendar server with it (`docs/Deploy.md`).
 
 ## Cutting a release
 
@@ -62,7 +62,7 @@
 4. Nothing. The tag's workflow signs the APK and creates the GitHub Release
    itself, verifying the signature before it publishes.
 5. Obtainium picks up the APK on its next poll; Watchtower deploys the web image
-   on its next cycle. Verify parity via the version badge on both.
+   on its next cycle. Verify parity in Settings, About, on both.
 
 If the signing step ever fails, the unsigned artifact is still uploaded and
 `./tooling/android-builder/sign-release.sh` finishes the job from this machine —
@@ -84,7 +84,7 @@ git tag v0.2.6-web.1 && git push origin main v0.2.6-web.1
 ```
 
 The `-web` suffix makes the Android workflow skip itself; only the web image
-builds and deploys. The version badge makes the divergence visible (web
+builds and deploys. Settings, About shows the divergence (web
 `0.2.6-web.1`, phone `0.2.6`) — deliberate, not drift. The next full release
 (e.g. `v0.2.7`) re-syncs both channels. Never run `sign-release.sh` for a
 web-only cut.

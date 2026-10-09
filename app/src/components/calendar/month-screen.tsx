@@ -588,8 +588,8 @@ export function MonthScreen() {
         {/* No bottom edge: the grid runs to the screen's bottom and the last row
           sits under the gesture bar, which is the trade taken deliberately —
           insetting it cost every row height and shortened every scroll. The
-          snackbar and the version badge sit outside this and apply the inset
-          themselves, so they stay clear of the bar regardless. */}
+          snackbar sits outside this and applies the inset itself, so it stays
+          clear of the bar regardless. */}
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
           <View style={styles.content}>
             <MonthHeader

@@ -69,7 +69,7 @@ helper scripts.
 
 - Releases are SYMMETRIC: pushes to `main` only run CI checks; a `v*` tag
   builds BOTH the web image (→ Watchtower) and the signed APK from the same
-  commit — web and Android versions always match (see the in-app badge).
+  commit — web and Android versions always match (see Settings, About).
 - Cut: bump `expo.version` + `android.versionCode` in `app/app.json` → push →
   `git tag vX.Y.Z && git push origin main vX.Y.Z`. The tag signs and publishes
   the Release itself (keystore in the `KEYSTORE_BASE64` repo secret, reversed

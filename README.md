@@ -52,8 +52,8 @@ its reminders on the device itself.
   of its own: the sync app does, so no bundle, image or CI secret holds either,
   and pointing it at a new server is done in DAVx⁵.
 - Web and Android ship from one tag. The same commit produces the container
-  image and the signed APK, so the two halves cannot report different versions.
-  Android is delivered as a release artifact tracked by an updater rather than
+  image and the signed APK, so a full release leaves both on the same version
+  (a web-only fix ships alone, with a `-web` suffix). Android is delivered as a release artifact tracked by an updater rather than
   through an app store.
 
 # Running it
@@ -75,6 +75,27 @@ volumes:
 ```
 
 The front door, HTTPS and the move from earlier versions are in
-[docs/Deploy.md](docs/Deploy.md). On Android, install the APK from the
-[releases](https://github.com/miraiconcepts/hitome/releases) (Obtainium can
-track them) and add your server in DAVx⁵.
+[docs/Deploy.md](docs/Deploy.md).
+
+## Android
+
+hitome on Android works on the phone's own calendars, so it needs something to
+keep them in step with your server. [DAVx⁵](https://www.davx5.com) does that.
+
+1. **Install DAVx⁵** (F-Droid or Play), add an account with your Radicale
+   address and login, and tick the calendars to sync. DAVx⁵'s sync interval is
+   how soon an event added elsewhere shows up here.
+2. **Install hitome** from the [releases](https://github.com/miraiconcepts/hitome/releases)
+   (`hitome-vX.Y.Z.apk`), or add `https://github.com/MiraiConcepts/hitome` to
+   [Obtainium](https://github.com/ImranR98/Obtainium) to get updates as they
+   come. The APK is for 64-bit ARM phones (arm64-v8a), Android 7 or newer, and is
+   signed with a certificate whose SHA-256 fingerprint is
+   `37:BA:82:EF:A8:B2:A4:9C:A5:41:D3:9E:C3:43:98:7B:E0:C4:BE:65:7F:1D:E8:81:1C:26:25:71:B7:36:76:D3`.
+3. **Open hitome and allow calendar access.** It asks for notifications at the
+   same time, for reminders (Settings shows their state). Reminders are exact
+   alarms; if your phone restricts background apps, exempt hitome from battery
+   optimisation or they can arrive late.
+4. **Add the widget** by long-pressing the home screen, choosing Widgets, then
+   hitome. Tapping an event opens it; the plus adds one.
+
+Problems and ideas: the link under Settings, About.

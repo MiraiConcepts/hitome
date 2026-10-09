@@ -73,8 +73,12 @@ calendar.example.com {
 }
 ```
 
-Traefik, Nginx Proxy Manager and the like: a plain proxy to `hitome:3000`, no
-special headers. Do not cache `/api/` or `/dav/`.
+Traefik, Nginx Proxy Manager and the like: a plain proxy to `hitome:3000`. Do
+not cache `/api/` or `/dav/`. hitome checks that a login came from its own
+address, so the proxy has to pass the original `Host` on (Caddy, Traefik and
+Nginx Proxy Manager do). A hand-written Nginx needs
+`proxy_set_header Host $host;`, because by default it replaces it with the
+upstream's and every login is then refused as cross-site.
 
 **On the internet or only on a private network?** Either works; the login
 guards both. On the open internet, keep Radicale itself off it (only hitome
