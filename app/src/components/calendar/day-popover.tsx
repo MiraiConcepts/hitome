@@ -18,17 +18,18 @@ import { AccentColor, DangerColor, Spacing } from '@/constants/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, formatTime } from '@/utils/date';
+import { durationLabel } from '@/utils/duration';
 
-/** The calendar mark beside a row's time. */
+/** The calendar's mark, in front of the title. */
 const MARK_SIZE = 16;
-/** The time's line height, so the mark centres on its first line. */
-const WHEN_LINE = 20;
-/** The time column's width: the longest start and end ("→ 11:15 am") with the
- *  mark and the cell's padding, on any screen. */
-const WHEN_COLUMN = 124;
-/** The phone's: a notch smaller type, so the column and its lines follow. */
-const WHEN_COLUMN_COMPACT = 112;
-const WHEN_LINE_COMPACT = 18;
+/** The title's line height, so the mark centres on its first line. */
+const TITLE_LINE = 24;
+const TITLE_LINE_COMPACT = 21;
+/** The time column: a start time and a duration are short, so it is narrow,
+ *  but wide enough for the widest ("11:00 am", bold) on one line. */
+const WHEN_COLUMN = 98;
+/** The phone's: a notch smaller type, so the column follows. */
+const WHEN_COLUMN_COMPACT = 86;
 
 type Props = {
   /** The day (dateString) whose events are listed. */
@@ -53,15 +54,9 @@ function compareEvents(a: CalEvent, b: CalEvent): number {
  * The "+N more" popover: a centered modal (the app's dialog idiom, same as
  * EventEditor) listing one day's full event set; tapping a row opens the
  * edit editor via onPressEvent. Drawn as the settings screen's card: the
- * day is the title row, each event a ruled row beneath it.
+ * day is the title row, each event a ruled row beneath it, with its start
+ * and length on the left, its title and tags in the middle, and a delete.
  */
-/** The time as lines: the start, then the end under it, so a column this
- *  narrow never has to cut either short. */
-function whenLines(event: CalEvent): string[] {
-  if (event.allDay) return ['All day'];
-  return [formatTime(event.start), `→ ${formatTime(event.end)}`];
-}
-
 export function DayPopover({
   day,
   events,
@@ -92,79 +87,95 @@ export function DayPopover({
           <ThemedView style={styles.card} testID="day-popover">
             <ScrollView>
               <SettingsSection title={dayLabel(day)}>
-                {sorted.map((event) => (
-                  <SettingsValue
-                    key={event.id}
-                    labelWidth={compact ? WHEN_COLUMN_COMPACT : WHEN_COLUMN}
-                    onPress={() => onPressEvent(event)}
-                    pressLabel={event.summary || '(untitled)'}
-                    trailing={
-                      <Pressable
-                        onPress={() => onDelete(event)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Delete ${event.summary || 'event'}`}
-                        testID={`day-popover-delete-${event.id}`}
-                        style={({
-                          pressed,
-                          hovered,
-                        }: {
-                          pressed: boolean;
-                          hovered?: boolean;
-                        }) => [
-                          styles.delete,
-                          (pressed || hovered) && {
-                            backgroundColor: theme.backgroundSelected,
-                          },
-                        ]}
-                      >
-                        <TrashIcon
-                          size={compact ? 18 : 20}
-                          color={DangerColor}
-                        />
-                      </Pressable>
-                    }
-                    label={
-                      // When, with the source calendar's mark in its colour.
-                      <View style={styles.when}>
-                        <View
-                          style={[
-                            styles.mark,
-                            compact && { height: WHEN_LINE_COMPACT },
+                {sorted.map((event) => {
+                  const duration = durationLabel(
+                    event.start,
+                    event.end,
+                    event.allDay
+                  );
+                  return (
+                    <SettingsValue
+                      key={event.id}
+                      labelWidth={compact ? WHEN_COLUMN_COMPACT : WHEN_COLUMN}
+                      onPress={() => onPressEvent(event)}
+                      pressLabel={event.summary || '(untitled)'}
+                      trailing={
+                        <Pressable
+                          onPress={() => onDelete(event)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Delete ${event.summary || 'event'}`}
+                          testID={`day-popover-delete-${event.id}`}
+                          style={({
+                            pressed,
+                            hovered,
+                          }: {
+                            pressed: boolean;
+                            hovered?: boolean;
+                          }) => [
+                            styles.delete,
+                            (pressed || hovered) && {
+                              backgroundColor: theme.backgroundSelected,
+                            },
                           ]}
                         >
-                          <CalendarMark
-                            icon={event.icon}
-                            color={event.color ?? AccentColor}
-                            size={MARK_SIZE}
+                          <TrashIcon
+                            size={compact ? 18 : 20}
+                            color={DangerColor}
                           />
-                        </View>
+                        </Pressable>
+                      }
+                      label={
+                        // When: the start, and how long it runs.
                         <View>
-                          {whenLines(event).map((line) => (
+                          <ThemedText
+                            type="smallBold"
+                            style={compact && styles.whenCompact}
+                          >
+                            {event.allDay ? 'All day' : formatTime(event.start)}
+                          </ThemedText>
+                          {duration ? (
                             <ThemedText
-                              key={line}
                               type="small"
                               themeColor="textSecondary"
+                              style={compact && styles.whenCompact}
+                            >
+                              {duration}
+                            </ThemedText>
+                          ) : null}
+                        </View>
+                      }
+                      value={
+                        <View>
+                          <View style={styles.titleRow}>
+                            <View
+                              style={{
+                                height: compact
+                                  ? TITLE_LINE_COMPACT
+                                  : TITLE_LINE,
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <CalendarMark
+                                icon={event.icon}
+                                color={event.color ?? AccentColor}
+                                size={MARK_SIZE}
+                              />
+                            </View>
+                            <ThemedText
                               style={[
-                                styles.whenLine,
-                                compact && styles.whenLineCompact,
+                                styles.title,
+                                compact && styles.titleCompact,
                               ]}
                             >
-                              {line}
+                              {event.summary || '(untitled)'}
                             </ThemedText>
-                          ))}
+                          </View>
+                          <EventTags event={event} compact={compact} />
                         </View>
-                      </View>
-                    }
-                    value={
-                      <View>
-                        <ThemedText style={compact && styles.titleCompact}>
-                          {event.summary || '(untitled)'}
-                        </ThemedText>
-                        <EventTags event={event} compact={compact} />
-                      </View>
-                    }
-                  />
-                ))}
+                      }
+                    />
+                  );
+                })}
                 {onAdd && (
                   <SettingsBlock>
                     <SettingsButtonRow>
@@ -214,29 +225,26 @@ const styles = StyleSheet.create({
     maxHeight: '100%',
     boxShadow: '4px 4px 0px rgba(0, 0, 0, 0.75)',
   },
-  when: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.one + Spacing.half,
-  },
   delete: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mark: {
-    height: WHEN_LINE,
-    justifyContent: 'center',
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.one + Spacing.half,
   },
-  whenLine: {
-    lineHeight: WHEN_LINE,
-  },
-  whenLineCompact: {
-    fontSize: 12,
-    lineHeight: WHEN_LINE_COMPACT,
+  title: {
+    flexShrink: 1,
+    lineHeight: TITLE_LINE,
   },
   titleCompact: {
     fontSize: 15,
-    lineHeight: 21,
+    lineHeight: TITLE_LINE_COMPACT,
+  },
+  whenCompact: {
+    fontSize: 12,
+    lineHeight: 18,
   },
 });
