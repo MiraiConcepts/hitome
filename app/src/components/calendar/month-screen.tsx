@@ -16,6 +16,8 @@ import {
 
 import { runAlarmReconcile } from '@/alarms/runner';
 import {
+  ConflictError,
+  deleteEvent,
   undoDelete as undoDeleteOnServer,
   type EditScope,
   requestSync,
@@ -51,6 +53,7 @@ import { AccentColor, Colors, OnAccentColor, Spacing } from '@/constants/theme';
 import {
   classifyConnectError,
   webConnectionProblem,
+  writeFailureMessage,
 } from '@/config/dav-config';
 import { recheckSource } from '@/config/source';
 import { useCalendarKeys } from '@/hooks/use-calendar-keys';
@@ -67,7 +70,7 @@ import { refreshAgendaWidget } from '@/widget/app-refresh';
 type EditorState =
   | { mode: 'closed' }
   | { mode: 'create'; day: string }
-  | { mode: 'edit'; event: CalEvent };
+  | { mode: 'edit'; event: CalEvent; askDelete?: boolean };
 
 /** The toast's lead: what happened, black on an accent block. */
 function SnackMark({ icon: Icon }: { icon: ComponentType<IconProps> }) {
@@ -339,6 +342,36 @@ export function MonthScreen() {
     setPopoverDay(null);
     setEditor({ mode: 'edit', event });
   }, []);
+
+  // The day list's trash. A plain event goes at once and the Undo bar takes
+  // over, so the list closes to let it show (a dialog would cover it); a
+  // repeating one needs "which occurrences?", which the editor already asks,
+  // so it opens there.
+  const onDeleteEvent = useCallback(
+    async (event: CalEvent) => {
+      setPopoverDay(null);
+      if (event.recurring) {
+        setEditor({ mode: 'edit', event, askDelete: true });
+        return;
+      }
+      try {
+        await deleteEvent(event, 'all');
+        onEditorDone({ deleted: event, scope: 'all' });
+      } catch (err) {
+        if (err instanceof ConflictError) {
+          onEditorDone('conflict');
+          return;
+        }
+        setSnack({
+          message: writeFailureMessage(err, 'delete'),
+          icon: AlertCircleIcon,
+        });
+      }
+    },
+    // onEditorDone is rebuilt every render and only sets state and refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   // Hold a cell anywhere, its events included — a new event on that day.
   const onCreateOnDay = useCallback(
@@ -647,6 +680,7 @@ export function MonthScreen() {
           events={popoverEvents}
           onClose={() => setPopoverDay(null)}
           onPressEvent={onPressEvent}
+          onDelete={onDeleteEvent}
           onAdd={
             Platform.OS === 'web'
               ? () => {
@@ -663,6 +697,7 @@ export function MonthScreen() {
           key={editor.mode === 'edit' ? editor.event.id : `new-${editor.day}`}
           event={editor.mode === 'edit' ? editor.event : null}
           defaultDay={editor.mode === 'create' ? editor.day : today}
+          askDeleteFirst={editor.mode === 'edit' && editor.askDelete}
           onClose={() => setEditor({ mode: 'closed' })}
           onDone={onEditorDone}
         />

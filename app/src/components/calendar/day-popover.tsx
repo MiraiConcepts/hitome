@@ -3,6 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { CalEvent } from '@/caldav/types';
 import { CalendarMark } from '@/components/calendar/calendar-mark';
 import { EventTags } from '@/components/calendar/event-tags';
+import { TrashIcon } from '@/components/icons';
 import {
   SettingsBlock,
   SettingsButton,
@@ -13,7 +14,8 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BACKDROP_BLUR } from '@/constants/backdrop';
-import { AccentColor, Spacing } from '@/constants/theme';
+import { AccentColor, DangerColor, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, formatTime } from '@/utils/date';
 
 /** The calendar mark beside a row's time. */
@@ -31,6 +33,8 @@ type Props = {
   events: CalEvent[];
   onClose: () => void;
   onPressEvent: (event: CalEvent) => void;
+  /** Delete an event from the list: one tap, with the Undo bar to follow. */
+  onDelete: (event: CalEvent) => void;
   /** A new event on this day. Given on the web, where a click on a busy day
    *  lands here and there is no hold to add with; the phone holds the cell. */
   onAdd?: () => void;
@@ -59,8 +63,10 @@ export function DayPopover({
   events,
   onClose,
   onPressEvent,
+  onDelete,
   onAdd,
 }: Props) {
+  const theme = useTheme();
   const sorted = [...events].sort(compareEvents);
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -87,6 +93,28 @@ export function DayPopover({
                     labelWidth={WHEN_COLUMN}
                     onPress={() => onPressEvent(event)}
                     pressLabel={event.summary || '(untitled)'}
+                    trailing={
+                      <Pressable
+                        onPress={() => onDelete(event)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete ${event.summary || 'event'}`}
+                        testID={`day-popover-delete-${event.id}`}
+                        style={({
+                          pressed,
+                          hovered,
+                        }: {
+                          pressed: boolean;
+                          hovered?: boolean;
+                        }) => [
+                          styles.delete,
+                          (pressed || hovered) && {
+                            backgroundColor: theme.backgroundSelected,
+                          },
+                        ]}
+                      >
+                        <TrashIcon size={20} color={DangerColor} />
+                      </Pressable>
+                    }
                     label={
                       // When, with the source calendar's mark in its colour.
                       <View style={styles.when}>
@@ -172,6 +200,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.one + Spacing.half,
+  },
+  delete: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   mark: {
     height: WHEN_LINE,

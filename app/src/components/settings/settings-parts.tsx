@@ -163,6 +163,7 @@ export function SettingsValue({
   labelWidth,
   onPress,
   pressLabel,
+  trailing,
 }: {
   /** Text, or something of your own (the day list's mark and time). */
   label: ReactNode;
@@ -178,6 +179,10 @@ export function SettingsValue({
    *  button, which the web rejects as invalid HTML. */
   onPress?: () => void;
   pressLabel?: string;
+  /** A third column after a rule of its own: a control for the row (the day
+   *  list's delete). It stays a button of its own above the row's, so give it
+   *  the whole cell to be pressed in. */
+  trailing?: ReactNode;
 }) {
   const theme = useTheme();
   const passThrough = onPress ? styles.passThrough : null;
@@ -234,6 +239,16 @@ export function SettingsValue({
             value
           )}
         </View>
+        {trailing ? (
+          <>
+            <View style={styles.columnRule}>
+              <View style={StyleSheet.absoluteFill}>
+                <DashedLine vertical />
+              </View>
+            </View>
+            <View style={styles.trailingCell}>{trailing}</View>
+          </>
+        ) : null}
       </View>
     </View>
   );
@@ -669,6 +684,10 @@ const styles = StyleSheet.create({
     width: Card.labelColumn,
     paddingVertical: Card.padV,
     paddingHorizontal: Card.padH,
+  },
+  trailingCell: {
+    width: 48,
+    alignItems: 'stretch',
   },
   valueCell: {
     flex: 1,

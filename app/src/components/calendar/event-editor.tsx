@@ -24,6 +24,8 @@ type Props = {
   defaultDay: string;
   onClose: () => void;
   onDone: (result: EditorResult) => void;
+  /** Open on a repeating event's delete question. */
+  askDeleteFirst?: boolean;
 };
 
 /**
@@ -33,7 +35,13 @@ type Props = {
  * web). The controller performs the CalDAV write itself and reports the
  * outcome via onDone.
  */
-export function EventEditor({ event, defaultDay, onClose, onDone }: Props) {
+export function EventEditor({
+  event,
+  defaultDay,
+  onClose,
+  onDone,
+  askDeleteFirst,
+}: Props) {
   const isWide = useIsWide();
 
   if (!isWide) {
@@ -43,6 +51,7 @@ export function EventEditor({ event, defaultDay, onClose, onDone }: Props) {
         defaultDay={defaultDay}
         onClose={onClose}
         onDone={onDone}
+        askDeleteFirst={askDeleteFirst}
       />
     );
   }
@@ -53,14 +62,21 @@ export function EventEditor({ event, defaultDay, onClose, onDone }: Props) {
       defaultDay={defaultDay}
       onClose={onClose}
       onDone={onDone}
+      askDeleteFirst={askDeleteFirst}
     />
   );
 }
 
 /** Wide-layout shell: header, scrolling fields, and the action bar stacked
  *  in a centered card. */
-function EventEditorDialog({ event, defaultDay, onClose, onDone }: Props) {
-  const editor = useEventEditor({ event, defaultDay, onDone });
+function EventEditorDialog({
+  event,
+  defaultDay,
+  onClose,
+  onDone,
+  askDeleteFirst,
+}: Props) {
+  const editor = useEventEditor({ event, defaultDay, onDone, askDeleteFirst });
   // Cmd/Ctrl+Enter saves from any field, as in a mail composer; Esc goes back
   // one step through the modal: out of the repeat question, then closed. Re-subscribed whenever save changes, so the
   // listener always saves the form as it stands.

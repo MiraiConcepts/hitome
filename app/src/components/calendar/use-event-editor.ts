@@ -54,6 +54,9 @@ type Options = {
   event: CalEvent | null;
   defaultDay: string;
   onDone: (result: EditorResult) => void;
+  /** Open on the delete question ("which occurrences?") of a repeating event:
+   *  the day list's trash button hands such an event over here. */
+  askDeleteFirst?: boolean;
 };
 
 export type EventEditorController = ReturnType<typeof useEventEditor>;
@@ -70,7 +73,12 @@ type EditorProblem = { field?: EditorField; text: string } | null;
  *  one occurrence has no rule of its own). */
 type ScopeAsk = { action: 'save' | 'delete'; allowThis: boolean };
 
-export function useEventEditor({ event, defaultDay, onDone }: Options) {
+export function useEventEditor({
+  event,
+  defaultDay,
+  onDone,
+  askDeleteFirst,
+}: Options) {
   const [initial] = useState(() =>
     initialFormState(event, defaultDay, new Date(), getDefaultAlert())
   );
@@ -90,7 +98,11 @@ export function useEventEditor({ event, defaultDay, onDone }: Options) {
   const [lastValidDay, setLastValidDay] = useState(initial.startDay);
   const [problem, setProblem] = useState<EditorProblem>(null);
   // A repeating event's Save or Delete waiting on "which occurrences?".
-  const [scopeAsk, setScopeAsk] = useState<ScopeAsk | null>(null);
+  const [scopeAsk, setScopeAsk] = useState<ScopeAsk | null>(() =>
+    askDeleteFirst && event?.recurring
+      ? { action: 'delete', allowThis: true }
+      : null
+  );
   const [busy, setBusy] = useState(false);
   const [alarmHint, setAlarmHint] = useState<string | null>(null);
   // The calendars to choose from and the selected one: where a new event is

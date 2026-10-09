@@ -42,6 +42,7 @@ type Props = {
   defaultDay: string;
   onClose: () => void;
   onDone: (result: EditorResult) => void;
+  askDeleteFirst?: boolean;
 };
 
 // BottomSheetTextInput's keyboard hooks call native TextInput.State APIs that
@@ -161,6 +162,7 @@ export function EventEditorSheet({
   defaultDay,
   onClose,
   onDone,
+  askDeleteFirst,
 }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -170,7 +172,7 @@ export function EventEditorSheet({
   // onChange also fires when the form's height changes (a repeat preset
   // unfolding its end options); the title is focused on the first settle only.
   const focusedTitle = useRef(false);
-  const editor = useEventEditor({ event, defaultDay, onDone });
+  const editor = useEventEditor({ event, defaultDay, onDone, askDeleteFirst });
   const { height } = useWindowDimensions();
 
   // Cancel dismisses the sheet; onDismiss then reports onClose, the same
