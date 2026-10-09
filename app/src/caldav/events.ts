@@ -16,12 +16,12 @@ import {
   editOccurrence,
   editPreserving,
   excludeOccurrence,
-  expandEvents,
   isFirstOccurrence,
   splitSeries,
   truncateSeries,
   type EditScope,
 } from './ics';
+import { expandObjects, isObjectUrl } from './objects';
 import type { CalEvent, EventChanges, EventIcon, EventInput } from './types';
 
 /** A calendar the editor can create into: URL (write target) + display bits. */
@@ -80,32 +80,19 @@ export async function fetchMonth(
     end: rangeEnd.toISOString(),
   };
   // One fetch per calendar in parallel; a single failure fails the month (as the
-  // single-calendar version did) rather than silently dropping a calendar.
+  // single-calendar version did) rather than silently dropping a calendar. A
+  // single unreadable object is only skipped (see expandObjects).
   const perCalendar = await Promise.all(
     calendars.map(async (calendar) => {
       const objects = await client.fetchCalendarObjects({
         calendar,
         timeRange,
+        urlFilter: isObjectUrl,
       });
-      const source = {
+      return expandObjects(objects, rangeStart, rangeEnd, {
         color: calendarColor(calendar),
         icon: calendarIcon(calendar),
-      };
-      const events: CalEvent[] = [];
-      for (const obj of objects) {
-        if (!obj.data) continue;
-        events.push(
-          ...expandEvents(
-            obj.data,
-            obj.url,
-            obj.etag ?? '',
-            rangeStart,
-            rangeEnd,
-            source
-          )
-        );
-      }
-      return events;
+      });
     })
   );
   return perCalendar.flat();

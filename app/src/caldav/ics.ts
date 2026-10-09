@@ -144,10 +144,16 @@ function writeTimezone(
   return new ICAL.Timezone(component);
 }
 
-/** An instant as wall-clock time in a zone. */
+/**
+ * An instant as wall-clock time in a zone. The platform's zone rules when it
+ * knows the TZID (every IANA name); otherwise the zone's own VTIMEZONE, as
+ * for Outlook's "W. Europe Standard Time", which Intl rejects. UTC when
+ * neither can place it.
+ */
 function zonedTime(d: Date, zone: ICAL.Timezone): ICAL.Time {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-US', {
+  let format: Intl.DateTimeFormat;
+  try {
+    format = new Intl.DateTimeFormat('en-US', {
       timeZone: zone.tzid,
       hourCycle: 'h23',
       year: 'numeric',
@@ -156,9 +162,16 @@ function zonedTime(d: Date, zone: ICAL.Timezone): ICAL.Time {
       hour: 'numeric',
       minute: 'numeric',
       second: 'numeric',
-    })
-      .formatToParts(d)
-      .map((p) => [p.type, Number(p.value)])
+    });
+  } catch {
+    try {
+      return ICAL.Time.fromJSDate(d, true).convertToZone(zone);
+    } catch {
+      return ICAL.Time.fromJSDate(d, true);
+    }
+  }
+  const parts = Object.fromEntries(
+    format.formatToParts(d).map((p) => [p.type, Number(p.value)])
   );
   return ICAL.Time.fromData(
     {
@@ -171,6 +184,62 @@ function zonedTime(d: Date, zone: ICAL.Timezone): ICAL.Time {
     },
     zone
   );
+}
+
+/** Where a series keeps its time of day: a zone, UTC (a zone with no
+ *  definition), or the device's own days (all-day dates). */
+type Clock = ICAL.Timezone | 'utc' | 'local';
+
+/**
+ * An instant's wall-clock time on `clock`, as ms with the fields read as
+ * UTC. The difference of two is whole days plus a change of time of day,
+ * whatever the clocks did in between: moving a series "a week on" across
+ * the change to summer time is 7 days, not 7 days less an hour, which put an
+ * all-day series on the day before and a timed one an hour early.
+ */
+function wallTime(d: Date, clock: Clock): number {
+  if (clock === 'utc') return d.getTime();
+  if (clock === 'local')
+    return Date.UTC(
+      d.getFullYear(),
+      d.getMonth(),
+      d.getDate(),
+      d.getHours(),
+      d.getMinutes(),
+      d.getSeconds()
+    );
+  const t = zonedTime(d, clock);
+  return Date.UTC(t.year, t.month - 1, t.day, t.hour, t.minute, t.second);
+}
+
+/** The instant at a wall-clock time (as wallTime gives it) on `clock`. */
+function fromWallTime(ms: number, clock: Clock): Date {
+  if (clock === 'utc') return new Date(ms);
+  const w = new Date(ms);
+  if (clock === 'local')
+    return new Date(
+      w.getUTCFullYear(),
+      w.getUTCMonth(),
+      w.getUTCDate(),
+      w.getUTCHours(),
+      w.getUTCMinutes(),
+      w.getUTCSeconds()
+    );
+  try {
+    return ICAL.Time.fromData(
+      {
+        year: w.getUTCFullYear(),
+        month: w.getUTCMonth() + 1,
+        day: w.getUTCDate(),
+        hour: w.getUTCHours(),
+        minute: w.getUTCMinutes(),
+        second: w.getUTCSeconds(),
+      },
+      clock
+    ).toJSDate();
+  } catch {
+    return new Date(ms);
+  }
 }
 
 /**
@@ -297,21 +366,31 @@ export function editPreserving(
 
   const before = new ICAL.Event(vevent).startDate.clone();
   let times: { start: Date; end: Date; allDay: boolean } | undefined;
+  let clock: Clock = 'utc';
   if (changes.start && changes.end) {
+    const allDay = changes.allDay ?? false;
+    // The shift and the length are wall-clock time where the series will be
+    // written (see wallTime), so they survive a change of clocks.
+    clock = allDay ? 'local' : (writeTimezone(vcalendar, vevent) ?? 'utc');
     const masterStart = before.toJSDate();
     const base = from ?? masterStart;
-    const shift = changes.start.getTime() - base.getTime();
-    const start = new Date(masterStart.getTime() + shift);
-    times = {
-      start,
-      end: new Date(
-        start.getTime() + (changes.end.getTime() - changes.start.getTime())
-      ),
-      allDay: changes.allDay ?? false,
-    };
+    if (base.getTime() === masterStart.getTime()) {
+      // Edited against the master's own start: the new times as they are.
+      times = { start: changes.start, end: changes.end, allDay };
+    } else {
+      const shift = wallTime(changes.start, clock) - wallTime(base, clock);
+      const start = wallTime(masterStart, clock) + shift;
+      const length =
+        wallTime(changes.end, clock) - wallTime(changes.start, clock);
+      times = {
+        start: fromWallTime(start, clock),
+        end: fromWallTime(start + length, clock),
+        allDay,
+      };
+    }
   }
   applyFieldChanges(vcalendar, vevent, changes, times);
-  if (times) shiftExceptions(vcalendar, vevent, before);
+  if (times) shiftExceptions(vcalendar, vevent, before, clock);
   // After any DTSTART change — the weekdays rotation reads the new value.
   // The editor only emits these for rules/alarms it owns ('custom'/'foreign'
   // prefills never produce a change), so foreign data is never rewritten.
@@ -325,41 +404,54 @@ export function editPreserving(
  * After the whole series moves, its exclusions and overrides move with it.
  * They name occurrences by their old start; left as they were, a deleted
  * occurrence would come back and a moved one would lose its changes, since
- * neither would match an occurrence any more. Only when the series keeps its
- * value type — toggling all-day changes what an occurrence is, and they are
- * left alone.
+ * neither would match an occurrence any more. When the series is toggled
+ * between all-day and timed, the exclusions and RECURRENCE-IDs take its new
+ * value type (RFC 5545 requires DTSTART's), naming the same occurrences; an
+ * override's own times are left as they are, keeping what it was changed to.
  */
 function shiftExceptions(
   vcalendar: ICAL.Component,
   master: ICAL.Component,
-  before: ICAL.Time
+  before: ICAL.Time,
+  clock: Clock
 ): void {
   const after = new ICAL.Event(master).startDate;
-  if (after.isDate !== before.isDate) return;
-  const shiftMs = after.toJSDate().getTime() - before.toJSDate().getTime();
-  if (shiftMs === 0) return;
+  const retyped = after.isDate !== before.isDate;
+  // On the series' own clock (see wallTime), so each keeps its time of day
+  // and its weekday on either side of a change of clocks.
+  const shift =
+    wallTime(after.toJSDate(), clock) - wallTime(before.toJSDate(), clock);
+  if (shift === 0 && !retyped) return;
   const shifted = (value: ICAL.Time): ICAL.Time => {
-    if (value.isDate) {
+    // Already of the new type (a DATE exclusion on a timed series, say): it
+    // names that day as it is.
+    if (retyped && value.isDate === after.isDate) return value;
+    if (value.isDate && !retyped) {
       const day = value.clone();
-      day.day += Math.round(shiftMs / 86_400_000);
+      day.day += Math.round(shift / 86_400_000);
       return day;
     }
-    return ICAL.Time.fromJSDate(
-      new Date(value.toJSDate().getTime() + shiftMs),
-      true
-    );
+    const at = fromWallTime(wallTime(value.toJSDate(), clock) + shift, clock);
+    return after.isDate && retyped
+      ? toAllDayTime(at)
+      : ICAL.Time.fromJSDate(at, true);
   };
   const moved = (prop: ICAL.Property) => {
-    prop.setValue(shifted(prop.getFirstValue() as ICAL.Time));
-    // Rewritten in UTC, like the master's own new start.
-    if (!(prop.getFirstValue() as ICAL.Time).isDate)
-      prop.removeParameter('tzid');
+    // Every value: one EXDATE may list several, comma-separated.
+    const old = prop.getValues() as ICAL.Time[];
+    const values = old.map(shifted);
+    if (values.every((value, i) => value === old[i])) return;
+    if (values.length > 1) prop.setValues(values);
+    else prop.setValue(values[0]);
+    // Rewritten in UTC, like the master's own new start (a DATE has none).
+    prop.removeParameter('tzid');
   };
   for (const ex of master.getAllProperties('exdate')) moved(ex);
   for (const v of vcalendar.getAllSubcomponents('vevent')) {
     const rid = v.getFirstProperty('recurrence-id');
     if (!rid) continue;
     moved(rid);
+    if (retyped) continue;
     // The override's own times follow too, so one renamed (or moved by an
     // hour) keeps the same place relative to the series it belongs to.
     for (const name of ['dtstart', 'dtend']) {
@@ -420,6 +512,27 @@ function setLikeDtstart(
 }
 
 /**
+ * An occurrence's own times in the form an edit gives them: an all-day end is
+ * its last day, not the midnight after it that expandEvents reads from DTEND
+ * (toTimePair adds that day back, so passing the occurrence as it is would
+ * write it one day longer).
+ */
+function asEdited(occurrence: { start: Date; end: Date; allDay: boolean }): {
+  start: Date;
+  end: Date;
+  allDay: boolean;
+} {
+  if (!occurrence.allDay) return occurrence;
+  const end = new Date(occurrence.end);
+  end.setDate(end.getDate() - 1);
+  return {
+    start: occurrence.start,
+    end: end < occurrence.start ? occurrence.start : end,
+    allDay: true,
+  };
+}
+
+/**
  * Edit ONE occurrence: its override VEVENT (RECURRENCE-ID = the occurrence),
  * created from the master when it does not exist yet — a copy minus the rule
  * (RRULE/RDATE/EXDATE belong to the series only), so attendees, X-* and the
@@ -460,7 +573,7 @@ export function editOccurrence(
           allDay: changes.allDay ?? occurrence.allDay,
         }
       : created
-        ? occurrence
+        ? asEdited(occurrence)
         : undefined;
   applyFieldChanges(vcalendar, override, changes, times);
   touch(override);
@@ -583,9 +696,15 @@ export function splitSeries(
   first.updatePropertyWithValue('sequence', 0);
   first.updatePropertyWithValue('dtstamp', utcNow());
   first.removeAllProperties('rdate');
-  for (const ex of first.getAllProperties('exdate'))
-    if ((ex.getFirstValue() as ICAL.Time).toUnixTime() < recurrenceStart)
-      first.removeProperty(ex);
+  // Only the exclusions from the split on; one EXDATE may list several.
+  for (const ex of first.getAllProperties('exdate')) {
+    const kept = (ex.getValues() as ICAL.Time[]).filter(
+      (t) => t.toUnixTime() >= recurrenceStart
+    );
+    if (kept.length === 0) first.removeProperty(ex);
+    else if (kept.length > 1) ex.setValues(kept);
+    else ex.setValue(kept[0]);
+  }
   const rule = master.getFirstPropertyValue('rrule') as ICAL.Recur | null;
   if (rule?.count) {
     const data = {
@@ -594,18 +713,17 @@ export function splitSeries(
     };
     first.updatePropertyWithValue('rrule', ICAL.Recur.fromData(data));
   }
-  applyFieldChanges(
-    tail,
-    first,
-    changes,
+  const times =
     changes.start && changes.end
       ? {
           start: changes.start,
           end: changes.end,
           allDay: changes.allDay ?? occurrence.allDay,
         }
-      : occurrence
-  );
+      : asEdited(occurrence);
+  // Where the rule had the occurrence: the new series starts from there.
+  const before = occurrenceTime(master, recurrenceStart);
+  applyFieldChanges(tail, first, changes, times);
   if (changes.recurrence !== undefined)
     applyRecurrence(first, changes.recurrence);
   tail.addSubcomponent(first);
@@ -617,6 +735,14 @@ export function splitSeries(
       tail.addSubcomponent(moved);
     }
   }
+  // A new time for the new series moves its exclusions and overrides with
+  // it, as a whole-series edit does (see shiftExceptions).
+  shiftExceptions(
+    tail,
+    first,
+    before,
+    times.allDay ? 'local' : (writeTimezone(tail, first) ?? 'utc')
+  );
 
   cutAt(original, master, recurrenceStart);
   touch(master);

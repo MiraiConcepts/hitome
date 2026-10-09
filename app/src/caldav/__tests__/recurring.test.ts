@@ -5,6 +5,7 @@ import {
   excludeOccurrence,
   expandEvents,
   isFirstOccurrence,
+  setWriteZone,
   splitSeries,
   truncateSeries,
 } from '../ics';
@@ -293,6 +294,210 @@ describe('splitSeries (edit this and following)', () => {
     expect(head).not.toContain('Special');
     const after = expand(tail);
     expect(after.map((o) => o.summary)).toEqual(['v2', 'Special', 'v2']);
+  });
+});
+
+describe('all-day occurrences keep their length', () => {
+  const lines = (ics: string, name: string) =>
+    ics.split('\r\n').filter((l) => l.startsWith(name));
+  // The same series over three days (Monday to Wednesday).
+  const THREE_DAYS = WEEKLY_ALLDAY.replace(
+    'DTEND;VALUE=DATE:20261006',
+    'DTEND;VALUE=DATE:20261008'
+  );
+
+  it('keeps a renamed occurrence to its one day', () => {
+    const second = expand(WEEKLY_ALLDAY)[1]; // Monday 12 Oct
+    const out = editOccurrence(WEEKLY_ALLDAY, second.recurrenceStart!, second, {
+      summary: 'Bins out (late)',
+    });
+    expect(lines(out, 'DTSTART')).toContain('DTSTART;VALUE=DATE:20261012');
+    expect(lines(out, 'DTEND')).toContain('DTEND;VALUE=DATE:20261013');
+    const renamed = expand(out).find((o) => o.summary === 'Bins out (late)')!;
+    expect(renamed.end.getTime() - renamed.start.getTime()).toBe(86_400_000);
+  });
+
+  it('keeps a renamed occurrence of a longer series to its days', () => {
+    const second = expand(THREE_DAYS)[1];
+    const out = editOccurrence(THREE_DAYS, second.recurrenceStart!, second, {
+      summary: 'Away',
+    });
+    expect(lines(out, 'DTEND')).toContain('DTEND;VALUE=DATE:20261015');
+  });
+
+  it('keeps every occurrence after a split to its one day', () => {
+    const third = expand(WEEKLY_ALLDAY)[2]; // Monday 19 Oct
+    const { tail } = splitSeries(
+      WEEKLY_ALLDAY,
+      third.recurrenceStart!,
+      third,
+      { summary: 'Bins v2' },
+      'series-2b'
+    );
+    expect(lines(tail, 'DTSTART')).toEqual(['DTSTART;VALUE=DATE:20261019']);
+    expect(lines(tail, 'DTEND')).toEqual(['DTEND;VALUE=DATE:20261020']);
+    const after = expand(tail);
+    expect(
+      after.every((o) => o.end.getTime() - o.start.getTime() === 86_400_000)
+    ).toBe(true);
+  });
+
+  it('keeps every occurrence of a longer series after a split to its days', () => {
+    const third = expand(THREE_DAYS)[2];
+    const { tail } = splitSeries(
+      THREE_DAYS,
+      third.recurrenceStart!,
+      third,
+      { summary: 'Away v2' },
+      'series-2c'
+    );
+    expect(lines(tail, 'DTEND')).toEqual(['DTEND;VALUE=DATE:20261022']);
+  });
+});
+
+describe('exclusions listed together on one EXDATE', () => {
+  // Written back in UTC, whatever the machine's zone, so the hours compare.
+  beforeEach(() => setWriteZone('UTC'));
+  afterEach(() => setWriteZone(undefined));
+
+  // Two deleted Mondays (12 and 19 Oct) on one line, as ical4j and Apple
+  // write them.
+  const TWO_GONE = WEEKLY.replace(
+    'RRULE:FREQ=WEEKLY;COUNT=6\r\n',
+    'RRULE:FREQ=WEEKLY;COUNT=6\r\nEXDATE:20261012T090000Z,20261019T090000Z\r\n'
+  );
+
+  it('are all deleted to begin with', () => {
+    expect(expand(TWO_GONE).map((o) => o.start.getUTCDate())).toEqual([
+      5, 26, 2, 9,
+    ]);
+  });
+
+  it('all move with the series', () => {
+    const first = expand(TWO_GONE)[0];
+    const out = editPreserving(
+      TWO_GONE,
+      {
+        start: new Date(first.start.getTime() + 3_600_000),
+        end: new Date(first.end.getTime() + 3_600_000),
+        allDay: false,
+      },
+      first.start
+    );
+    expect(out).toContain('EXDATE:20261012T100000Z,20261019T100000Z');
+    const after = expand(out);
+    expect(after.map((o) => o.start.getUTCDate())).toEqual([5, 26, 2, 9]);
+    expect(after.every((o) => o.start.getUTCHours() === 10)).toBe(true);
+  });
+
+  it('go to the new series only from the split on', () => {
+    const occ = expand(TWO_GONE);
+    // Split at Monday 26 Oct: both deleted Mondays are before it.
+    const late = splitSeries(
+      TWO_GONE,
+      occ[1].recurrenceStart!,
+      occ[1],
+      { summary: 'v2' },
+      'series-1c'
+    );
+    expect(late.tail).not.toContain('EXDATE');
+    // Split at 12 Oct with one deleted Monday on each side of it.
+    const ics = TWO_GONE.replace(
+      'EXDATE:20261012T090000Z,20261019T090000Z',
+      'EXDATE:20261005T090000Z,20261019T090000Z'
+    );
+    const twelfth = expand(ics)[0]; // 12 Oct
+    const { tail } = splitSeries(
+      ics,
+      twelfth.recurrenceStart!,
+      twelfth,
+      { summary: 'v2' },
+      'series-1d'
+    );
+    // 5 Oct is before the split and goes; 19 Oct stays deleted.
+    expect(tail).toContain('EXDATE:20261019T090000Z');
+    expect(tail).not.toContain('20261005T090000Z');
+    expect(expand(tail).map((o) => o.start.getUTCDate())).toEqual([
+      12, 26, 2, 9,
+    ]);
+  });
+});
+
+describe('deleted and changed occurrences when the times change', () => {
+  // Written back in UTC, whatever the machine's zone, so the hours compare.
+  beforeEach(() => setWriteZone('UTC'));
+  afterEach(() => setWriteZone(undefined));
+
+  it('carry over to the new series of a split that moves the time', () => {
+    const occ = expand(WEEKLY);
+    let ics = editOccurrence(WEEKLY, occ[3].recurrenceStart!, occ[3], {
+      summary: 'Special',
+    }); // 26 Oct renamed
+    ics = excludeOccurrence(ics, occ[4].recurrenceStart!); // no 2 Nov
+    const third = expand(ics)[2]; // 19 Oct
+    const { head, tail } = splitSeries(
+      ics,
+      third.recurrenceStart!,
+      third,
+      {
+        start: new Date('2026-10-19T10:00:00Z'),
+        end: new Date('2026-10-19T11:00:00Z'),
+        allDay: false,
+      },
+      'series-1e'
+    );
+    expect(expand(head).map((o) => o.start.getUTCDate())).toEqual([5, 12]);
+    const after = expand(tail);
+    expect(after.map((o) => [iso(o.start), o.summary])).toEqual([
+      ['2026-10-19T10:00:00.000Z', 'Standup'],
+      ['2026-10-26T10:00:00.000Z', 'Special'],
+      ['2026-11-09T10:00:00.000Z', 'Standup'],
+    ]);
+  });
+
+  it('stay deleted when a timed series becomes all-day', () => {
+    const occ = expand(WEEKLY);
+    const ics = excludeOccurrence(WEEKLY, occ[1].recurrenceStart!); // 12 Oct
+    const first = occ[0];
+    const day = new Date(
+      first.start.getFullYear(),
+      first.start.getMonth(),
+      first.start.getDate()
+    );
+    const out = editPreserving(
+      ics,
+      { start: day, end: day, allDay: true },
+      first.start
+    );
+    expect(out).toContain('EXDATE;VALUE=DATE:20261012');
+    const after = expand(out);
+    expect(after.every((o) => o.allDay)).toBe(true);
+    expect(after.map((o) => o.start.getDate())).toEqual([5, 19, 26, 2, 9]);
+  });
+
+  it('stay deleted, and changed, when an all-day series gets a time', () => {
+    const occ = expand(WEEKLY_ALLDAY);
+    let ics = excludeOccurrence(WEEKLY_ALLDAY, occ[1].recurrenceStart!);
+    ics = editOccurrence(ics, occ[2].recurrenceStart!, occ[2], {
+      summary: 'Bins (both)',
+    });
+    const first = expand(ics)[0]; // Monday 5 Oct
+    const at9 = new Date(first.start);
+    at9.setHours(9);
+    const at10 = new Date(first.start);
+    at10.setHours(10);
+    const out = editPreserving(
+      ics,
+      { start: at9, end: at10, allDay: false },
+      first.start
+    );
+    const after = expand(out).filter((o) => o.start < new Date(2026, 9, 27));
+    // 12 Oct still gone; 19 Oct's change still applies to it.
+    expect(after.map((o) => o.start.getDate())).toEqual([5, 19, 26]);
+    expect(after[1].summary).toBe('Bins (both)');
+    expect(after[0].start.getHours()).toBe(9);
+    // Written in UTC here, so the same UTC time each week.
+    expect(after[2].start.getUTCHours()).toBe(after[0].start.getUTCHours());
   });
 });
 
