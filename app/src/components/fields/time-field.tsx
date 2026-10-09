@@ -6,7 +6,12 @@ import { Keyboard, Pressable, StyleSheet, Text } from 'react-native';
 
 import { Fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatTime, parseDayTime, toDateString } from '@/utils/date';
+import {
+  clock24Hour,
+  formatTime,
+  parseDayTime,
+  toDateString,
+} from '@/utils/date';
 
 import { FieldChrome, type TimeFieldProps } from './field-chrome';
 
@@ -42,7 +47,8 @@ export function TimeField({ value, onChange, testID }: TimeFieldProps) {
             initialDate={(
               parseDayTime(toDateString(new Date()), value) ?? new Date()
             ).toISOString()}
-            is24Hour
+            // The phone's clock, as the field and every other time shows.
+            is24Hour={clock24Hour()}
             onDateSelected={(d) => {
               const hh = `${d.getHours()}`.padStart(2, '0');
               const mm = `${d.getMinutes()}`.padStart(2, '0');

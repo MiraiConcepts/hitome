@@ -22,11 +22,41 @@ const UNSAFE_SCHEMES = new Set([
   'android-app',
 ]);
 
-/** `normalizeLink`, or undefined when the link's scheme is unsafe to open. */
+/**
+ * The part of a link between `//` and the path, or undefined for a link that
+ * has none (mailto:, tel:, geo:). Browsers read `\\` as `/` in web links, so
+ * either ends it: `https://evil.example\\.zoom.us/` goes to evil.example.
+ */
+function authorityOf(link: string): string | undefined {
+  const rest = link.replace(/^[a-z][a-z0-9+.-]*:/i, '');
+  if (!/^[/\\]{2}/.test(rest)) return undefined;
+  return rest.slice(2).split(/[/\\?#]/, 1)[0];
+}
+
+/** Whether the link names a login before its host (`name@host`), which an
+ *  event link only ever uses to make another host read as the real one. */
+function hasUserinfo(link: string): boolean {
+  return authorityOf(link)?.includes('@') ?? false;
+}
+
+/** The host a link reaches, lowercased and without its port or any login
+ *  before it; '' when it has none. */
+export function hostOf(link: string): string {
+  const authority = authorityOf(link) ?? '';
+  return authority
+    .slice(authority.lastIndexOf('@') + 1)
+    .replace(/:\d*$/, '')
+    .toLowerCase();
+}
+
+/** `normalizeLink`, or undefined when the link's scheme is unsafe to open or
+ *  it names a login before its host. */
 export function openableLink(link: string): string | undefined {
   const normalized = normalizeLink(link.trim());
   const scheme = normalized.slice(0, normalized.indexOf(':')).toLowerCase();
-  return UNSAFE_SCHEMES.has(scheme) ? undefined : normalized;
+  return UNSAFE_SCHEMES.has(scheme) || hasUserinfo(normalized)
+    ? undefined
+    : normalized;
 }
 
 /** Hosts whose URLs are joinable meetings (matched as host or subdomain). */
@@ -42,22 +72,29 @@ const MEETING_HOSTS = [
   'facetime.apple.com',
 ];
 
-function hostOf(url: string): string {
-  const stripped = url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
-  return stripped.split(/[/?#]/, 1)[0].toLowerCase();
-}
-
 export function isMeetingLink(url: string): boolean {
+  if (hasUserinfo(url)) return false;
   const host = hostOf(url);
   return MEETING_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
 }
 
 const URL_IN_TEXT = /https?:\/\/[^\s<>"')\]]+/gi;
 
+/** Sentence punctuation after a URL, which is not part of it. */
+const TRAILING = '.,;!?';
+
+/** `url` without its trailing punctuation. A loop rather than a regex, which
+ *  would take quadratic time over a long run of it. */
+function trimTrailing(url: string): string {
+  let end = url.length;
+  while (end > 0 && TRAILING.includes(url[end - 1])) end--;
+  return url.slice(0, end);
+}
+
 /** The first meeting-host URL in free text, trailing punctuation stripped. */
 export function meetingLinkInText(text: string): string | undefined {
   for (const match of text.match(URL_IN_TEXT) ?? []) {
-    const url = match.replace(/[.,;!?]+$/, '');
+    const url = trimTrailing(match);
     if (isMeetingLink(url)) return url;
   }
   return undefined;
@@ -78,8 +115,13 @@ export function findMeetingLink(e: {
   location?: string;
   description?: string;
 }): string | undefined {
-  if (e.conference && /^https?:\/\//i.test(e.conference.trim())) {
-    return e.conference.trim();
+  const conference = e.conference?.trim();
+  if (
+    conference &&
+    /^https?:\/\//i.test(conference) &&
+    !hasUserinfo(conference)
+  ) {
+    return conference;
   }
   if (e.link) {
     const normalized = openableLink(e.link);

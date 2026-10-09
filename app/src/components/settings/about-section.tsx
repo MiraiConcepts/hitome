@@ -66,7 +66,8 @@ export function AboutSection() {
         {LINKS.map(({ label, url, icon: Icon }) => (
           <Pressable
             key={url}
-            onPress={() => Linking.openURL(url)}
+            // Rejects when no app takes the link; the tap then does nothing.
+            onPress={() => Linking.openURL(url).catch(() => {})}
             accessibilityRole="link"
             hitSlop={6}
             style={({ pressed }) => [styles.link, pressed && styles.pressed]}

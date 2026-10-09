@@ -69,7 +69,9 @@ function Tag({
 }) {
   return (
     <Pressable
-      onPress={() => Linking.openURL(uri)}
+      // Rejects when no app takes the link (zoommtg: without Zoom); the tap
+      // then does nothing.
+      onPress={() => Linking.openURL(uri).catch(() => {})}
       accessibilityRole="link"
       accessibilityLabel={label}
       style={[styles.tag, { backgroundColor: background }]}

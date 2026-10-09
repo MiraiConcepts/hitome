@@ -19,8 +19,8 @@ const ICON_SIZE = 14;
 /**
  * A labelled field with its caption above it rather than beside it — for a
  * form of a few full-width fields (the server connection card), where the
- * editor's side column would only squeeze the input. FieldRow is the
- * side-by-side counterpart. Captions are in the accent, glyph included.
+ * editor's side column would only squeeze the input. Captions are in the
+ * accent, glyph included.
  */
 export function FieldStack({ label, icon: Icon, children, testID }: Props) {
   // The caption names the group, so a screen reader entering a row of

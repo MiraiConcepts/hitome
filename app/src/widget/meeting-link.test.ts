@@ -1,6 +1,7 @@
 import {
   findMeetingLink,
   isMeetingLink,
+  meetingLinkInText,
   normalizeLink,
   openableLink,
 } from './meeting-link';
@@ -97,5 +98,60 @@ describe('findMeetingLink', () => {
 
   it('returns undefined when nothing matches', () => {
     expect(findMeetingLink({})).toBeUndefined();
+  });
+});
+
+// A browser reads `\` as `/` in a web link and treats `name@` before the host
+// as a login, so a string test on the text can be fooled about where a link
+// really goes.
+describe('links that disguise their host', () => {
+  it('reads the host as a browser does, ending it at a backslash', () => {
+    expect(isMeetingLink('https://evil.example\\.zoom.us/')).toBe(false);
+    expect(isMeetingLink('https://evil.example\\@zoom.us/')).toBe(false);
+    expect(
+      meetingLinkInText('Join: https://evil.example\\.zoom.us/j/1')
+    ).toBeUndefined();
+    expect(
+      findMeetingLink({ link: 'https://evil.example\\.zoom.us/j/1' })
+    ).toBeUndefined();
+  });
+
+  it('refuses a link with a login before the host', () => {
+    expect(
+      openableLink('https://accounts.google.com@evil.example/')
+    ).toBeUndefined();
+    expect(openableLink('https://zoom.us:x@evil.example/j/1')).toBeUndefined();
+    expect(isMeetingLink('https://zoom.us@evil.example/j/1')).toBe(false);
+    expect(
+      findMeetingLink({ conference: 'https://zoom.us@evil.example/j/1' })
+    ).toBeUndefined();
+    expect(
+      meetingLinkInText('Join: https://meet.google.com@evil.example/x')
+    ).toBeUndefined();
+  });
+
+  it('still opens links whose @ is not a login', () => {
+    expect(openableLink('mailto:sam@example.com')).toBe(
+      'mailto:sam@example.com'
+    );
+    expect(openableLink('https://example.com/u/@sam')).toBe(
+      'https://example.com/u/@sam'
+    );
+    expect(isMeetingLink('https://zoom.us/j/1?who=a@b.c')).toBe(true);
+    expect(isMeetingLink('https://ZOOM.US:443/j/1')).toBe(true);
+  });
+});
+
+describe('meetingLinkInText', () => {
+  it('strips a long run of trailing punctuation quickly', () => {
+    const text = `https://zoom.us/j/1${'.'.repeat(100_000)}x`;
+    const started = performance.now();
+    expect(meetingLinkInText(`${text} https://zoom.us/j/2!!!`)).toBe(
+      'https://zoom.us/j/1'.concat('.'.repeat(100_000), 'x')
+    );
+    expect(meetingLinkInText(`https://zoom.us/j/1${';'.repeat(100_000)}`)).toBe(
+      'https://zoom.us/j/1'
+    );
+    expect(performance.now() - started).toBeLessThan(200);
   });
 });

@@ -3,6 +3,7 @@
 // context).
 import { eventDays, parseDay, toDateString } from '@/utils/date';
 
+import { hostOf } from './meeting-link';
 import type { WidgetEvent } from './types';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
@@ -72,10 +73,7 @@ export function headerDate(now: Date): string {
 
 /** Display label for an event link — bare host, e.g. 'meet.google.com'. */
 export function linkHost(link: string): string {
-  const stripped = link
-    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
-    .replace(/^www\./i, '');
-  return stripped.split(/[/?#]/, 1)[0] || link;
+  return hostOf(link).replace(/^www\./, '') || link;
 }
 
 function sameLocalDay(a: Date, b: Date): boolean {

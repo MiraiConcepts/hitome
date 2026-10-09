@@ -14,6 +14,8 @@ let child: ReturnType<typeof Bun.spawn>;
 
 beforeAll(async () => {
   writeFileSync(join(dir, 'index.html'), '<!doctype html><title>app</title>');
+  writeFileSync(join(dir, 'about.html'), '<!doctype html><title>about</title>');
+  writeFileSync(join(dir, 'version.json'), '{"version":"1"}');
   child = Bun.spawn(['bun', join(import.meta.dir, 'index.ts')], {
     env: {
       PATH: process.env.PATH ?? '',
@@ -70,5 +72,40 @@ describe('server answers to bad requests', () => {
     const res = await fetch(`${base}/settings`);
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('<title>app</title>');
+  });
+
+  it("serves a route's own page and a file that is there", async () => {
+    const page = await fetch(`${base}/about`);
+    expect(await page.text()).toContain('<title>about</title>');
+    const file = await fetch(`${base}/version.json`);
+    expect(file.status).toBe(200);
+    expect(await file.text()).toContain('"version"');
+  });
+
+  it('serves the app shell for a client route the export has no page for', async () => {
+    const res = await fetch(`${base}/somewhere/deep`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('<title>app</title>');
+  });
+
+  // After a release a browser holding the old page asks for the old bundle; the
+  // shell in its place would run as JavaScript and fail as a syntax error.
+  it('answers 404, not the shell, for a missing file', async () => {
+    for (const path of [
+      '/_expo/static/js/web/entry-abc.js',
+      '/x.js',
+      '/styles.css',
+      '/logo.png',
+      '/data.json',
+      '/entry.js.map',
+      '/favicon.ico',
+      '/robots.txt',
+      '/.well-known/caldav',
+      '/.well-known/carddav',
+    ]) {
+      const res = await fetch(`${base}${path}`);
+      expect({ path, status: res.status }).toEqual({ path, status: 404 });
+      expect(await res.text()).toBe('');
+    }
   });
 });

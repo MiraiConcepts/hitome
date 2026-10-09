@@ -14,7 +14,7 @@
 import { mkdirSync } from 'node:fs';
 import { normalize, join, sep } from 'node:path';
 
-import { cacheControl } from './caching';
+import { cacheControl, mayServeShell } from './caching';
 import { basicAuth, checkLogin, forward, upstreamUrl } from './caldav';
 import { createLimiter } from './limiter';
 import { openSessions } from './sessions';
@@ -237,13 +237,16 @@ async function staticFile(req: Request, url: URL): Promise<Response> {
   // No file name holds a NUL, and Bun.file throws on one.
   if (pathname.includes('\0')) return new Response(null, { status: 400 });
   // As the old Caddyfile's try_files: the file, the route's own .html (the
-  // export writes one per route), else the app shell for client routing.
-  const candidates = [
-    pathname,
-    `${pathname}.html`,
-    join(pathname, 'index.html'),
-    '/index.html',
-  ];
+  // export writes one per route), else the app shell for client routing. A
+  // path that names a file gets only that file.
+  const candidates = mayServeShell(pathname)
+    ? [
+        pathname,
+        `${pathname}.html`,
+        join(pathname, 'index.html'),
+        '/index.html',
+      ]
+    : [pathname];
   for (const candidate of candidates) {
     const path = normalize(join(root, candidate));
     if (path !== root && !path.startsWith(root + sep)) continue;

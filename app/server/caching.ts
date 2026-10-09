@@ -19,3 +19,16 @@ export function cacheControl(requested: string, served: string): string {
     ? 'public, max-age=31536000, immutable'
     : 'no-cache';
 }
+
+/**
+ * Whether a path not found may be answered with the app shell. Only a client
+ * route can be: a path that names a file (its last part has an extension) or
+ * sits under /.well-known/ is a 404, so a browser asking for a bundle gone
+ * after a release never runs the shell as JavaScript.
+ */
+export function mayServeShell(pathname: string): boolean {
+  if (pathname === '/.well-known' || pathname.startsWith('/.well-known/'))
+    return false;
+  const last = pathname.slice(pathname.lastIndexOf('/') + 1);
+  return !/\.[^.]+$/.test(last);
+}

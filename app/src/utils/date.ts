@@ -22,6 +22,11 @@ export function setClock24(uses24h: boolean): void {
   clock24 = uses24h;
 }
 
+/** Whether the phone uses a 24-hour clock, for a picker that draws its own. */
+export function clock24Hour(): boolean {
+  return clock24;
+}
+
 /**
  * A time as the phone shows them: '18:30', or '6:30 pm' on a 12-hour phone.
  * Takes a Date or the fields' 'HH:MM'.

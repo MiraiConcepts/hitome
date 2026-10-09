@@ -2,7 +2,7 @@
 // and the CalDAV write (diff-based on edit — untouched ICS properties stay
 // byte-identical). Presentation is the components' job (event-editor-form)
 // and the shells' (centered dialog vs bottom sheet); they only read this.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   notificationsBlocked,
@@ -43,6 +43,7 @@ import {
   toDateString,
   toTimeString,
 } from '@/utils/date';
+import { exclusive } from '@/utils/exclusive';
 
 export type EditorResult =
   | 'created'
@@ -104,6 +105,9 @@ export function useEventEditor({
       : null
   );
   const [busy, setBusy] = useState(false);
+  // Held while a Save or Delete runs. `busy` disables the buttons only once it
+  // is drawn, so a second tap in the same frame would write a second time.
+  const writing = useRef(false);
   const [alarmHint, setAlarmHint] = useState<string | null>(null);
   // The calendars to choose from and the selected one: where a new event is
   // created, or where an existing one lives (choosing another moves it).
@@ -446,16 +450,17 @@ export function useEventEditor({
     problemFor: (field: EditorField) =>
       problem?.field === field ? problem.text : null,
     busy,
-    save: () => save(),
-    remove: () => remove(),
+    save: () => exclusive(writing, () => save()),
+    remove: () => exclusive(writing, () => remove()),
     /** The open "which occurrences?" question, if any. */
     scopeAsk,
     /** Answer it: run the pending Save or Delete for that scope. */
     chooseScope: (scope: EditScope) => {
       const ask = scopeAsk;
       setScopeAsk(null);
-      if (ask?.action === 'save') save(scope);
-      else if (ask?.action === 'delete') remove(scope);
+      if (ask?.action === 'save') exclusive(writing, () => save(scope));
+      else if (ask?.action === 'delete')
+        exclusive(writing, () => remove(scope));
     },
     cancelScope: () => setScopeAsk(null),
   };

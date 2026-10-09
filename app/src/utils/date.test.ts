@@ -1,5 +1,6 @@
 import {
   agoLabel,
+  clock24Hour,
   eventDays,
   formatTime,
   nextFullHour,
@@ -104,5 +105,11 @@ describe('formatTime', () => {
     expect(formatTime('09:30')).toBe('9:30 am');
     expect(formatTime('12:00')).toBe('12:00 pm');
     expect(formatTime(new Date(2026, 9, 4, 18, 5))).toBe('6:05 pm');
+  });
+
+  it('tells the time picker which clock the phone uses', () => {
+    expect(clock24Hour()).toBe(true);
+    setClock24(false);
+    expect(clock24Hour()).toBe(false);
   });
 });

@@ -37,6 +37,14 @@ describe('linkHost', () => {
     expect(linkHost('https://www.google.com/search?q=x')).toBe('google.com');
     expect(linkHost('https://zoom.us')).toBe('zoom.us');
   });
+
+  it('shows the host a browser would reach', () => {
+    expect(linkHost('https://evil.example\\.zoom.us/')).toBe('evil.example');
+    expect(linkHost('https://accounts.google.com@evil.example/')).toBe(
+      'evil.example'
+    );
+    expect(linkHost('https://Zoom.US:8443/j/1')).toBe('zoom.us');
+  });
 });
 
 describe('dayHeader', () => {
