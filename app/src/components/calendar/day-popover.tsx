@@ -69,9 +69,12 @@ type Props = {
  * one. It sits outside the screen's blur target, as a sibling after it.
  */
 function Overlay({
+  label,
   onClose,
   children,
 }: {
+  /** The dialog's name: the day, as its heading says it. */
+  label: string;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -83,6 +86,8 @@ function Overlay({
       transparent
       animationType={MODAL_ANIMATION}
       onRequestClose={onClose}
+      // The web's Modal passes this on to its role=dialog element.
+      {...({ 'aria-label': label } as object)}
     >
       {children}
     </Modal>
@@ -132,21 +137,31 @@ export function DayPopover({
   const compact = !useIsWide();
   const sorted = [...events].sort(compareEvents);
   return (
-    <Overlay onClose={onClose}>
+    <Overlay label={dayLabel(day)} onClose={onClose}>
       <View style={[styles.backdrop, BACKDROP_BLUR]}>
         <BlurBackdrop />
         {/* The backdrop is a layer behind the card, not around it: wrapped,
             every row became a button inside a button, which the web
             rejects as invalid HTML. */}
-        {/* Not a keyboard stop: the dialog focuses its first stop on
-            opening, and a full-screen one wore the focus ring as a frame
-            round the page. Escape closes it from the keyboard. */}
-        <Pressable
-          style={[StyleSheet.absoluteFill, styles.dismiss]}
-          onPress={onClose}
-          focusable={false}
-          accessibilityLabel="Close"
-        />
+        {Platform.OS === 'web' ? (
+          // Not a keyboard stop, nor focusable at all: the dialog focuses
+          // its first focusable element on opening, and a Pressable is one
+          // whatever its tabIndex, so the focus landed on a full-screen
+          // "Close" instead of the list. A plain click does it here; Escape
+          // closes it from the keyboard.
+          <View
+            style={[StyleSheet.absoluteFill, styles.dismiss]}
+            {...({ onClick: onClose } as object)}
+          />
+        ) : (
+          // TalkBack's way out besides Back: a Close it can find.
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={onClose}
+            focusable={false}
+            accessibilityLabel="Close"
+          />
+        )}
         <View style={styles.cardWrap}>
           <ThemedView style={styles.card} testID="day-popover">
             <ScrollView>
@@ -286,13 +301,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.three,
   },
-  // The dialog still focuses this layer when it opens from the keyboard; it
-  // is the whole screen, so a ring on it would frame the page.
+  // The Pressable this replaced on the web showed the hand; so does this.
   dismiss: {
-    // Solid at zero width: Chrome draws its 'auto' focus ring whatever the
-    // width says, so the style has to change too.
-    outlineStyle: 'solid',
-    outlineWidth: 0,
+    cursor: 'pointer',
   },
   cardWrap: {
     width: '100%',

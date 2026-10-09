@@ -124,7 +124,12 @@ export function SettingsSection({
 }: SectionProps) {
   return (
     <CardFrame testID={testID}>
-      <ThemedText style={[styles.cardTitle, large && styles.cardTitleLarge]}>
+      {/* A heading, so a screen reader can jump from card to card. */}
+      <ThemedText
+        accessibilityRole="header"
+        aria-level={2}
+        style={[styles.cardTitle, large && styles.cardTitleLarge]}
+      >
         {title}
       </ThemedText>
       {children}
@@ -575,7 +580,12 @@ export function SettingsMessage({
         ? CheckIcon
         : InfoCircleIcon);
   return (
-    <View style={styles.message} testID={testID}>
+    <View
+      style={styles.message}
+      // An outcome is read out as it arrives; a standing note is not.
+      aria-live={tone === 'note' ? undefined : 'polite'}
+      testID={testID}
+    >
       <View style={styles.messageGlyph}>
         <Glyph size={Message.icon} color={glyphColor} />
       </View>
@@ -673,6 +683,9 @@ export function SettingsButton({
       accessibilityRole="button"
       aria-busy={busy}
       aria-disabled={disabled || busy || cooling}
+      // The web's keyboard ring is the accent, which vanishes on a filled
+      // button's own accent; this asks global.css for the label's ink instead.
+      {...(filled ? { dataSet: { focusRing: 'ink' } } : null)}
       hitSlop={8}
       style={({ pressed }) => [
         filled ? styles.filledButton : styles.textButton,

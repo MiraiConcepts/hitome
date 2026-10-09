@@ -29,6 +29,12 @@ a:focus-visible,
   outline-offset: -2px;
 }
 
+/* A filled button is the accent itself, so the ring above would not show on
+   it: there it takes the label's ink (SettingsButton sets the attribute). */
+[data-focus-ring='ink']:focus-visible {
+  outline-color: #000000;
+}
+
 /* Never let the browser fake bold by thickening letters: every bold here is
    the real Satoshi Bold file (see constants/font-faces.web.ts). Faked, it
    doubled up on text that was already bold. */

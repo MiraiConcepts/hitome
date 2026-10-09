@@ -54,6 +54,9 @@ export function LocationField({
           onFocus?.();
         }}
         onBlur={() => setFocused(false)}
+        // The caption above names the group; the input needs its own name,
+        // or a screen reader hears only the placeholder.
+        accessibilityLabel="Location"
         placeholder="Add a place"
         returnKeyType="done"
         submitBehavior="blurAndSubmit"

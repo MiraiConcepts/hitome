@@ -27,12 +27,30 @@ export function BlurTargetProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** The content that a BlurBackdrop blurs: the screens, not the dialogs. */
-export function BlurTarget({ children }: { children: ReactNode }) {
+/**
+ * The content that a BlurBackdrop blurs: the screens, not the dialogs.
+ * `accessibilityHidden` takes it out of what a screen reader can reach while a
+ * dialog sits over it: on Android the dialogs are layers in the same window, so
+ * TalkBack would otherwise walk on into the screen behind.
+ */
+export function BlurTarget({
+  children,
+  accessibilityHidden = false,
+}: {
+  children: ReactNode;
+  accessibilityHidden?: boolean;
+}) {
   const ref = useContext(TargetContext);
   if (Platform.OS !== 'android' || !ref) return <>{children}</>;
   return (
-    <BlurTargetView ref={ref} style={styles.fill}>
+    <BlurTargetView
+      ref={ref}
+      style={styles.fill}
+      importantForAccessibility={
+        accessibilityHidden ? 'no-hide-descendants' : 'auto'
+      }
+      accessibilityElementsHidden={accessibilityHidden}
+    >
       {children}
     </BlurTargetView>
   );

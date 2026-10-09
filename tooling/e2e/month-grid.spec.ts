@@ -495,3 +495,168 @@ test("share from the day list copies the event as text, and the list has Add eve
   expect(lines[1]).toContain("12:00 to 12:45");
   expect(lines[1]).toContain(`${target(27).getFullYear()}`);
 });
+
+/** Opens the busy day's list (day 27 of the target month) on a desktop-sized
+ *  window, where the list is the centred dialog. */
+async function openBusyDay(page: Page) {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(`/?day=${dateString(target(1))}`);
+  await expect(page.getByTestId("calendar-header-label")).toHaveText(
+    monthTitle(target(1)),
+    { timeout: 30_000 },
+  );
+  await expect(
+    grid(page).getByTestId(`more-${dateString(target(27))}`),
+  ).toHaveText(/\+\d+/, { timeout: 30_000 });
+  await grid(page)
+    .getByTestId(`day-cell-${dateString(target(27))}`)
+    .click({ position: { x: 10, y: 6 } });
+  await expect(page.getByTestId("day-popover")).toBeVisible();
+}
+
+/** The page's focused element, summarised: its data-testid, aria-label and
+ *  whether it sits inside the day list's card. */
+async function focused(page: Page) {
+  return page.evaluate(() => {
+    const el = document.activeElement as HTMLElement | null;
+    return {
+      testId: el?.getAttribute("data-testid") ?? null,
+      label: el?.getAttribute("aria-label") ?? null,
+      inCard: Boolean(el?.closest('[data-testid="day-popover"]')),
+    };
+  });
+}
+
+test("a11y: the day list is a named dialog, focused inside its card", async ({
+  page,
+}) => {
+  await openBusyDay(page);
+  const name = await editorTitleFor(page, dateString(target(27)));
+  const dialog = page.getByRole("dialog", { name, exact: true });
+  await expect(dialog).toBeVisible();
+  // The card's title is a heading, and it is what names the dialog.
+  await expect(
+    dialog.getByRole("heading", { name, exact: true }),
+  ).toBeVisible();
+
+  // No full-screen Close to land on: the first focus is in the card, and so
+  // is every stop after it, all the way round.
+  await expect(page.getByRole("button", { name: "Close" })).toHaveCount(0);
+  await expect.poll(async () => (await focused(page)).inCard).toBe(true);
+  for (let i = 0; i < 35; i++) {
+    await page.keyboard.press("Tab");
+    const now = await focused(page);
+    expect(now.label).not.toBe("Close");
+    expect(now.inCard).toBe(true);
+  }
+
+  // Escape still closes it, and so does a click outside the card.
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("day-popover")).toHaveCount(0);
+  await grid(page)
+    .getByTestId(`day-cell-${dateString(target(27))}`)
+    .click({ position: { x: 10, y: 6 } });
+  await expect(page.getByTestId("day-popover")).toBeVisible();
+  await page.mouse.click(20, 400);
+  await expect(page.getByTestId("day-popover")).toHaveCount(0);
+});
+
+test("a11y: Add event in the day list shows a ring from the keyboard only", async ({
+  page,
+}) => {
+  await openBusyDay(page);
+  const add = page.getByTestId("day-popover-add");
+  const ring = () =>
+    add.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return {
+        visible: el.matches(":focus-visible"),
+        style: cs.outlineStyle,
+        color: cs.outlineColor,
+        fill: cs.backgroundColor,
+      };
+    });
+  // Reached by Tab: a ring, in a colour that is not the button's own fill.
+  for (let i = 0; i < 40 && !(await ring()).visible; i++)
+    await page.keyboard.press("Tab");
+  const keyboard = await ring();
+  expect(keyboard.visible).toBe(true);
+  expect(keyboard.style).toBe("solid");
+  expect(keyboard.color).not.toBe(keyboard.fill);
+
+  // Clicked: no ring. (Click opens the editor, so look at the moment of the
+  // press rather than after it.)
+  await page.keyboard.press("Escape");
+  await openBusyDay(page);
+  await add.hover();
+  await page.mouse.down();
+  expect((await ring()).visible).toBe(false);
+  await page.mouse.up();
+});
+
+test("a11y: toasts and the connection banner are live regions", async ({
+  page,
+}) => {
+  await openBusyDay(page);
+  await page.evaluate(() => {
+    if (navigator.clipboard) navigator.clipboard.writeText = async () => {};
+  });
+  await page
+    .getByTestId("day-popover")
+    .getByRole("button", { name: "Share 🧪 Busy 5", exact: true })
+    .click();
+  const toast = page.getByRole("status").filter({
+    hasText: "Copied to clipboard",
+  });
+  await expect(toast).toBeVisible();
+  await expect(toast).toHaveAttribute("aria-live", "polite");
+
+  // The server stops answering: the banner is an alert.
+  await page.route("**/dav/**", (route) => route.abort());
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  const banner = page.getByTestId("error-banner");
+  await expect(banner).toBeVisible({ timeout: 30_000 });
+  await expect(banner).toHaveAttribute("role", "alert");
+  await expect(banner).toHaveAttribute("aria-live", "assertive");
+});
+
+test("a11y: day cells name the year, today and the count", async ({ page }) => {
+  await page.goto("/");
+  await expect(grid(page).getByText("🧪 E2E Today")).toBeVisible({
+    timeout: 30_000,
+  });
+  const cellLabel = (d: Date) =>
+    grid(page)
+      .getByTestId(`day-cell-${dateString(d)}`)
+      .getAttribute("aria-label");
+  const todayLabel = await cellLabel(now);
+  expect(todayLabel).toMatch(/, today, \d+ events?$/);
+  expect(todayLabel).not.toContain(`${now.getFullYear()}`);
+
+  // A busy day says how many it holds, the ones under "+N" included, and
+  // the counter itself is not read out a second time.
+  await page.goto(`/?day=${dateString(target(1))}`);
+  const more = grid(page).getByTestId(`more-${dateString(target(27))}`);
+  await expect(more).toHaveText(/\+\d+/, { timeout: 30_000 });
+  expect(await cellLabel(target(27))).toMatch(/, 1\d events$/);
+  await expect(more).toHaveAttribute("aria-hidden", "true");
+
+  // Another year's day names its year; an empty day says nothing of events.
+  const nextYear = new Date(now.getFullYear() + 1, 5, 15);
+  await page.goto(`/?day=${dateString(nextYear)}`);
+  await expect(page.getByTestId("calendar-header-label")).toHaveText(
+    monthTitle(nextYear),
+    { timeout: 30_000 },
+  );
+  const label = await cellLabel(nextYear);
+  expect(label).toContain(`${nextYear.getFullYear()}`);
+  expect(label).not.toMatch(/event/);
+});
+
+test("a11y: the location input has a name", async ({ page }) => {
+  await page.goto("/?new=e2e-a11y-location");
+  await expect(page.getByTestId("event-editor")).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByRole("textbox", { name: "Location" })).toBeVisible();
+});

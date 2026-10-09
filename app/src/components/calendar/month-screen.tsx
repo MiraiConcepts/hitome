@@ -7,7 +7,7 @@ import {
   useState,
   type ComponentType,
 } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { AppState, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import {
   SafeAreaView,
@@ -17,6 +17,7 @@ import {
 import { runAlarmReconcile } from '@/alarms/runner';
 import { CardFrame, DashedLine } from '@/components/settings/settings-parts';
 import {
+  commitDeletes,
   ConflictError,
   deleteEvent,
   undoDelete as undoDeleteOnServer,
@@ -84,11 +85,15 @@ export function SnackBar({
   icon: Icon,
   message,
   action,
+  urgent = false,
   testID,
 }: {
   icon: ComponentType<IconProps>;
   message: string;
   action?: { label: string; onPress: () => void };
+  /** A problem that stops the calendar (the connection banner): read out at
+   *  once, over whatever a screen reader was saying. */
+  urgent?: boolean;
   testID?: string;
 }) {
   return (
@@ -96,6 +101,10 @@ export function SnackBar({
       entering={FadeIn.duration(SNACK_FADE_MS)}
       exiting={FadeOut.duration(SNACK_FADE_MS)}
       style={styles.snack}
+      // Read out as it appears, Undo included: a screen reader user would
+      // otherwise never learn the toast, or its eight seconds, were there.
+      role={urgent ? 'alert' : 'status'}
+      aria-live={urgent ? 'assertive' : 'polite'}
       testID={testID}
     >
       <CardFrame style={styles.snackCard}>
@@ -380,6 +389,33 @@ export function MonthScreen() {
     return () => clearTimeout(timer);
   }, [snack]);
 
+  // Android holds a deleted event back until its Undo bar is gone (see
+  // commitDeletes in store/events): so whenever no Undo is on screen, a
+  // delete still waiting goes now. That covers the bar timing out, giving
+  // way to another message, and Undo itself (which has already taken its
+  // delete back by the time this runs). Nothing waits on the web.
+  useEffect(() => {
+    if (!snack?.undo) void commitDeletes();
+  }, [snack]);
+
+  // Leaving the front ends the window too: Android may kill a background
+  // app without warning, and a delete it took with it would quietly not
+  // happen. The bar goes with it, as its Undo could no longer keep the
+  // event. Leaving the screen ends it as well. (The web's Undo needs no
+  // window: its tab may come and go with the bar still working.)
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') return;
+      void commitDeletes();
+      setSnack((prev) => (prev?.undo ? null : prev));
+    });
+    return () => {
+      sub.remove();
+      void commitDeletes();
+    };
+  }, []);
+
   const onMonthChange = useCallback((anchor: MonthAnchor) => {
     setMonth((prev) => (sameMonth(prev, anchor) ? prev : anchor));
   }, []);
@@ -537,9 +573,13 @@ export function MonthScreen() {
     event: CalEvent;
     scope: EditScope;
   }) {
+    // Started before the bar is cleared: a bar with no Undo ends the window
+    // for a delete still waiting, and this one must be taken back first
+    // (which undoDelete does before it awaits anything).
+    const restoring = undoDeleteOnServer(event, scope);
     setSnack(null);
     try {
-      await undoDeleteOnServer(event, scope);
+      await restoring;
       refresh();
       refreshAgendaWidget();
       runAlarmReconcile();
@@ -603,7 +643,10 @@ export function MonthScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <BlurTarget>
+      {/* Out of TalkBack's reach while the day list or the editor is over it:
+          on Android those are layers in this window, not windows of their
+          own. */}
+      <BlurTarget accessibilityHidden={overlayOpen}>
         {/* No bottom edge: the grid runs to the screen's bottom and the last row
           sits under the gesture bar, which is the trade taken deliberately —
           insetting it cost every row height and shortened every scroll. The
@@ -700,6 +743,7 @@ export function MonthScreen() {
                     ? () => router.navigate('/settings')
                     : onManualRefresh,
               }}
+              urgent
               testID="error-banner"
             />
           )}

@@ -31,6 +31,7 @@ import { AccentColor, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addDays, layoutWeek, weekendBoundaries } from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
+import { dayCellLabel } from '@/utils/day-cell-label';
 
 /** Height of one banner/chip slot inside a day cell: one line of event text
  *  (EVENT_LINE_HEIGHT), the dp the strip stands proud of it at each end, and
@@ -240,12 +241,15 @@ export const WeekRow = memo(function WeekRow({
   // to pick its list, so a cell arms the long press exactly when the popover
   // would have something in it. Multi-day events count on every day they
   // cover, not just the one their chip lands in.
+  // Counted, not only marked: a screen reader hears how many each day holds
+  // (the "+N" counter is drawn for the eye only).
   const daysWithEvents = useMemo(() => {
-    const set = new Set<string>();
+    const counts = new Map<string, number>();
     for (const event of events) {
-      for (const day of eventDays(event.start, event.end)) set.add(day);
+      for (const day of eventDays(event.start, event.end))
+        counts.set(day, (counts.get(day) ?? 0) + 1);
     }
-    return set;
+    return counts;
   }, [events]);
 
   // A week touches at most two months, so its shading is two blocks, not seven
@@ -501,13 +505,14 @@ export const WeekRow = memo(function WeekRow({
             <Pressable
               key={dateString}
               testID={`day-cell-${dateString}`}
-              // A screen reader names the whole date, and offers the hold
-              // (add an event) as an action of its own.
+              // A screen reader names the whole date, today and the day's
+              // count, and offers the hold (add an event) as an action of its
+              // own.
               accessibilityRole="button"
-              accessibilityLabel={day.toLocaleDateString(undefined, {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
+              accessibilityLabel={dayCellLabel(day, {
+                isToday,
+                count: daysWithEvents.get(dateString) ?? 0,
+                currentYear: Number(todayStr.slice(0, 4)),
               })}
               accessibilityActions={[
                 { name: 'longpress', label: 'Add an event' },
@@ -669,10 +674,14 @@ export const WeekRow = memo(function WeekRow({
             count > 0 ? (
               // A label, not a target: the cell underneath owns both the tap
               // and the long press, so the counter must not swallow either.
+              // Hidden from screen readers, which hear the count in the
+              // cell's own name instead.
               <View
                 key={`more-${col}`}
                 testID={`more-${toDateString(days[col])}`}
                 pointerEvents="none"
+                aria-hidden
+                importantForAccessibility="no-hide-descendants"
                 style={{
                   position: 'absolute',
                   left: pct(col),
