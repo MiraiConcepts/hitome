@@ -17,6 +17,7 @@ import { NotificationsSection } from '@/components/settings/notifications-sectio
 import { SettingsHeader } from '@/components/settings/settings-parts';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { useEscapeKey } from '@/hooks/use-escape-key';
 
 /**
  * The app's second screen. Sections scroll under a header bar cut from the
@@ -28,20 +29,19 @@ export function SettingsScreen() {
   // Two columns once both fit at the single column's width: where things
   // come from on the left, how they reach you on the right.
   const twoColumns = useWindowDimensions().width >= TWO_COLUMN_MIN_WIDTH;
+  // A pushed screen pops; a cold landing on /settings (a shared web URL) has
+  // nothing to pop to, so it goes home instead of dead-ending. Escape does the
+  // same as the back arrow.
+  const goBack = () =>
+    router.canGoBack() ? router.back() : router.replace('/');
+  useEscapeKey(goBack);
   return (
     <ThemedView style={styles.container}>
       {/* Top and sides only, as in the month view; the scroll view applies the
           bottom inset to its content so the list can run under the gesture
           bar while its last row stays reachable. */}
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <SettingsHeader
-          title="Settings"
-          // A pushed screen pops; a cold landing on /settings (a shared web URL)
-          // has nothing to pop to, so it goes home instead of dead-ending.
-          onBack={() =>
-            router.canGoBack() ? router.back() : router.replace('/')
-          }
-        />
+        <SettingsHeader title="Settings" onBack={goBack} />
         <ScrollView
           contentContainerStyle={[
             styles.body,

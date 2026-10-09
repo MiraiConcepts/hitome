@@ -33,6 +33,7 @@ import {
   type EventEditorController,
 } from '@/components/calendar/use-event-editor';
 import { AccentColor } from '@/constants/theme';
+import { useEscapeKey } from '@/hooks/use-escape-key';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
@@ -224,6 +225,12 @@ export function EventEditorSheet({
       scrollToEnd();
     });
   }
+
+  // Escape on the web: out of the repeat question first, then the sheet. (A
+  // phone has no such key; the back button below does the closing there.)
+  useEscapeKey(() =>
+    editor.scopeAsk ? editor.cancelScope() : sheetRef.current?.dismiss()
+  );
 
   // The library leaves the Android back button to us (predictive back is off
   // in app.json, so BackHandler is reliable).

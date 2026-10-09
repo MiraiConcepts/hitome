@@ -60,8 +60,8 @@ export function EventEditor({ event, defaultDay, onClose, onDone }: Props) {
  *  in a centered card. */
 function EventEditorDialog({ event, defaultDay, onClose, onDone }: Props) {
   const editor = useEventEditor({ event, defaultDay, onDone });
-  // Cmd/Ctrl+Enter saves from any field, as in a mail composer; Esc already
-  // closes through the modal. Re-subscribed whenever save changes, so the
+  // Cmd/Ctrl+Enter saves from any field, as in a mail composer; Esc goes back
+  // one step through the modal: out of the repeat question, then closed. Re-subscribed whenever save changes, so the
   // listener always saves the form as it stands.
   const { save, busy, scopeAsk } = editor;
   useEffect(() => {
@@ -78,7 +78,12 @@ function EventEditorDialog({ event, defaultDay, onClose, onDone }: Props) {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [save, busy, scopeAsk]);
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={scopeAsk ? editor.cancelScope : onClose}
+    >
       <View style={styles.backdrop}>
         <ThemedView style={styles.card} testID="event-editor">
           <EventEditorHeader editor={editor} roomy />
