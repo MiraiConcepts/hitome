@@ -70,6 +70,7 @@
     "typecheck": "tsc --noEmit && tsc -p server",
     "test": "jest",
     "test:server": "bun test server",
+    "test:dst": "TZ=Europe/Berlin bun test src/caldav/__tests__/zones.test.ts src/store/__tests__/events-dst.test.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -78,7 +79,8 @@
     "preset": "jest-expo",
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "<rootDir>/server/"
+      "<rootDir>/server/",
+      "events-dst.test.ts"
     ]
   },
   "patchedDependencies": {
