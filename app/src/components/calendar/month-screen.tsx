@@ -192,14 +192,19 @@ export function MonthScreen() {
   // rebuilt without the app relaunching (a new week start keys it), and a
   // rebuild that re-read the last link reopened a widget-tapped event behind
   // Settings, where the next Back closed it instead of leaving Settings.
+  //
+  // "Once" is once per arrival (link.serial), not once per link text: tapping
+  // the same widget row again is a new arrival and must open it again, and the
+  // widget cannot put anything that differs between taps into its link.
+  const eventKey = link.event && `event:${link.serial}:${link.event}`;
+  const newKey = link.new && `new:${link.serial}:${link.new}`;
   const eventParam =
-    link.event && !actedOn.has(`event:${link.event}`) ? link.event : null;
-  const newParam =
-    link.new && !actedOn.has(`new:${link.new}`) ? link.new : null;
+    link.event && eventKey && !actedOn.has(eventKey) ? link.event : null;
+  const newParam = link.new && newKey && !actedOn.has(newKey) ? link.new : null;
   useEffect(() => {
-    if (link.event) actedOn.add(`event:${link.event}`);
-    if (link.new) actedOn.add(`new:${link.new}`);
-  }, [link.event, link.new]);
+    if (eventKey) actedOn.add(eventKey);
+    if (newKey) actedOn.add(newKey);
+  }, [eventKey, newKey]);
 
   const bottomInset = Platform.select({
     web: Spacing.four,
@@ -261,9 +266,9 @@ export function MonthScreen() {
 
   // The widget's `+` deep-links `?new=<nonce>`; open the new-event editor (dated
   // today). Cold start seeds it above; a fresh nonce (warm start) re-opens here.
-  const [handledNewParam, setHandledNewParam] = useState(newParam);
-  if (newParam && newParam !== handledNewParam) {
-    setHandledNewParam(newParam);
+  const [handledNewKey, setHandledNewKey] = useState(newParam && newKey);
+  if (newParam && newKey !== handledNewKey) {
+    setHandledNewKey(newKey);
     setEditor({ mode: 'create', day: today });
   }
 
@@ -272,20 +277,24 @@ export function MonthScreen() {
   // setState effect. The scroll itself runs in the effect below once the grid
   // is mounted (it only needs layout, not events — the grid is pure date math);
   // a ref marks the consumed value so the effect fires once per deep link.
-  const [handledDayParam, setHandledDayParam] = useState(dayParam);
-  const [pendingScrollDay, setPendingScrollDay] = useState<string | null>(null);
-  if (dayParam && dayParam !== handledDayParam) {
-    setHandledDayParam(dayParam);
-    setPendingScrollDay(dayParam);
+  const dayKey = dayParam && `${link.serial}:${dayParam}`;
+  const [handledDayKey, setHandledDayKey] = useState(dayKey);
+  const [pendingScroll, setPendingScroll] = useState<{
+    key: string;
+    day: string;
+  } | null>(null);
+  if (dayParam && dayKey && dayKey !== handledDayKey) {
+    setHandledDayKey(dayKey);
+    setPendingScroll({ key: dayKey, day: dayParam });
   }
-  const scrolledForDay = useRef<string | null>(null);
+  const scrolledForKey = useRef<string | null>(null);
   useEffect(() => {
-    if (!pendingScrollDay || !gridSize) return;
-    if (scrolledForDay.current === pendingScrollDay) return;
-    scrolledForDay.current = pendingScrollDay;
-    const target = monthOfDay(pendingScrollDay, new Date());
+    if (!pendingScroll || !gridSize) return;
+    if (scrolledForKey.current === pendingScroll.key) return;
+    scrolledForKey.current = pendingScroll.key;
+    const target = monthOfDay(pendingScroll.day, new Date());
     gridRef.current?.scrollToMonth(target.year, target.month0, false);
-  }, [pendingScrollDay, gridSize]);
+  }, [pendingScroll, gridSize]);
 
   // A tapped widget row carries the event's id alongside its day. The widget's
   // snapshot can be half an hour old, so the id is not trusted on sight: it is
@@ -334,9 +343,11 @@ export function MonthScreen() {
 
   // A widget row's id, resolved against the month's events — reconciled during
   // render like the other deep links above, not in an effect.
-  const [handledEventParam, setHandledEventParam] = useState(eventParam);
-  if (eventParam && eventParam !== handledEventParam) {
-    setHandledEventParam(eventParam);
+  const [handledEventKey, setHandledEventKey] = useState(
+    eventParam && eventKey
+  );
+  if (eventParam && eventKey !== handledEventKey) {
+    setHandledEventKey(eventKey);
     if (dayParam) {
       setPendingEvent({ id: eventParam, day: dayParam, since: fetchedAt });
     }

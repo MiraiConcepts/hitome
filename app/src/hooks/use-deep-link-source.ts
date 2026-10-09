@@ -11,6 +11,9 @@ function first(value: unknown): string | null {
  *  no intent: delivered straight to the mounted source. */
 const inAppListeners = new Set<(link: DeepLink) => void>();
 
+/** Counts the links received in this process (see DeepLink.serial). */
+let arrivals = 0;
+
 /**
  * Open a day — and optionally an event — as if a link had arrived: the month
  * view lands there exactly as it does for the widget's links.
@@ -20,6 +23,7 @@ export function openInApp(target: { day: string; event?: string }): void {
     ...EMPTY_DEEP_LINK,
     day: target.day,
     event: target.event ?? null,
+    serial: ++arrivals,
   };
   inAppListeners.forEach((listener) => listener(link));
 }
@@ -31,6 +35,7 @@ function parseDeepLink(url: string | null): DeepLink {
     day: first(query.day),
     event: first(query.event),
     new: first(query.new),
+    serial: ++arrivals,
   };
 }
 

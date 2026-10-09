@@ -31,7 +31,7 @@ export function useDeepLinkSource(): { link: DeepLink; ready: boolean } {
   const event = typeof params.event === 'string' ? params.event : null;
   const created = typeof params.new === 'string' ? params.new : null;
   const link = useMemo(
-    () => ({ day, event, new: created }),
+    () => ({ day, event, new: created, serial: 0 }),
     [day, event, created]
   );
   return { link, ready: true };
