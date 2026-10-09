@@ -12,7 +12,7 @@ import {
 } from '@/components/settings/settings-parts';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MODAL_ANIMATION, useBackdropFade } from '@/constants/backdrop';
+import { BACKDROP_BLUR, MODAL_ANIMATION } from '@/constants/backdrop';
 import { DangerColor, Spacing } from '@/constants/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 import { useTheme } from '@/hooks/use-theme';
@@ -70,7 +70,6 @@ export function DayPopover({
 }: Props) {
   const theme = useTheme();
   const compact = !useIsWide();
-  const fade = useBackdropFade();
   const sorted = [...events].sort(compareEvents);
   return (
     <Modal
@@ -79,7 +78,7 @@ export function DayPopover({
       animationType={MODAL_ANIMATION}
       onRequestClose={onClose}
     >
-      <View style={[styles.backdrop, fade]}>
+      <View style={[styles.backdrop, BACKDROP_BLUR]}>
         {/* The backdrop is a layer behind the card, not around it: wrapped,
             every row became a button inside a button, which the web
             rejects as invalid HTML. */}

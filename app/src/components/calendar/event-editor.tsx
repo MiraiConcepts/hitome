@@ -18,7 +18,7 @@ import {
 import { EventEditorSheet } from '@/components/calendar/event-editor-sheet';
 import { useEventEditor } from '@/components/calendar/use-event-editor';
 import { CardFrame, DashedLine } from '@/components/settings/settings-parts';
-import { MODAL_ANIMATION, useBackdropFade } from '@/constants/backdrop';
+import { BACKDROP_BLUR, MODAL_ANIMATION } from '@/constants/backdrop';
 import { Spacing } from '@/constants/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 import { useTheme } from '@/hooks/use-theme';
@@ -85,7 +85,6 @@ function EventEditorDialog({
   askDeleteFirst,
 }: Props) {
   const theme = useTheme();
-  const fade = useBackdropFade();
   const editor = useEventEditor({ event, defaultDay, onDone, askDeleteFirst });
   // Cmd/Ctrl+Enter saves from any field, as in a mail composer; Esc goes back
   // one step through the modal: out of the repeat question, then closed. Re-subscribed whenever save changes, so the
@@ -111,7 +110,7 @@ function EventEditorDialog({
       animationType={MODAL_ANIMATION}
       onRequestClose={scopeAsk ? editor.cancelScope : onClose}
     >
-      <View style={[styles.backdrop, fade]}>
+      <View style={[styles.backdrop, BACKDROP_BLUR]}>
         {/* A click outside the card steps back, as Escape does: out of the
             repeat question first, then closed. A layer behind the card, not
             around it, and not a keyboard stop (the popover's, too). */}

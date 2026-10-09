@@ -1,9 +1,9 @@
 import {
-  BottomSheetBackdrop,
   BottomSheetFooter,
   BottomSheetModal,
   BottomSheetScrollView,
   BottomSheetTextInput,
+  useBottomSheetModal,
   type BottomSheetBackdropProps,
   type BottomSheetBackgroundProps,
   type BottomSheetFooterProps,
@@ -14,11 +14,13 @@ import {
   BackHandler,
   Keyboard,
   Platform,
+  Pressable,
   StyleSheet,
   TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { CalEvent } from '@/caldav/types';
@@ -51,15 +53,26 @@ type Props = {
 // manages its own keyboard anyway, so the plain input is correct on web.
 const SheetTextInput = Platform.OS === 'web' ? TextInput : BottomSheetTextInput;
 
-function Backdrop(props: BottomSheetBackdropProps) {
+/**
+ * The dim behind the sheet: there from the moment the sheet starts to rise and
+ * gone once it has left, a step and not the library's fade. A tap on it
+ * dismisses the sheet.
+ */
+function Backdrop({ animatedIndex, style }: BottomSheetBackdropProps) {
+  const { dismiss } = useBottomSheetModal();
+  const shown = useAnimatedStyle(() => ({
+    opacity: animatedIndex.value > -0.95 ? 1 : 0,
+  }));
   return (
-    <BottomSheetBackdrop
-      {...props}
-      style={[props.style, BACKDROP_BLUR]}
-      appearsOnIndex={0}
-      disappearsOnIndex={-1}
-      pressBehavior="close"
-    />
+    <Animated.View style={[style, styles.backdrop, shown, BACKDROP_BLUR]}>
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={() => dismiss()}
+        accessibilityRole="button"
+        accessibilityLabel="Close"
+        focusable={false}
+      />
+    </Animated.View>
   );
 }
 
@@ -413,6 +426,9 @@ const styles = StyleSheet.create({
   webActions: {
     position: 'sticky' as 'relative',
     bottom: 0,
+  },
+  backdrop: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   // The library's default handle box: 10 above and below the indicator.
   handle: {
