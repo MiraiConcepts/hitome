@@ -588,13 +588,15 @@ export function MonthScreen() {
             )}
           </View>
         </View>
-        {sidePanel && popoverDay && (
+        {sidePanel && (
           <DayPanel
             day={popoverDay}
             events={popoverEvents}
             onClose={() => setPopoverDay(null)}
             onPressEvent={onPressEvent}
-            onAdd={() => setEditor({ mode: 'create', day: popoverDay })}
+            onAdd={() =>
+              setEditor({ mode: 'create', day: popoverDay ?? today })
+            }
           />
         )}
       </SafeAreaView>
