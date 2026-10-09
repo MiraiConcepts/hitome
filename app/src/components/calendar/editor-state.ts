@@ -149,3 +149,31 @@ export function alarmEqual(a: AlarmState, b: AlarmState): boolean {
     return a.offsetMinutes === b.offsetMinutes;
   return true;
 }
+
+/** The form as it stands, with the calendar it would save to (undefined
+ *  until the calendar list has loaded). */
+export type DraftState = FormState & { calendarUrl?: string };
+
+/**
+ * Whether the form holds anything the person would lose by closing it: any
+ * field that differs from what the editor opened with (for a new event, the
+ * defaults). A calendar counts only once both sides are known, so the list
+ * arriving after the editor opened is not a change.
+ */
+export function isDirty(initial: DraftState, current: DraftState): boolean {
+  return (
+    current.summary !== initial.summary ||
+    current.allDay !== initial.allDay ||
+    current.startDay !== initial.startDay ||
+    current.startTime !== initial.startTime ||
+    current.endDay !== initial.endDay ||
+    current.endTime !== initial.endTime ||
+    current.location !== initial.location ||
+    current.description !== initial.description ||
+    !recurEqual(current.recurrence, initial.recurrence) ||
+    !alarmEqual(current.alarm, initial.alarm) ||
+    (initial.calendarUrl !== undefined &&
+      current.calendarUrl !== undefined &&
+      current.calendarUrl !== initial.calendarUrl)
+  );
+}

@@ -73,10 +73,21 @@ function spanDays(startDay: string, endDay: string): number {
   );
 }
 
+/** What kind of edit this is. */
+function modeLabel(editor: EventEditorController): string {
+  return editor.event ? 'Edit event' : 'New event';
+}
+
+/** The editor's accessible name, from its header: the kind of edit and the
+ *  day ("New event, Mon 12 Oct"). Both shells name their dialog with it. */
+export function editorName(editor: EventEditorController): string {
+  return `${modeLabel(editor)}, ${dayLabel(editor.headerDay)}`;
+}
+
 /** The header's second line: what kind of edit this is, and when the event
  *  runs — read live from the fields, so it doubles as a summary of them. */
 function whenLabel(editor: EventEditorController): string {
-  const mode = editor.event ? 'Edit event' : 'New event';
+  const mode = modeLabel(editor);
   if (editor.allDay) {
     const days = spanDays(editor.startDay, editor.endDay);
     return days > 1 ? `${mode} · All day · ${days} days` : `${mode} · All day`;
@@ -387,7 +398,9 @@ export function EventEditorActions({
           {problem}
         </SettingsMessage>
       )}
-      {scopeAsk ? (
+      {editor.discardAsk ? (
+        <DiscardChoice onKeep={editor.keepEditing} onDiscard={onClose} />
+      ) : scopeAsk ? (
         <ScopeChoice
           ask={scopeAsk}
           onChoose={editor.chooseScope}
@@ -421,6 +434,41 @@ export function EventEditorActions({
           </View>
         </View>
       )}
+    </View>
+  );
+}
+
+/**
+ * "Discard your changes?" when a way out other than Cancel (Escape, a click
+ * or tap outside, Back, a drag) meets a form with changes. In place of the
+ * action row, as the repeat question is; Keep editing is the filled answer,
+ * so the one that loses nothing is the easy one to hit.
+ */
+function DiscardChoice({
+  onKeep,
+  onDiscard,
+}: {
+  onKeep: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <View style={styles.scope} testID="editor-discard-ask">
+      <SettingsMessage icon={PencilIcon}>Discard your changes?</SettingsMessage>
+      <View style={styles.actionRow}>
+        <View style={styles.actionsRight}>
+          <SettingsButton
+            label="Discard"
+            onPress={onDiscard}
+            testID="editor-discard"
+          />
+          <SettingsButton
+            label="Keep editing"
+            variant="filled"
+            onPress={onKeep}
+            testID="editor-keep-editing"
+          />
+        </View>
+      </View>
     </View>
   );
 }

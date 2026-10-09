@@ -15,7 +15,7 @@ import {
 
 import { FieldChrome, type TimeFieldProps } from './field-chrome';
 
-export function TimeField({ value, onChange, testID }: TimeFieldProps) {
+export function TimeField({ value, onChange, label, testID }: TimeFieldProps) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
 
@@ -24,6 +24,10 @@ export function TimeField({ value, onChange, testID }: TimeFieldProps) {
       <Pressable
         testID={testID}
         accessibilityRole="button"
+        // What the field is, then its value, as the date field does.
+        accessibilityLabel={
+          label ? `${label}, ${formatTime(value)}` : undefined
+        }
         onPress={() => {
           Keyboard.dismiss();
           setOpen(true);

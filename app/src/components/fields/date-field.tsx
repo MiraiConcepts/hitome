@@ -32,6 +32,7 @@ export function DateField({
   onChange,
   min,
   max,
+  label,
   testID,
 }: DateFieldProps) {
   const theme = useTheme();
@@ -42,6 +43,9 @@ export function DateField({
       <Pressable
         testID={testID}
         accessibilityRole="button"
+        // What the field is, then its value: the text alone ("12 Oct 2026")
+        // left a screen reader to guess start from end.
+        accessibilityLabel={label ? `${label}, ${pretty(value)}` : undefined}
         onPress={() => {
           // The dialog is its own window; a keyboard left up from a text
           // field would sit under it and come back in the way after.

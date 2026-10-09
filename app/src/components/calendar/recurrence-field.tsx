@@ -118,6 +118,7 @@ export function RecurrenceField({
                   end: { type: 'until', day },
                 })
               }
+              label="Repeat end date"
               testID={testID ? `${testID}-until` : undefined}
             />
           )}
@@ -135,6 +136,7 @@ export function RecurrenceField({
                     end: { type: 'count', n },
                   });
                 }}
+                accessibilityLabel="Number of times"
                 keyboardType="number-pad"
                 inputMode="numeric"
                 returnKeyType="done"

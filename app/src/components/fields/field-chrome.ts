@@ -10,7 +10,7 @@ export type DateFieldProps = {
   /** Inclusive bounds, 'YYYY-MM-DD'. */
   min?: string;
   max?: string;
-  /** What the field is ("Start date"), for screen readers on the web. */
+  /** What the field is ("Start date"), for screen readers. */
   label?: string;
   testID?: string;
 };
@@ -19,7 +19,7 @@ export type TimeFieldProps = {
   /** 'HH:MM' (24h) */
   value: string;
   onChange: (next: string) => void;
-  /** What the field is ("Start time"), for screen readers on the web. */
+  /** What the field is ("Start time"), for screen readers. */
   label?: string;
   testID?: string;
 };

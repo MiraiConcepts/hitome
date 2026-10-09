@@ -3,12 +3,17 @@ import {
   BottomSheetModal,
   BottomSheetScrollView,
   BottomSheetTextInput,
-  useBottomSheetModal,
   type BottomSheetBackdropProps,
   type BottomSheetFooterProps,
   type BottomSheetScrollViewMethods,
 } from '@gorhom/bottom-sheet';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import {
   BackHandler,
   Keyboard,
@@ -22,29 +27,24 @@ import {
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { CalEvent } from '@/caldav/types';
 import {
+  editorName,
   EventEditorActions,
   EventEditorFields,
   EventEditorHeader,
-  type EditorResult,
 } from '@/components/calendar/event-editor-form';
 import { HEADER_GROUND } from '@/components/calendar/month-header';
-import {
-  useEventEditor,
-  type EventEditorController,
-} from '@/components/calendar/use-event-editor';
+import type { EventEditorController } from '@/components/calendar/use-event-editor';
 import { BACKDROP_BLUR } from '@/constants/backdrop';
 import { AccentColor } from '@/constants/theme';
 import { useEscapeKey } from '@/hooks/use-escape-key';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
-  event: CalEvent | null;
-  defaultDay: string;
+  /** The controller, kept by EventEditor above this shell so a resize that
+   *  swaps the shells keeps the form. */
+  editor: EventEditorController;
   onClose: () => void;
-  onDone: (result: EditorResult) => void;
-  askDeleteFirst?: boolean;
 };
 
 // BottomSheetTextInput's keyboard hooks call native TextInput.State APIs that
@@ -53,36 +53,21 @@ type Props = {
 const SheetTextInput = Platform.OS === 'web' ? TextInput : BottomSheetTextInput;
 
 /**
- * The dim behind the sheet: there from the moment the sheet starts to rise and
- * gone once it has left, a step and not the library's fade. A tap on it
- * dismisses the sheet.
- */
-function Backdrop({ animatedIndex, style }: BottomSheetBackdropProps) {
-  const { dismiss } = useBottomSheetModal();
-  const shown = useAnimatedStyle(() => ({
-    opacity: animatedIndex.value > -0.95 ? 1 : 0,
-  }));
-  return (
-    <Animated.View style={[style, styles.backdrop, shown, BACKDROP_BLUR]}>
-      <Pressable
-        style={StyleSheet.absoluteFill}
-        onPress={() => dismiss()}
-        accessibilityRole="button"
-        accessibilityLabel="Close"
-        focusable={false}
-      />
-    </Animated.View>
-  );
-}
-
-/**
  * The footer is rendered by the sheet itself (via `footerComponent`), inside
  * a portal that does not carry React context from this tree, and a fresh
  * component identity per render would remount it on every keystroke. So the
  * footer is one stable component that reads its props from a tiny external
- * store this shell keeps current from an effect.
+ * store this shell keeps current from an effect. The handle and the
+ * backdrop read it too.
  */
-type FooterProps = { editor: EventEditorController; onClose: () => void };
+type FooterProps = {
+  editor: EventEditorController;
+  /** Cancel and Discard: closes, no questions. */
+  onClose: () => void;
+  /** Any other way out (the backdrop): steps back, asking first when
+   *  something changed. */
+  onDismiss: () => void;
+};
 
 function createFooterStore(initial: FooterProps) {
   let value = initial;
@@ -115,6 +100,31 @@ function useKeyboardShown() {
     };
   }, []);
   return shown;
+}
+
+/**
+ * The dim behind the sheet: there from the moment the sheet starts to rise and
+ * gone once it has left, a step and not the library's fade. A tap on it
+ * steps back as Escape does: closes the sheet, or asks first when something
+ * changed.
+ */
+function makeBackdrop(store: ReturnType<typeof createFooterStore>) {
+  return function Backdrop({ animatedIndex, style }: BottomSheetBackdropProps) {
+    const shown = useAnimatedStyle(() => ({
+      opacity: animatedIndex.value > -0.95 ? 1 : 0,
+    }));
+    return (
+      <Animated.View style={[style, styles.backdrop, shown, BACKDROP_BLUR]}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => store.get().onDismiss()}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          focusable={false}
+        />
+      </Animated.View>
+    );
+  };
 }
 
 function makeFooter(
@@ -170,13 +180,7 @@ function makeHandle(store: ReturnType<typeof createFooterStore>) {
  * stays in reach while typing. Mounted only while open — presents itself on
  * mount and reports every dismissal path through onClose.
  */
-export function EventEditorSheet({
-  event,
-  defaultDay,
-  onClose,
-  onDone,
-  askDeleteFirst,
-}: Props) {
+export function EventEditorSheet({ editor, onClose }: Props) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheetModal>(null);
@@ -185,20 +189,57 @@ export function EventEditorSheet({
   // onChange also fires when the form's height changes (a repeat preset
   // unfolding its end options); the title is focused on the first settle only.
   const focusedTitle = useRef(false);
-  const editor = useEventEditor({ event, defaultDay, onDone, askDeleteFirst });
+  const { event } = editor;
   const { height } = useWindowDimensions();
 
+  // The controller as last drawn, for the handlers registered once (Back)
+  // and the sheet's own callbacks.
+  const latest = useRef(editor);
+  useEffect(() => {
+    latest.current = editor;
+  });
+
+  // Set once this shell has asked the sheet to close (Cancel, Discard, or a
+  // way out with nothing changed): the slide out is then let run. Any other
+  // slide toward closed is a drag let go, which a changed form stops.
+  const closing = useRef(false);
+  // Set while this shell is going away with the editor still open (a window
+  // resized across the breakpoint swaps in the dialog): the library then
+  // dismisses the sheet itself, which is not the person closing the editor.
+  // A layout effect, so it is set before the library's own cleanup runs.
+  const unmounted = useRef(false);
+  useLayoutEffect(() => {
+    unmounted.current = false;
+    return () => {
+      unmounted.current = true;
+    };
+  }, []);
+
   // Cancel dismisses the sheet; onDismiss then reports onClose, the same
-  // path a drag-down or backdrop tap takes. The real handler lands from the
-  // effect (it reads the sheet ref, which render must not).
+  // path a drag-down or backdrop tap takes. The real handlers land from the
+  // effect (they read the sheet ref, which render must not).
   const [store] = useState(() =>
-    createFooterStore({ editor, onClose: () => {} })
+    createFooterStore({ editor, onClose: () => {}, onDismiss: () => {} })
   );
   const [Footer] = useState(() => makeFooter(store, insets.bottom));
   const [Handle] = useState(() => makeHandle(store));
+  const [Backdrop] = useState(() => makeBackdrop(store));
   useEffect(() => {
-    store.set({ editor, onClose: () => sheetRef.current?.dismiss() });
+    store.set({ editor, onClose: close, onDismiss: dismiss });
   });
+
+  /** Close the sheet, no questions: Cancel, Discard. */
+  function close() {
+    closing.current = true;
+    dismissing.current = true;
+    sheetRef.current?.dismiss();
+  }
+
+  /** Any other way out: steps back one level (out of an open question, or
+   *  to "Discard your changes?" when something changed), else closes. */
+  function dismiss() {
+    if (latest.current.requestDismiss()) close();
+  }
 
   useEffect(() => {
     sheetRef.current?.present();
@@ -243,11 +284,10 @@ export function EventEditorSheet({
     });
   }
 
-  // Escape on the web: out of the repeat question first, then the sheet. (A
-  // phone has no such key; the back button below does the closing there.)
-  useEscapeKey(() =>
-    editor.scopeAsk ? editor.cancelScope() : sheetRef.current?.dismiss()
-  );
+  // Escape on the web: out of an open question first, then the sheet (asking
+  // first when something changed). A phone has no such key; the back button
+  // below does the same there.
+  useEscapeKey(dismiss);
 
   // The library leaves the Android back button to us (predictive back is off
   // in app.json, so BackHandler is reliable).
@@ -259,10 +299,15 @@ export function EventEditorSheet({
   // therefore ate the second press, and the app appeared to ignore the back
   // button for a beat. Only the press that starts the dismissal is ours; once
   // it is running, later presses fall through to the system and exit.
+  //
+  // A press that only steps back (out of a question, or to "Discard your
+  // changes?") is ours too, and leaves the sheet open.
   const dismissing = useRef(false);
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (dismissing.current) return false;
+      if (!latest.current.requestDismiss()) return true;
+      closing.current = true;
       dismissing.current = true;
       sheetRef.current?.dismiss();
       return true;
@@ -293,7 +338,31 @@ export function EventEditorSheet({
   return (
     <BottomSheetModal
       ref={sheetRef}
-      onDismiss={onClose}
+      accessibilityLabel={editorName(editor)}
+      onDismiss={() => {
+        if (unmounted.current) return;
+        if (!closing.current && latest.current.dirty) {
+          // A drag that got all the way out before onAnimate could stop it:
+          // the form is still here, so the sheet comes back up, asking.
+          dismissing.current = false;
+          sheetRef.current?.present();
+          latest.current.askDiscard();
+          return;
+        }
+        onClose();
+      }}
+      // A drag let go past the point of closing: with changes in the form
+      // the sheet springs back open and asks "Discard your changes?"
+      // instead. Closing on purpose (closing set) is let run.
+      onAnimate={(_from, to) => {
+        if (to !== -1 || closing.current) return;
+        if (!latest.current.dirty) {
+          dismissing.current = true;
+          return;
+        }
+        sheetRef.current?.snapToIndex(0);
+        latest.current.askDiscard();
+      }}
       // A new event starts in the title — once the sheet has settled, so the
       // keyboard rises under a resting sheet rather than a moving one.
       onChange={(index) => {
@@ -365,10 +434,7 @@ export function EventEditorSheet({
           // Stuck to the bottom of the form while it scrolls, as the native
           // footer is: on a long event Save had scrolled out of sight.
           <View style={styles.webActions}>
-            <EventEditorActions
-              editor={editor}
-              onClose={() => sheetRef.current?.dismiss()}
-            />
+            <EventEditorActions editor={editor} onClose={close} />
           </View>
         )}
       </BottomSheetScrollView>

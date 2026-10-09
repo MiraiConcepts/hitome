@@ -33,6 +33,7 @@ import {
   endDayForAllDay,
   alarmEqual,
   initialFormState,
+  isDirty,
   recurEqual,
 } from '@/components/calendar/editor-state';
 import type { RecurrenceState } from '@/components/calendar/recurrence-field';
@@ -104,6 +105,9 @@ export function useEventEditor({
       ? { action: 'delete', allowThis: true }
       : null
   );
+  // A dismissal (Escape, a click or tap outside, Back, a drag) met a form
+  // with changes: "Discard your changes?" waits in place of the action row.
+  const [discardAsk, setDiscardAsk] = useState(false);
   const [busy, setBusy] = useState(false);
   // Held while a Save or Delete runs. `busy` disables the buttons only once it
   // is drawn, so a second tap in the same frame would write a second time.
@@ -116,6 +120,11 @@ export function useEventEditor({
 
   // Where the event started out, to tell a move from a stay.
   const [originalCalendarUrl, setOriginalCalendarUrl] = useState<
+    string | undefined
+  >(undefined);
+  // The calendar selected when the list arrived, a new event's included: the
+  // baseline a changed calendar is told from.
+  const [loadedCalendarUrl, setLoadedCalendarUrl] = useState<
     string | undefined
   >(undefined);
 
@@ -133,6 +142,7 @@ export function useEventEditor({
         if (!alive) return;
         setCalendars(list);
         setCalendarUrl(url);
+        setLoadedCalendarUrl(url);
         if (event) setOriginalCalendarUrl(url);
       })
       .catch(() => {});
@@ -416,6 +426,45 @@ export function useEventEditor({
   // web date input is mid-edit (its value is '' between keystrokes).
   const headerDay = parseDay(startDay) ? startDay : lastValidDay;
 
+  const dirty = isDirty(
+    { ...initial, calendarUrl: loadedCalendarUrl },
+    {
+      summary,
+      allDay,
+      startDay,
+      startTime,
+      endDay,
+      endTime,
+      location,
+      description,
+      recurrence,
+      alarm,
+      calendarUrl,
+    }
+  );
+
+  /**
+   * A way out other than Cancel (Escape, a click or tap outside, Back): steps
+   * back one level and says whether the shell may close. An open question
+   * goes first (the repeat one is cancelled, "Discard your changes?" means
+   * keep editing); then a form with changes asks before dropping them.
+   */
+  function requestDismiss(): boolean {
+    if (discardAsk) {
+      setDiscardAsk(false);
+      return false;
+    }
+    if (scopeAsk) {
+      setScopeAsk(null);
+      return false;
+    }
+    if (dirty) {
+      setDiscardAsk(true);
+      return false;
+    }
+    return true;
+  }
+
   return {
     event,
     summary,
@@ -450,6 +499,18 @@ export function useEventEditor({
     problemFor: (field: EditorField) =>
       problem?.field === field ? problem.text : null,
     busy,
+    /** The form differs from what it opened with. */
+    dirty,
+    /** "Discard your changes?" is showing. */
+    discardAsk,
+    requestDismiss,
+    /** Ask "Discard your changes?" (a drag that was let go to close). */
+    askDiscard: () => {
+      setScopeAsk(null);
+      setDiscardAsk(true);
+    },
+    /** Answer it with Keep editing: back to the form as it was. */
+    keepEditing: () => setDiscardAsk(false),
     save: () => exclusive(writing, () => save()),
     remove: () => exclusive(writing, () => remove()),
     /** The open "which occurrences?" question, if any. */

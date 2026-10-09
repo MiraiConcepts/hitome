@@ -1,6 +1,6 @@
 import type { CalEvent } from '@/caldav/types';
 
-import { endDayForAllDay, initialFormState } from './editor-state';
+import { endDayForAllDay, initialFormState, isDirty } from './editor-state';
 
 const NOW = new Date(2026, 6, 19, 14, 20); // local 2026-07-19 14:20
 
@@ -181,5 +181,73 @@ describe('endDayForAllDay', () => {
     expect(endDayForAllDay(true, { ...late, endDay: '2026-10-01' })).toBe(
       '2026-10-04'
     );
+  });
+});
+
+describe('isDirty', () => {
+  const fresh = () => initialFormState(null, '2026-07-25', NOW, 10);
+
+  it('a new event left at its defaults is not dirty', () => {
+    expect(isDirty(fresh(), fresh())).toBe(false);
+  });
+
+  it('an opened event left alone is not dirty', () => {
+    const e = makeEvent({ location: 'Room 1' }, ['RRULE:FREQ=WEEKLY;COUNT=4']);
+    expect(
+      isDirty(initialFormState(e, '', NOW), initialFormState(e, '', NOW))
+    ).toBe(false);
+  });
+
+  it('any typed or changed field makes it dirty', () => {
+    const base = fresh();
+    const changes: Partial<typeof base>[] = [
+      { summary: 'Lunch' },
+      { summary: ' ' },
+      { allDay: true },
+      { startDay: '2026-07-26' },
+      { startTime: '09:00' },
+      { endDay: '2026-07-27' },
+      { endTime: '23:00' },
+      { location: 'Cafe' },
+      { description: 'Bring cake' },
+      {
+        recurrence: {
+          kind: 'preset',
+          preset: 'daily',
+          end: { type: 'forever' },
+        },
+      },
+      { alarm: { kind: 'none' } },
+      { alarm: { kind: 'set', offsetMinutes: 30 } },
+    ];
+    for (const change of changes)
+      expect(isDirty(base, { ...base, ...change })).toBe(true);
+  });
+
+  it('a repeat count or end date edited counts, an equal one does not', () => {
+    const repeat = {
+      kind: 'preset' as const,
+      preset: 'weekly' as const,
+      end: { type: 'count' as const, n: 4 },
+    };
+    const base = { ...fresh(), recurrence: repeat };
+    expect(isDirty(base, { ...base, recurrence: { ...repeat } })).toBe(false);
+    expect(
+      isDirty(base, {
+        ...base,
+        recurrence: { ...repeat, end: { type: 'count', n: 5 } },
+      })
+    ).toBe(true);
+  });
+
+  it('a calendar counts once both sides are known', () => {
+    const base = fresh();
+    expect(isDirty(base, { ...base, calendarUrl: '/a/' })).toBe(false);
+    expect(
+      isDirty({ ...base, calendarUrl: '/a/' }, { ...base, calendarUrl: '/a/' })
+    ).toBe(false);
+    expect(
+      isDirty({ ...base, calendarUrl: '/a/' }, { ...base, calendarUrl: '/b/' })
+    ).toBe(true);
   });
 });

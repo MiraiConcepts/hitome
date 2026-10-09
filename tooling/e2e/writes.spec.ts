@@ -377,3 +377,130 @@ test("the day list's trash updates the month on screen, not the one the page ope
     for (const uid of uids) await page.request.delete(`${CAL}${uid}.ics`);
   }
 });
+
+/** Hold an empty day until the create editor is up (the grid can still sit
+ *  under its loading cover right after load, which swallows the hold). */
+async function holdToCreate(page: Page, onDay: number) {
+  await expect(async () => {
+    await grid(page)
+      .getByTestId(`day-cell-${dateString(day(onDay))}`)
+      .click(HOLD);
+    await expect(page.getByTestId("event-editor")).toBeVisible({
+      timeout: 2_000,
+    });
+  }).toPass({ timeout: 20_000 });
+}
+
+test("a way out other than Cancel asks before dropping what was typed", async ({
+  page,
+}) => {
+  const title = "🧪 W Unsaved draft";
+  const ask = page.getByTestId("editor-discard-ask");
+  const summary = page.getByTestId("editor-summary");
+
+  // The desktop dialog: Escape and a click on the dim area.
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await openMonth(page);
+  await holdToCreate(page, 22);
+  // Named by its header, for screen readers.
+  await expect(
+    page.getByRole("dialog", { name: /^New event, / }),
+  ).toBeVisible();
+  await summary.fill(title);
+  await page.keyboard.press("Escape");
+  await expect(ask).toBeVisible();
+  await expect(ask).toContainText("Discard your changes?");
+  await expect(summary).toHaveValue(title);
+  await page.getByTestId("editor-keep-editing").click();
+  await expect(ask).toHaveCount(0);
+  await expect(summary).toHaveValue(title);
+  // While it asks, Escape means keep editing.
+  await page.keyboard.press("Escape");
+  await expect(ask).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(ask).toHaveCount(0);
+  await expect(page.getByTestId("event-editor")).toBeVisible();
+  await page.mouse.click(8, 8);
+  await expect(ask).toBeVisible();
+  await page.getByTestId("editor-discard").click();
+  await expect(page.getByTestId("event-editor")).toHaveCount(0, {
+    timeout: SHEET_CLOSE_MS,
+  });
+
+  // The phone-width sheet: Escape the same way.
+  await page.setViewportSize({ width: 480, height: 900 });
+  await holdToCreate(page, 22);
+  await summary.fill(title);
+  // A repeat count too: its field is named.
+  await page.getByTestId("editor-repeat-preset-daily").click();
+  await page.getByTestId("editor-repeat-end-count").click();
+  await expect(
+    page.getByRole("textbox", { name: "Number of times" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(ask).toBeVisible();
+  await page.getByTestId("editor-keep-editing").click();
+  await expect(summary).toHaveValue(title);
+  await page.keyboard.press("Escape");
+  await page.getByTestId("editor-discard").click();
+  await expect(page.getByTestId("event-editor")).toHaveCount(0, {
+    timeout: SHEET_CLOSE_MS,
+  });
+
+  // Nothing was written.
+  expect(await countOnServer(page, title)).toBe(0);
+});
+
+test("an unchanged editor closes on Escape at once, and the focus goes back to the day", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await openMonth(page);
+  const cell = grid(page).getByTestId(`day-cell-${dateString(day(22))}`);
+  await expect(async () => {
+    await cell.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("event-editor")).toBeVisible({
+      timeout: 2_000,
+    });
+  }).toPass({ timeout: 20_000 });
+  await expect(page.getByTestId("editor-summary")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("editor-discard-ask")).toHaveCount(0);
+  await expect(page.getByTestId("event-editor")).toHaveCount(0, {
+    timeout: SHEET_CLOSE_MS,
+  });
+  await expect(cell).toBeFocused();
+});
+
+test("resizing across the breakpoint keeps the open editor and what was typed", async ({
+  page,
+}) => {
+  const title = "🧪 W Resize draft";
+  const summary = page.getByTestId("editor-summary");
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await openMonth(page);
+  await holdToCreate(page, 22);
+  await summary.fill(title);
+
+  // Dialog to sheet: the sheet hugs the bottom edge and holds the title.
+  await page.setViewportSize({ width: 700, height: 800 });
+  await expect(summary).toHaveValue(title);
+  await expect
+    .poll(async () => {
+      const box = await page.getByTestId("event-editor").boundingBox();
+      return box ? box.y + box.height : 0;
+    })
+    .toBeGreaterThan(800 - 80);
+
+  // And back: still open, still holding it.
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.waitForTimeout(1_000);
+  await expect(page.getByTestId("event-editor")).toBeVisible();
+  await expect(summary).toHaveValue(title);
+  await page.getByTestId("editor-cancel").click();
+  await expect(page.getByTestId("event-editor")).toHaveCount(0, {
+    timeout: SHEET_CLOSE_MS,
+  });
+  expect(await countOnServer(page, title)).toBe(0);
+});
