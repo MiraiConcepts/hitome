@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type DimensionValue } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -171,7 +171,7 @@ export function SettingsValue({
   testID?: string;
   /** The label column's share of the row, where the card's own is too wide
    *  or too narrow for what it holds. */
-  labelWidth?: string;
+  labelWidth?: DimensionValue;
   /** Makes the whole row a button, lit while hovered or pressed. Its own
    *  tappable parts (a tag) are `pointerEvents: 'auto'` inside the value, and
    *  everything else passes the press through: a button never holds another
@@ -207,7 +207,7 @@ export function SettingsValue({
         <View
           style={[
             styles.valueLabelCell,
-            labelWidth ? { width: labelWidth as `${number}%` } : null,
+            labelWidth ? { width: labelWidth } : null,
             passThrough,
           ]}
         >

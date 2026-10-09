@@ -14,11 +14,15 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BACKDROP_BLUR } from '@/constants/backdrop';
 import { AccentColor, Spacing } from '@/constants/theme';
-import { useIsWide } from '@/hooks/use-is-wide';
-import { dayLabel, formatTime, timeSpan } from '@/utils/date';
+import { dayLabel, formatTime } from '@/utils/date';
 
 /** The calendar mark beside a row's time. */
 const MARK_SIZE = 16;
+/** The time's line height, so the mark centres on its first line. */
+const WHEN_LINE = 20;
+/** The time column's width: the longest start and end ("→ 11:15 am") with the
+ *  mark and the cell's padding, on any screen. */
+const WHEN_COLUMN = 124;
 
 type Props = {
   /** The day (dateString) whose events are listed. */
@@ -43,12 +47,11 @@ function compareEvents(a: CalEvent, b: CalEvent): number {
  * edit editor via onPressEvent. Drawn as the settings screen's card: the
  * day is the title row, each event a ruled row beneath it.
  */
-function whenLabel(event: CalEvent, wide: boolean): string {
-  if (event.allDay) return 'All day';
-  const start = formatTime(event.start);
-  const end = formatTime(event.end);
-  // The arrow's room is the phone's to spare.
-  return wide ? timeSpan(start, end) : `${start}–${end}`;
+/** The time as lines: the start, then the end under it, so a column this
+ *  narrow never has to cut either short. */
+function whenLines(event: CalEvent): string[] {
+  if (event.allDay) return ['All day'];
+  return [formatTime(event.start), `→ ${formatTime(event.end)}`];
 }
 
 export function DayPopover({
@@ -58,7 +61,6 @@ export function DayPopover({
   onPressEvent,
   onAdd,
 }: Props) {
-  const isWide = useIsWide();
   const sorted = [...events].sort(compareEvents);
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -82,31 +84,36 @@ export function DayPopover({
                 {sorted.map((event) => (
                   <SettingsValue
                     key={event.id}
-                    labelWidth={isWide ? '38%' : '42%'}
+                    labelWidth={WHEN_COLUMN}
                     onPress={() => onPressEvent(event)}
                     pressLabel={event.summary || '(untitled)'}
                     label={
                       // When, with the source calendar's mark in its colour.
                       <View style={styles.when}>
-                        <CalendarMark
-                          icon={event.icon}
-                          color={event.color ?? AccentColor}
-                          size={MARK_SIZE}
-                        />
-                        <ThemedText
-                          type="small"
-                          themeColor="textSecondary"
-                          numberOfLines={1}
-                        >
-                          {whenLabel(event, isWide)}
-                        </ThemedText>
+                        <View style={styles.mark}>
+                          <CalendarMark
+                            icon={event.icon}
+                            color={event.color ?? AccentColor}
+                            size={MARK_SIZE}
+                          />
+                        </View>
+                        <View>
+                          {whenLines(event).map((line) => (
+                            <ThemedText
+                              key={line}
+                              type="small"
+                              themeColor="textSecondary"
+                              style={styles.whenLine}
+                            >
+                              {line}
+                            </ThemedText>
+                          ))}
+                        </View>
                       </View>
                     }
                     value={
                       <View>
-                        <ThemedText numberOfLines={2}>
-                          {event.summary || '(untitled)'}
-                        </ThemedText>
+                        <ThemedText>{event.summary || '(untitled)'}</ThemedText>
                         <EventTags event={event} />
                       </View>
                     }
@@ -151,15 +158,26 @@ const styles = StyleSheet.create({
   },
   cardWrap: {
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 560,
     maxHeight: '80%',
   },
+  // The settings card's hard offset shadow, on the outside edge: inside the
+  // scroll area it was clipped, and at 2px black on the dimmed grid it did not
+  // show.
   card: {
     maxHeight: '100%',
+    boxShadow: '4px 4px 0px rgba(0, 0, 0, 0.75)',
   },
   when: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.one + Spacing.half,
+  },
+  mark: {
+    height: WHEN_LINE,
+    justifyContent: 'center',
+  },
+  whenLine: {
+    lineHeight: WHEN_LINE,
   },
 });

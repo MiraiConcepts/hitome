@@ -74,13 +74,9 @@ function Tag({
       accessibilityLabel={label}
       style={[styles.tag, { backgroundColor: background }]}
     >
-      <ThemedText
-        numberOfLines={1}
-        style={[styles.text, { color }]}
-        // Not the row's: the tag handles its own press.
-      >
-        {text}
-      </ThemedText>
+      {/* Wraps rather than cutting a long place short: a name is worth
+          reading whole. */}
+      <ThemedText style={[styles.text, { color }]}>{text}</ThemedText>
     </Pressable>
   );
 }
