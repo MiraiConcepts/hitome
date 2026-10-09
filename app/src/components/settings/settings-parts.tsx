@@ -1,5 +1,6 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import {
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -185,6 +186,64 @@ export function DashedLine({
   );
 }
 
+/**
+ * A row's value cell, and its button when the row has one. On the web the
+ * button is a layer behind the cell, which lets presses through its text: a
+ * button never holds another button there (invalid HTML), and the tags inside
+ * are buttons. On a phone the cell is the button itself, so a press on the
+ * title reaches it by bubbling (a text takes the touch, and a sibling layer
+ * beneath it never sees it) and a tag nested in it keeps its own.
+ */
+function ValueCell({
+  children,
+  style,
+  onPress,
+  pressLabel,
+  setHovered,
+  setPressed,
+}: {
+  children: ReactNode;
+  style: StyleProp<ViewStyle>;
+  onPress?: () => void;
+  pressLabel?: string;
+  setHovered: (on: boolean) => void;
+  setPressed: (on: boolean) => void;
+}) {
+  if (onPress && Platform.OS !== 'web') {
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={pressLabel}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+        style={style}
+      >
+        {children}
+      </Pressable>
+    );
+  }
+  return (
+    <View style={style}>
+      {onPress && (
+        // The row's button is this cell alone: the time beside it is not a
+        // target, and neither lights nor answers a click.
+        <Pressable
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={pressLabel}
+          onHoverIn={() => setHovered(true)}
+          onHoverOut={() => setHovered(false)}
+          onPressIn={() => setPressed(true)}
+          onPressOut={() => setPressed(false)}
+          style={[StyleSheet.absoluteFill, styles.pressTarget]}
+        />
+      )}
+      {children}
+    </View>
+  );
+}
+
 /** A label/value row of the card's table. */
 export function SettingsValue({
   label,
@@ -226,7 +285,6 @@ export function SettingsValue({
   trailing?: ReactNode;
 }) {
   const theme = useTheme();
-  const passThrough = onPress ? styles.passThrough : null;
   // Lit while hovered or pressed, on the value cell alone: the time column,
   // the rules and the delete beside it keep their ground.
   const [hovered, setHovered] = useState(false);
@@ -261,7 +319,11 @@ export function SettingsValue({
             <DashedLine vertical />
           </View>
         </View>
-        <View
+        <ValueCell
+          onPress={onPress}
+          pressLabel={pressLabel}
+          setHovered={setHovered}
+          setPressed={setPressed}
           style={[
             styles.valueCell,
             cellPaddingY !== undefined
@@ -271,30 +333,21 @@ export function SettingsValue({
               ? { paddingHorizontal: valuePaddingX }
               : null,
             centerValue ? styles.valueCentered : null,
-            passThrough,
+            onPress && Platform.OS === 'web' ? styles.passThrough : null,
             lit && { backgroundColor: theme.backgroundSelected },
           ]}
         >
-          {onPress && (
-            // The row's button is this cell alone: the time beside it is not
-            // a target, and neither lights nor answers a click.
-            <Pressable
-              onPress={onPress}
-              accessibilityRole="button"
-              accessibilityLabel={pressLabel}
-              onHoverIn={() => setHovered(true)}
-              onHoverOut={() => setHovered(false)}
-              onPressIn={() => setPressed(true)}
-              onPressOut={() => setPressed(false)}
-              style={[StyleSheet.absoluteFill, styles.pressTarget]}
-            />
-          )}
           {typeof value === 'string' ? (
-            <ThemedText type="small">{value}</ThemedText>
+            <ThemedText
+              type="small"
+              style={onPress && Platform.OS === 'web' && styles.passThrough}
+            >
+              {value}
+            </ThemedText>
           ) : (
             value
           )}
-        </View>
+        </ValueCell>
         {trailing ? (
           <>
             <View style={styles.columnRule}>

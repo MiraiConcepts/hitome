@@ -30,13 +30,14 @@ import {
   EventEditorHeader,
   type EditorResult,
 } from '@/components/calendar/event-editor-form';
+import { HEADER_GROUND } from '@/components/calendar/month-header';
 import { Card, DashedLine } from '@/components/settings/settings-parts';
 import {
   useEventEditor,
   type EventEditorController,
 } from '@/components/calendar/use-event-editor';
 import { BACKDROP_BLUR } from '@/constants/backdrop';
-import { AccentColor, Colors } from '@/constants/theme';
+import { AccentColor } from '@/constants/theme';
 import { useEscapeKey } from '@/hooks/use-escape-key';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -77,10 +78,8 @@ function Backdrop({ animatedIndex, style }: BottomSheetBackdropProps) {
 }
 
 /**
- * The sheet's ground, drawn as the settings card: the page's colour with the
- * accent edge down the left and the dotted rule along the top. Under the
- * handle, the form and the footer, which are all see-through (the footer
- * keeps clear of the edge) so the edge runs the sheet's whole height.
+ * The sheet's ground: the page's colour, square, under the handle, the form
+ * and the footer, which are see-through.
  */
 function SheetBackground({ style }: BottomSheetBackgroundProps) {
   const theme = useTheme();
@@ -88,12 +87,7 @@ function SheetBackground({ style }: BottomSheetBackgroundProps) {
     <View
       pointerEvents="none"
       style={[style, { backgroundColor: theme.background }]}
-    >
-      <View style={styles.cardTop}>
-        <DashedLine weight={Card.dotted} dash={Card.dot} strong />
-      </View>
-      <View style={styles.cardEdge} />
-    </View>
+    />
   );
 }
 
@@ -156,14 +150,8 @@ function makeFooter(
     const theme = useTheme();
     return (
       <BottomSheetFooter {...props}>
-        {/* On the page's ground, so the fields do not show through, and clear
-            of the accent edge down the sheet's left. */}
-        <View
-          style={{
-            backgroundColor: theme.background,
-            marginLeft: Card.accentBar,
-          }}
-        >
+        {/* On the page's ground, so the fields do not show through. */}
+        <View style={{ backgroundColor: theme.background }}>
           <DashedLine />
           <EventEditorActions
             editor={editor}
@@ -188,11 +176,13 @@ function makeHandle(store: ReturnType<typeof createFooterStore>) {
     const { editor } = useSyncExternalStore(store.subscribe, store.get);
     return (
       <View>
+        {/* The grab handle sits on the header's black ground, so handle and
+            header read as one band, closed by the card's dotted edge. */}
         <View style={styles.handle}>
           <View style={styles.handleIndicator} />
         </View>
-        <EventEditorHeader editor={editor} card />
-        <DashedLine />
+        <EventEditorHeader editor={editor} />
+        <DashedLine weight={Card.dotted} dash={Card.dot} strong />
       </View>
     );
   };
@@ -397,13 +387,7 @@ export function EventEditorSheet({
           // Stuck to the bottom of the form while it scrolls, as the native
           // footer is: on a long event Save had scrolled out of sight.
           <View
-            style={[
-              styles.webActions,
-              {
-                backgroundColor: theme.background,
-                marginLeft: Card.accentBar,
-              },
-            ]}
+            style={[styles.webActions, { backgroundColor: theme.background }]}
           >
             <DashedLine />
             <EventEditorActions
@@ -434,25 +418,11 @@ const styles = StyleSheet.create({
   handle: {
     alignItems: 'center',
     paddingVertical: 10,
+    backgroundColor: HEADER_GROUND,
   },
   handleIndicator: {
-    backgroundColor: Colors.dark.ruleStrong,
+    backgroundColor: AccentColor,
     width: 36,
     height: 4,
-  },
-  // The card's dotted top edge and accent edge, in the sheet's background.
-  cardTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-  },
-  cardEdge: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: Card.accentBar,
-    backgroundColor: AccentColor,
   },
 });

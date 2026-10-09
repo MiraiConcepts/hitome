@@ -159,7 +159,10 @@ export function DayPopover({
                         </View>
                       }
                       value={
-                        <View>
+                        // No view of its own around these: the cell lets a
+                        // press through its gaps to the row's button, and a
+                        // plain view would take it.
+                        <>
                           <ThemedText
                             style={[
                               styles.title,
@@ -169,7 +172,7 @@ export function DayPopover({
                             {event.summary || '(untitled)'}
                           </ThemedText>
                           <EventTags event={event} />
-                        </View>
+                        </>
                       }
                     />
                   );
@@ -228,9 +231,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Not a press target of its own: the row's button, behind it, takes the press.
   title: {
     fontSize: ROW_FONT,
     lineHeight: ROW_LINE,
+    pointerEvents: 'none',
   },
   titleCompact: {
     fontSize: ROW_FONT_COMPACT,
