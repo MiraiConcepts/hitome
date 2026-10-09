@@ -23,6 +23,10 @@ export async function requestSync(): Promise<boolean> {
   return false;
 }
 
+/** End the Undo window for deletes. The web has none waiting: its delete
+ *  is made at once, and Undo puts the exact object back. */
+export async function commitDeletes(): Promise<void> {}
+
 /** Changes to local calendar data. The web has none to watch. */
 export function subscribeStore(_listener: () => void): () => void {
   return () => {};

@@ -1,7 +1,9 @@
 // An in-memory stand-in for Android's calendar store, enough of it to run
 // src/store/events against: calendars, events with exceptions (cancelled or
-// changed occurrences), reminders, and the Instances view that expands a
-// repeating event into occurrences the way the provider does.
+// changed occurrences), reminders, attendees, and the Instances view that
+// expands a repeating event into occurrences the way the provider does.
+// Rows keep any column they are given (uid2445, organizer…), as the
+// provider's do, so a test can tell the same row from a copy.
 //
 // `synced` (the default) stands for events the sync app has already sent:
 // they carry a _sync_id. Like Android, an exception only stands in for an
@@ -41,6 +43,7 @@ export function fakeStore({ synced = true }: { synced?: boolean } = {}) {
   ];
   const events: Row[] = [];
   const reminders: Row[] = [];
+  const attendees: Row[] = [];
 
   const num = (v: unknown) => Number(v);
   const event = (id: string | number) =>
@@ -165,6 +168,10 @@ export function fakeStore({ synced = true }: { synced?: boolean } = {}) {
       const ids = (args ?? []).map(Number);
       return reminders.filter((r) => ids.includes(num(r.event_id)));
     }
+    if (path === '/attendees') {
+      const ids = (args ?? []).map(Number);
+      return attendees.filter((r) => ids.includes(num(r.event_id)));
+    }
     throw new Error(`fake store: no query for ${uri}`);
   }
 
@@ -222,6 +229,10 @@ export function fakeStore({ synced = true }: { synced?: boolean } = {}) {
         reminders.push({ _id: id, ...clean });
         return String(id);
       }
+      if (path === '/attendees') {
+        attendees.push({ _id: id, ...clean });
+        return String(id);
+      }
       throw new Error(`fake store: no insert for ${uri}`);
     },
     async update(
@@ -251,6 +262,7 @@ export function fakeStore({ synced = true }: { synced?: boolean } = {}) {
         const count = events.length;
         events.length = 0;
         reminders.length = 0;
+        attendees.length = 0;
         return count;
       }
       const one = /^\/events\/(\d+)$/.exec(path);
@@ -260,9 +272,11 @@ export function fakeStore({ synced = true }: { synced?: boolean } = {}) {
         for (let i = events.length - 1; i >= 0; i--)
           if (num(events[i]._id) === id || num(events[i].original_id) === id)
             gone.push(num(events.splice(i, 1)[0]._id));
-        // The provider drops an event's reminders with it.
+        // The provider drops an event's reminders and attendees with it.
         for (let i = reminders.length - 1; i >= 0; i--)
           if (gone.includes(num(reminders[i].event_id))) reminders.splice(i, 1);
+        for (let i = attendees.length - 1; i >= 0; i--)
+          if (gone.includes(num(attendees[i].event_id))) attendees.splice(i, 1);
         return gone.length;
       }
       if (path === '/reminders') {
@@ -275,5 +289,5 @@ export function fakeStore({ synced = true }: { synced?: boolean } = {}) {
       throw new Error(`fake store: no delete for ${uri}`);
     },
   };
-  return { store, events, reminders };
+  return { store, events, reminders, attendees };
 }

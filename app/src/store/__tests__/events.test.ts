@@ -1,6 +1,7 @@
 import type { CalEvent } from '@/caldav/types';
 
 import {
+  commitDeletes,
   createEvent,
   deleteEvent,
   fetchMonth,
@@ -26,6 +27,8 @@ beforeEach(() => {
   fake = fakeStore();
   setStoreForTests(fake.store);
 });
+// A whole-event delete waits for its Undo window: none left for the next test.
+afterEach(() => commitDeletes());
 afterAll(() => setStoreForTests(null));
 
 const at = (day: number, hour = 9) => new Date(2026, 9, day, hour, 0);

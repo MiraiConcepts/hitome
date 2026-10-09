@@ -197,7 +197,11 @@ export async function fetchMonth(
       ...new Set(rows.filter((r) => r.rrule).map((r) => String(n(r.event_id)))),
     ]),
   ]);
+  // A delete still waiting out its Undo window is not in the store's answer
+  // but is gone all the same (see deleteEvent). Checked after the reads, so
+  // a fetch already under way when the delete came does not bring it back.
   return rows
+    .filter((row) => !isPendingDelete(row))
     .map((row) => instanceToEvent(row, { alarms, overridden }))
     .filter((e) => e.end > rangeStart && e.start < rangeEnd);
 }
@@ -316,7 +320,9 @@ async function setReminders(eventId: string, minutes: number[]) {
 }
 
 /** A whole series as it stands: its row, exceptions, reminders. Enough to
- *  put it back (undo) or write it elsewhere (move). */
+ *  write it elsewhere (move, the tail of a split), though only the columns
+ *  in EVENT_COLUMNS: the copy is a new event to the sync app, with a new
+ *  UID and without attendees or the properties it keeps aside. */
 type Snapshot = {
   row: StoreRow;
   exceptions: StoreRow[];
@@ -614,15 +620,90 @@ export async function updateEvent(
 
 /**
  * What undoing the last delete needs, keyed by the event it was made on —
- * the store's ids are its own, so undo is "put this snapshot back" rather
- * than replaying ICS as the CalDAV backend does.
+ * the store's ids are its own, so undo is "put this back" rather than
+ * replaying ICS as the CalDAV backend does.
  */
 const undoTokens = new Map<string, () => Promise<void>>();
+
+/**
+ * Whole events deleted but not yet taken out of the store, by series id,
+ * with the undo token that would keep them.
+ *
+ * The store cannot put a deleted event back as it was. Its row is marked
+ * deleted for the sync app to delete on the server, and a copy written in
+ * its place is a new event to the sync app: a new UID, no sync id, no
+ * organizer or attendees, none of the properties it keeps aside. So the
+ * delete waits instead: hidden from every read (fetchMonth, which the
+ * grid, the day list, the widget and the reminders all go through) until
+ * the Undo window ends, and Undo only stops hiding it, writing nothing.
+ *
+ * The window ends at commitDeletes: when the Undo bar goes (the screen
+ * calls it when the bar times out or gives way to another message, when
+ * the app leaves the front, and when the screen goes), when another delete
+ * starts, or at pendingLimitMs whatever else happens. A process killed
+ * inside the window takes the delete with it: the event stays, the safe
+ * way to fail.
+ */
+const pendingDeletes = new Map<string, () => Promise<void>>();
+let pendingTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** The latest a delete waits. Longer than the Undo bar's 8 s, which starts
+ *  a moment after the delete did, so a tap on its last moment still finds
+ *  the delete waiting; the screen ends the wait sooner itself. */
+let pendingLimitMs = 10_000;
+
+/** Tests only: a shorter limit, so its timer can run out in a test. */
+export function setPendingLimitForTests(ms: number): void {
+  pendingLimitMs = ms;
+}
+
+/** Those told when the store's answer changes without the store changing
+ *  (a delete starts or ends its wait); subscribeStore adds to them. */
+const localListeners = new Set<() => void>();
+const notifyLocal = () => {
+  for (const listener of localListeners) listener();
+};
+
+function isPendingDelete(row: StoreRow): boolean {
+  if (pendingDeletes.size === 0) return false;
+  return (
+    pendingDeletes.has(String(n(row.event_id))) ||
+    (row.original_id != null && pendingDeletes.has(String(row.original_id)))
+  );
+}
+
+/**
+ * End the Undo window: every waiting delete goes to the store now. Safe to
+ * call at any time and as often as wanted; with nothing waiting it does
+ * nothing. A delete the store refuses is no longer hidden, so the event
+ * shows again rather than seeming gone while it is still there.
+ */
+export async function commitDeletes(): Promise<void> {
+  if (pendingTimer) clearTimeout(pendingTimer);
+  pendingTimer = null;
+  if (pendingDeletes.size === 0) return;
+  const due = [...pendingDeletes];
+  pendingDeletes.clear();
+  for (const [seriesId, undo] of due) {
+    // Only this delete's token: Undo can no longer keep it.
+    for (const [key, token] of undoTokens)
+      if (token === undo) undoTokens.delete(key);
+    try {
+      await store().delete(URI.event(seriesId), null, null);
+    } catch {
+      // Left in the store and no longer hidden: it shows again.
+    }
+  }
+  notifyLocal();
+}
 
 export async function deleteEvent(
   event: CalEvent,
   scope: EditScope = 'all'
 ): Promise<void> {
+  // A new delete takes over the Undo bar, so the one waiting can no longer
+  // be undone: it goes now rather than being lost or left hidden.
+  await commitDeletes();
   const seriesId = seriesIdOf(event);
   const row = event.recurring ? await eventRow(seriesId) : undefined;
   const effective = effectiveScope(event, scope, row);
@@ -691,8 +772,8 @@ export async function deleteEvent(
     return;
   }
 
-  const snap = await snapshot(seriesId);
   if (effective === 'following') {
+    const snap = await snapshot(seriesId);
     const at = occurrenceMs(event);
     const allDay = n(snap.row.allDay) === 1;
     await store().update(
@@ -723,12 +804,24 @@ export async function deleteEvent(
     return;
   }
 
-  await store().delete(URI.event(seriesId), null, null);
-  undoTokens.set(event.id, async () => {
-    await insertSnapshot(snap, String(n(snap.row.calendar_id)));
-  });
+  // The whole event: hidden now, taken out when the Undo window ends (see
+  // pendingDeletes). Read first, so a delete of something already gone
+  // still says so, as it did when the delete was immediate.
+  await eventRow(seriesId);
+  const undo = async () => {
+    pendingDeletes.delete(seriesId);
+    notifyLocal();
+  };
+  pendingDeletes.set(seriesId, undo);
+  undoTokens.set(event.id, undo);
+  pendingTimer = setTimeout(() => void commitDeletes(), pendingLimitMs);
+  notifyLocal();
 }
 
+/** Put back the last delete made on `event`. For a whole event that is
+ *  still waiting, nothing is written: it only stops being hidden. The token
+ *  is taken before anything is awaited, so an Undo tapped as the window
+ *  closes either keeps the event or finds nothing to undo, never both. */
 export async function undoDelete(
   event: CalEvent,
   _scope: EditScope
@@ -769,11 +862,15 @@ export async function requestSync(): Promise<boolean> {
   return true;
 }
 
-/** Calls back on any change to the store (own writes, a sync landing). */
+/** Calls back on any change to the store (own writes, a sync landing), and
+ *  when a delete starts or ends its wait for the Undo window. */
 export function subscribeStore(listener: () => void): () => void {
-  if (!CalendarStore) return () => {};
-  const sub = CalendarStore.addListener('onChange', listener);
-  return () => sub.remove();
+  localListeners.add(listener);
+  const sub = CalendarStore?.addListener('onChange', listener);
+  return () => {
+    localListeners.delete(listener);
+    sub?.remove();
+  };
 }
 
 const DAVX5 = 'at.bitfire.davdroid';
