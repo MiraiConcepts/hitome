@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 import { TextField } from '@/components/fields/text-field';
+import { CardFrame, DashedLine } from '@/components/settings/settings-parts';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useLocationSearch } from '@/hooks/use-location-search';
@@ -59,38 +60,41 @@ export function LocationField({
         testID={testID}
       />
       {suggestions.length > 0 && (
-        <View
-          style={styles.list}
+        <CardFrame
+          style={{ backgroundColor: theme.background }}
           testID={testID ? `${testID}-suggestions` : undefined}
         >
-          {suggestions.map((label) => (
-            <Pressable
-              key={label}
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.item,
-                {
-                  backgroundColor: pressed
-                    ? theme.backgroundSelected
-                    : theme.backgroundElement,
-                },
-              ]}
-              // onPressIn beats the input's blur — a tap can't lose the race
-              // against the suggestion list unmounting.
-              onPressIn={() => {
-                setPicked(label);
-                onChange(label);
-              }}
-            >
-              <ThemedText type="small" numberOfLines={2}>
-                {label}
-              </ThemedText>
-            </Pressable>
+          {suggestions.map((label, index) => (
+            <View key={label}>
+              {index > 0 && <DashedLine />}
+              <Pressable
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.item,
+                  pressed && { backgroundColor: theme.backgroundSelected },
+                ]}
+                // onPressIn beats the input's blur — a tap can't lose the race
+                // against the suggestion list unmounting.
+                onPressIn={() => {
+                  setPicked(label);
+                  onChange(label);
+                }}
+              >
+                <ThemedText type="small" numberOfLines={2}>
+                  {label}
+                </ThemedText>
+              </Pressable>
+            </View>
           ))}
-          <ThemedText type="code" themeColor="textSecondary">
+          <DashedLine />
+          <ThemedText
+            type="code"
+            themeColor="textSecondary"
+            style={styles.credit}
+          >
             Search by Photon · data © OpenStreetMap contributors
           </ThemedText>
-        </View>
+        </CardFrame>
       )}
     </View>
   );
@@ -100,10 +104,11 @@ const styles = StyleSheet.create({
   column: {
     gap: Spacing.two,
   },
-  list: {
-    gap: Spacing.one,
-  },
   item: {
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+  },
+  credit: {
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
   },

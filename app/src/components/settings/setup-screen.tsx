@@ -6,7 +6,12 @@ import {
 
 import { AppName } from '@/components/settings/app-name';
 import { LoginFields, useLoginForm } from '@/components/settings/login-form';
-import { SettingsButton } from '@/components/settings/settings-parts';
+import {
+  SettingsBlock,
+  SettingsButton,
+  SettingsButtonRow,
+  SettingsSection,
+} from '@/components/settings/settings-parts';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
@@ -51,10 +56,19 @@ export function SetupScreen() {
             />
             <AppName />
           </View>
-          <LoginFields form={form} />
-          {/* A desktop window is tall and wide: the button belongs under the
-              fields, not in the far corner of the screen. */}
-          {isWide && <View style={styles.actions}>{button}</View>}
+          {/* The settings card: the fields as a block, and on a desktop window,
+              tall and wide, the button as its last row, not in the far
+              corner of the screen. */}
+          <SettingsSection title="Log in">
+            <SettingsBlock>
+              <LoginFields form={form} />
+            </SettingsBlock>
+            {isWide && (
+              <SettingsBlock>
+                <SettingsButtonRow>{button}</SettingsButtonRow>
+              </SettingsBlock>
+            )}
+          </SettingsSection>
         </ScrollView>
         {!isWide && (
           <View

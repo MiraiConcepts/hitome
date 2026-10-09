@@ -15,6 +15,7 @@ import {
 } from 'react-native-safe-area-context';
 
 import { runAlarmReconcile } from '@/alarms/runner';
+import { CardFrame, DashedLine } from '@/components/settings/settings-parts';
 import {
   ConflictError,
   deleteEvent,
@@ -49,7 +50,7 @@ import {
 import { Spinner } from '@/components/spinner';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { AccentColor, Colors, OnAccentColor, Spacing } from '@/constants/theme';
+import { AccentColor, Colors, DangerColor, Spacing } from '@/constants/theme';
 import {
   classifyConnectError,
   webConnectionProblem,
@@ -72,12 +73,61 @@ type EditorState =
   | { mode: 'create'; day: string }
   | { mode: 'edit'; event: CalEvent; askDelete?: boolean };
 
-/** The toast's lead: what happened, black on an accent block. */
-function SnackMark({ icon: Icon }: { icon: ComponentType<IconProps> }) {
+/**
+ * The toast, as the settings card: the accent edge and dotted top, what
+ * happened (a glyph, then a sentence), and when there is something to do
+ * about it, a ruled cell for that beside it.
+ */
+function SnackBar({
+  icon: Icon,
+  message,
+  action,
+  testID,
+}: {
+  icon: ComponentType<IconProps>;
+  message: string;
+  action?: { label: string; onPress: () => void };
+  testID?: string;
+}) {
   return (
-    <View style={styles.snackMark}>
-      <Icon size={18} color={OnAccentColor} />
-    </View>
+    <Animated.View
+      entering={FadeIn.duration(SNACK_FADE_MS)}
+      exiting={FadeOut.duration(SNACK_FADE_MS)}
+      style={styles.snack}
+      testID={testID}
+    >
+      <CardFrame style={styles.snackCard}>
+        <View style={styles.snackRow}>
+          <View style={styles.snackBody}>
+            <Icon
+              size={18}
+              color={Icon === TrashIcon ? DangerColor : AccentColor}
+            />
+            <ThemedText type="small" style={styles.snackText} numberOfLines={2}>
+              {message}
+            </ThemedText>
+          </View>
+          {action && (
+            <>
+              <View style={styles.snackRule}>
+                <View style={StyleSheet.absoluteFill}>
+                  <DashedLine vertical />
+                </View>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                style={styles.snackAction}
+                onPress={action.onPress}
+              >
+                <ThemedText type="smallBold" style={styles.snackActionText}>
+                  {action.label}
+                </ThemedText>
+              </Pressable>
+            </>
+          )}
+        </View>
+      </CardFrame>
+    </Animated.View>
   );
 }
 
@@ -615,54 +665,30 @@ export function MonthScreen() {
           can fade out rather than vanish with its parent. */}
       <View style={[styles.snackWrapper, { bottom: bottomInset }]}>
         {error && !neverLoaded && (
-          <Animated.View
-            entering={FadeIn.duration(SNACK_FADE_MS)}
-            exiting={FadeOut.duration(SNACK_FADE_MS)}
-            style={styles.snack}
-            testID="error-banner"
-          >
-            <SnackMark icon={authFailed ? AlertCircleIcon : WifiOffIcon} />
-            <ThemedText type="small" style={styles.snackText} numberOfLines={2}>
-              {problem?.title ?? error}
-            </ThemedText>
-            {/* A rejected login is not something retrying fixes. */}
-            <Pressable
-              accessibilityRole="button"
-              style={styles.snackButton}
-              onPress={
+          <SnackBar
+            icon={authFailed ? AlertCircleIcon : WifiOffIcon}
+            message={problem?.title ?? error}
+            // A rejected login is not something retrying fixes.
+            action={{
+              label: authFailed && !problem ? 'Settings' : 'Retry',
+              onPress:
                 authFailed && !problem
                   ? () => router.navigate('/settings')
-                  : onManualRefresh
-              }
-            >
-              <ThemedText type="smallBold" style={styles.snackAction}>
-                {authFailed && !problem ? 'Settings' : 'Retry'}
-              </ThemedText>
-            </Pressable>
-          </Animated.View>
+                  : onManualRefresh,
+            }}
+            testID="error-banner"
+          />
         )}
         {snack && (
-          <Animated.View
-            entering={FadeIn.duration(SNACK_FADE_MS)}
-            exiting={FadeOut.duration(SNACK_FADE_MS)}
-            style={[styles.snack, !snack.undo && styles.snackPlain]}
-          >
-            <SnackMark icon={snack.icon} />
-            <ThemedText type="small" style={styles.snackText} numberOfLines={2}>
-              {snack.message}
-            </ThemedText>
-            {snack.undo && (
-              <Pressable
-                accessibilityRole="button"
-                style={styles.snackButton}
-                onPress={() => undoDelete(snack.undo!)}
-              >
-                <ThemedText type="smallBold" style={styles.snackAction}>
-                  Undo
-                </ThemedText>
-              </Pressable>
-            )}
-          </Animated.View>
+          <SnackBar
+            icon={snack.icon}
+            message={snack.message}
+            action={
+              snack.undo
+                ? { label: 'Undo', onPress: () => undoDelete(snack.undo!) }
+                : undefined
+            }
+          />
         )}
       </View>
 
@@ -766,46 +792,37 @@ const styles = StyleSheet.create({
     pointerEvents: 'box-none',
   },
   snack: {
-    flexDirection: 'row',
-    // Stretched, so the mark's block runs the bar's full height; the text
-    // and the button centre themselves.
-    alignItems: 'stretch',
-    gap: Spacing.three,
-    // Inverse surface: the snack keeps the dark palette in both schemes.
-    // Black with a ruled edge, so it stands off the grid's near-black cells.
-    backgroundColor: Colors.dark.backgroundElement,
-    borderWidth: 1,
-    borderColor: Colors.dark.ruleStrong,
-    paddingRight: Spacing.two,
-    // A bar with a button and one without stand the same height: the
-    // button's line plus its padding, the bar's padding, and the rule.
-    minHeight: 20 + Spacing.one * 2 + Spacing.two * 2 + 2,
     maxWidth: 480,
   },
-  // No button: the right gets the left's padding, or the message sits off
-  // centre in its bar.
-  snackPlain: {
-    paddingRight: Spacing.three,
+  // The card's own ground in both schemes: the toast keeps the dark palette.
+  snackCard: {
+    backgroundColor: Colors.dark.background,
+    boxShadow: '4px 4px 0px rgba(0, 0, 0, 0.75)',
   },
-  snackMark: {
-    width: 42,
+  snackRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  snackBody: {
+    flexShrink: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: AccentColor,
+    gap: Spacing.two,
+    paddingVertical: Spacing.three - Spacing.one,
+    paddingHorizontal: Spacing.three - Spacing.one,
   },
   snackText: {
     color: Colors.dark.text,
     flexShrink: 1,
-    alignSelf: 'center',
-    paddingVertical: Spacing.two,
   },
-  snackButton: {
-    alignSelf: 'center',
+  snackRule: {
+    width: 1,
   },
   snackAction: {
-    color: OnAccentColor,
-    backgroundColor: AccentColor,
+    justifyContent: 'center',
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
+  },
+  snackActionText: {
+    color: AccentColor,
   },
 });
