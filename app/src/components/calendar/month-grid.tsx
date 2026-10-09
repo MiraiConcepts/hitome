@@ -2,7 +2,6 @@ import {
   forwardRef,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useImperativeHandle,
   useMemo,
   useRef,
@@ -133,8 +132,6 @@ const WEB_SNAP_CONTAINER =
  *  up to SNAP_RESTORE_TRIES times. */
 const SNAP_RESTORE_MS = 300;
 const SNAP_RETRY_MS = 50;
-/** How long after the last size change scroll reports are not believed. */
-const RESIZE_QUIET_MS = 600;
 const SNAP_RESTORE_TRIES = 40;
 
 /** The scroller's DOM node on web (RNW), null on native. */
@@ -348,7 +345,6 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     armSettle();
-    if (Date.now() < resizingUntil.current) return;
     // The header follows the scroll live: the month is whichever one the
     // offset is nearest, with nothing to settle afterwards.
     const index = nearestSnapIndex(snapOffsets, e.nativeEvent.contentOffset.y);
@@ -424,18 +420,11 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   };
 
   // Pane resize (rotation / window resize): the row height changed, so put the
-  // current month back under the viewport. A layout effect, so it runs before
-  // the browser reports any scroll for the new layout: the browser keeps the
-  // old offset in pixels while every row changes height, and read against the
-  // new rows that offset is some other month — years away on a far one. Scroll
-  // reports are therefore ignored until the size has been still for a moment
-  // (`resizing`), and the month being looked at is put back on every change.
+  // current month back under the viewport.
   const prevHeight = useRef(height);
-  const resizingUntil = useRef(0);
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (prevHeight.current === height) return;
     prevHeight.current = height;
-    resizingUntil.current = Date.now() + RESIZE_QUIET_MS;
     jumpTo(currentRow.current * rowHeight, false);
   }, [height, rowHeight, jumpTo]);
 
