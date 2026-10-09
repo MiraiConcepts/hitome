@@ -32,6 +32,7 @@ import {
   useEventEditor,
   type EventEditorController,
 } from '@/components/calendar/use-event-editor';
+import { BACKDROP_BLUR } from '@/constants/backdrop';
 import { AccentColor } from '@/constants/theme';
 import { useEscapeKey } from '@/hooks/use-escape-key';
 import { useTheme } from '@/hooks/use-theme';
@@ -52,6 +53,7 @@ function Backdrop(props: BottomSheetBackdropProps) {
   return (
     <BottomSheetBackdrop
       {...props}
+      style={[props.style, BACKDROP_BLUR]}
       appearsOnIndex={0}
       disappearsOnIndex={-1}
       pressBehavior="close"

@@ -11,6 +11,7 @@ import {
 import { EventEditorSheet } from '@/components/calendar/event-editor-sheet';
 import { useEventEditor } from '@/components/calendar/use-event-editor';
 import { ThemedView } from '@/components/themed-view';
+import { BACKDROP_BLUR } from '@/constants/backdrop';
 import { Colors, Spacing } from '@/constants/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 
@@ -84,7 +85,7 @@ function EventEditorDialog({ event, defaultDay, onClose, onDone }: Props) {
       animationType="fade"
       onRequestClose={scopeAsk ? editor.cancelScope : onClose}
     >
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, BACKDROP_BLUR]}>
         <ThemedView style={styles.card} testID="event-editor">
           <EventEditorHeader editor={editor} roomy />
           <ScrollView keyboardShouldPersistTaps="handled">
