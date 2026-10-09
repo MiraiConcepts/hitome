@@ -394,14 +394,14 @@ export const WeekRow = memo(function WeekRow({
 
   const dayAt = useCallback((col: number) => toDateString(days[col]), [days]);
 
-  /** Tap: the day's list. An empty day has no list: on the phone it stays
-   *  inert (the cell is still there to be held), and on the web, where a
-   *  mouse has no hold, a click there starts a new event instead. */
+  /** Tap: the day's list. An empty day has no list, so a tap there starts a
+   *  new event on it, on the phone as on the web (a hold does the same, on a
+   *  day with events too). */
   const openDay = useCallback(
     (col: number) => {
       const day = dayAt(col);
       if (daysWithEvents.has(day)) onOpenDay(day);
-      else if (Platform.OS === 'web') onCreateOnDay(day);
+      else onCreateOnDay(day);
     },
     [dayAt, daysWithEvents, onOpenDay, onCreateOnDay]
   );

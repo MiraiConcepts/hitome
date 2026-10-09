@@ -178,11 +178,13 @@ export function EventBanner({
   const ink = readableTextColor(fill);
   const pressed = pressedOccurrence.useIs(event.id);
   const dimmed = hoveredOccurrence.useDimmed(event.id);
-  // Out of focus, a banner fades by blending toward the grid's ground rather
-  // than turning see-through: it crosses the grid's rules (the weekend line
-  // among them), which showed through a translucent fill.
+  // Out of focus, or pressed, a banner fades by blending toward the grid's
+  // ground rather than turning see-through: it crosses the grid's rules (the
+  // weekend line among them), which showed through a translucent fill. A
+  // press washes it further than a hover: it has to read under a thumb.
   const ground = useTheme().background;
-  const fade = (color: string) => mixHex(color, ground, 1 - UNFOCUSED);
+  const wash = pressed ? 1 - BANNER_PRESSED : dimmed ? 1 - UNFOCUSED : 0;
+  const fade = (color: string) => (wash ? mixHex(color, ground, wash) : color);
   const { onPressIn, onPressOut } = press;
   return (
     <Pressable
@@ -203,22 +205,17 @@ export function EventBanner({
       accessibilityLabel={event.summary}
       style={[
         styles.banner,
-        { backgroundColor: dimmed ? fade(fill) : fill },
+        { backgroundColor: fade(fill) },
         continuesRight && styles.bannerContinuesRight,
         style,
         BANNER_FOCUS_MOTION,
-        pressed && styles.pressed,
       ]}
     >
       <ThemedText
         type="small"
         numberOfLines={titleLines}
         textBreakStrategy="simple"
-        style={[
-          styles.bannerTitle,
-          TITLE_FOCUS_MOTION,
-          { color: dimmed ? fade(ink) : ink },
-        ]}
+        style={[styles.bannerTitle, TITLE_FOCUS_MOTION, { color: fade(ink) }]}
       >
         {event.summary || '(untitled)'}
       </ThemedText>
@@ -251,6 +248,9 @@ const CHIP_GAP = 3;
 /** The other events' strength while one is hovered (web only: nothing
  *  hovers on a phone), and how fast they dim and return. */
 const UNFOCUSED = 0.4;
+/** A banner's strength under a thumb: the fill is the event's whole face, so
+ *  it goes further than a hover's. */
+const BANNER_PRESSED = 0.6;
 const focusMotion = (property: string) =>
   Platform.OS === 'web'
     ? ({
@@ -271,11 +271,6 @@ const styles = StyleSheet.create({
   // Every event but the hovered one, while one is.
   unfocused: {
     opacity: UNFOCUSED,
-  },
-  // A banner's fill is the event's whole face, so a press dims it further
-  // than a hover: it has to read under a thumb.
-  pressed: {
-    opacity: 0.6,
   },
   chip: {
     flexDirection: 'row',
