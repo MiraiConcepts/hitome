@@ -23,6 +23,7 @@ import {
   RepeatIcon,
 } from '@/components/icons';
 import {
+  DashedLine,
   SettingsButton,
   SettingsMessage,
   SettingsToggle,
@@ -95,15 +96,25 @@ function whenLabel(editor: EventEditorController): string {
 export function EventEditorHeader({
   editor,
   roomy = false,
+  card = false,
 }: {
   editor: EventEditorController;
+  /** The desktop dialog's card: the title on the card's own ground, not the
+   *  header's black band. */
+  card?: boolean;
   /** The centred dialog's header, with no grab handle above it to lend it
    *  height: a roomier bar, so the day does not sit hard against the card's
    *  top edge. */
   roomy?: boolean;
 }) {
   return (
-    <View style={[styles.header, roomy && styles.headerRoomy]}>
+    <View
+      style={[
+        styles.header,
+        roomy && styles.headerRoomy,
+        card && styles.headerCard,
+      ]}
+    >
       <ThemedText style={styles.headerTitle} testID="editor-title">
         {dayLabel(editor.headerDay)}
       </ThemedText>
@@ -302,10 +313,17 @@ export function EventEditorFields({
   );
 
   if (columns) {
+    // The card's dashed rule runs between the columns, so each column carries
+    // its own padding on either side of it.
     return (
-      <View style={[styles.fields, styles.columns]}>
-        <View style={styles.column}>{what}</View>
-        <View style={styles.column}>{details}</View>
+      <View style={[styles.fields, styles.columns, styles.columnsCard]}>
+        <View style={[styles.column, styles.columnPadded]}>{what}</View>
+        <View style={styles.columnRule}>
+          <View style={StyleSheet.absoluteFill}>
+            <DashedLine vertical />
+          </View>
+        </View>
+        <View style={[styles.column, styles.columnPadded]}>{details}</View>
       </View>
     );
   }
@@ -330,6 +348,8 @@ function FieldProblem({ text }: { text: string | null }) {
 type ActionsProps = {
   editor: EventEditorController;
   onClose: () => void;
+  /** The desktop card: no rule or ground of its own, the card draws them. */
+  card?: boolean;
   /** Extra room under the buttons — the sheet passes the gesture-bar inset. */
   bottomInset?: number;
 };
@@ -343,6 +363,7 @@ type ActionsProps = {
 export function EventEditorActions({
   editor,
   onClose,
+  card = false,
   bottomInset = 0,
 }: ActionsProps) {
   const theme = useTheme();
@@ -351,11 +372,14 @@ export function EventEditorActions({
     <View
       style={[
         styles.actions,
-        {
-          backgroundColor: theme.background,
-          borderTopColor: DIVIDER,
-          paddingBottom: styles.actions.paddingVertical + bottomInset,
-        },
+        card
+          ? null
+          : {
+              backgroundColor: theme.background,
+              borderTopColor: DIVIDER,
+              borderTopWidth: StyleSheet.hairlineWidth,
+            },
+        { paddingBottom: styles.actions.paddingVertical + bottomInset },
       ]}
     >
       {problem && (
@@ -509,6 +533,12 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.four,
     paddingBottom: Spacing.four - Spacing.one,
   },
+  // On the card's ground rather than the black band, with room to match.
+  headerCard: {
+    backgroundColor: 'transparent',
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.three,
+  },
   headerTitle: {
     fontFamily: FontFamilyBold,
     color: AccentColor,
@@ -550,6 +580,23 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: Spacing.four + Spacing.one,
   },
+  // Two columns with a rule between: the row stretches so the rule runs the
+  // full height, and the padding moves from the row to the columns.
+  columnsCard: {
+    alignItems: 'stretch',
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    gap: 0,
+  },
+  columnPadded: {
+    paddingHorizontal: Bar.paddingHorizontal,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.three,
+  },
+  columnRule: {
+    width: 1,
+  },
   detailsColumn: {
     flex: 1,
   },
@@ -569,7 +616,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Bar.paddingHorizontal,
     paddingVertical: Bar.paddingHorizontal,
     gap: Spacing.two,
-    borderTopWidth: StyleSheet.hairlineWidth,
   },
   scope: {
     gap: Spacing.two,

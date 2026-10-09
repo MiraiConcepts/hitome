@@ -10,10 +10,11 @@ import {
 } from '@/components/calendar/event-editor-form';
 import { EventEditorSheet } from '@/components/calendar/event-editor-sheet';
 import { useEventEditor } from '@/components/calendar/use-event-editor';
-import { ThemedView } from '@/components/themed-view';
+import { CardFrame, DashedLine } from '@/components/settings/settings-parts';
 import { BACKDROP_BLUR } from '@/constants/backdrop';
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
+import { useTheme } from '@/hooks/use-theme';
 
 export type { EditorResult } from '@/components/calendar/use-event-editor';
 
@@ -76,6 +77,7 @@ function EventEditorDialog({
   onDone,
   askDeleteFirst,
 }: Props) {
+  const theme = useTheme();
   const editor = useEventEditor({ event, defaultDay, onDone, askDeleteFirst });
   // Cmd/Ctrl+Enter saves from any field, as in a mail composer; Esc goes back
   // one step through the modal: out of the repeat question, then closed. Re-subscribed whenever save changes, so the
@@ -102,17 +104,25 @@ function EventEditorDialog({
       onRequestClose={scopeAsk ? editor.cancelScope : onClose}
     >
       <View style={[styles.backdrop, BACKDROP_BLUR]}>
-        <ThemedView style={styles.card} testID="event-editor">
-          <EventEditorHeader editor={editor} roomy />
-          <ScrollView keyboardShouldPersistTaps="handled">
+        <CardFrame
+          style={[styles.card, { backgroundColor: theme.background }]}
+          testID="event-editor"
+        >
+          <EventEditorHeader editor={editor} roomy card />
+          <DashedLine />
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            style={styles.fieldsScroll}
+          >
             <EventEditorFields
               editor={editor}
               autoFocusTitle={!event}
               columns
             />
           </ScrollView>
-          <EventEditorActions editor={editor} onClose={onClose} />
-        </ThemedView>
+          <DashedLine />
+          <EventEditorActions editor={editor} onClose={onClose} card />
+        </CardFrame>
       </View>
     </Modal>
   );
@@ -129,12 +139,18 @@ const styles = StyleSheet.create({
   // Wide enough for two columns of fields. The edge is drawn because the
   // header's black ground is the dimmed backdrop's colour: without it the
   // date title looked to float above the card.
+  // When nothing in the form holds the focus (the delete question of a repeating
+  // event), the dialog hands it to this scroll area, and Chrome rings it.
+  fieldsScroll: {
+    outlineStyle: 'solid',
+    outlineWidth: 0,
+  },
+  // The settings card's frame (accent bar, dotted top, hard shadow), wide
+  // enough for two columns of fields.
   card: {
-    overflow: 'hidden',
     width: '100%',
     maxWidth: 840,
     maxHeight: '90%',
-    borderWidth: 1,
-    borderColor: Colors.dark.ruleStrong,
+    boxShadow: '4px 4px 0px rgba(0, 0, 0, 0.75)',
   },
 });

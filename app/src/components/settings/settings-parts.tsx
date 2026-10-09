@@ -1,5 +1,12 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type DimensionValue } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  View,
+  type DimensionValue,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -106,12 +113,35 @@ type SectionProps = {
  */
 export function SettingsSection({ title, children, testID }: SectionProps) {
   return (
-    <View style={styles.card} testID={testID}>
+    <CardFrame testID={testID}>
+      <ThemedText style={styles.cardTitle}>{title}</ThemedText>
+      {children}
+    </CardFrame>
+  );
+}
+
+/**
+ * The card's frame on its own: the accent bar down the left edge, the dotted
+ * top edge and the hard offset shadow, around whatever the card holds. The
+ * event editor's desktop dialog is one, with its own rules between header,
+ * fields and buttons. `style` sets what the frame does not: its ground, its
+ * width.
+ */
+export function CardFrame({
+  children,
+  style,
+  testID,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  testID?: string;
+}) {
+  return (
+    <View style={[styles.card, style]} testID={testID}>
       <View style={styles.cardTopEdge} pointerEvents="none">
         <DashedLine weight={Card.dotted} dash={Card.dot} strong />
       </View>
       <View style={styles.cardAccentBar} pointerEvents="none" />
-      <ThemedText style={styles.cardTitle}>{title}</ThemedText>
       {children}
     </View>
   );
@@ -123,7 +153,7 @@ export function SettingsSection({ title, children, testID }: SectionProps) {
  * SVG rather than a border, because Android only dashes a border drawn on
  * all four sides.
  */
-function DashedLine({
+export function DashedLine({
   vertical = false,
   weight = 1,
   dash = Card.dash,
