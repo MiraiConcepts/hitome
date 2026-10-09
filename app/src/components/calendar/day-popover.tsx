@@ -145,7 +145,7 @@ export function DayPopover({
         <View style={styles.cardWrap}>
           <ThemedView style={styles.card} testID="day-popover">
             <ScrollView>
-              <SettingsSection title={dayLabel(day)}>
+              <SettingsSection title={dayLabel(day)} large>
                 {sorted.map((event) => {
                   const duration = durationLabel(
                     event.start,

@@ -5,7 +5,6 @@ import {
   BottomSheetTextInput,
   useBottomSheetModal,
   type BottomSheetBackdropProps,
-  type BottomSheetBackgroundProps,
   type BottomSheetFooterProps,
   type BottomSheetScrollViewMethods,
 } from '@gorhom/bottom-sheet';
@@ -31,8 +30,6 @@ import {
   type EditorResult,
 } from '@/components/calendar/event-editor-form';
 import { HEADER_GROUND } from '@/components/calendar/month-header';
-import { BlurBackdrop } from '@/components/blur-backdrop';
-import { Card, DashedLine } from '@/components/settings/settings-parts';
 import {
   useEventEditor,
   type EventEditorController,
@@ -67,7 +64,6 @@ function Backdrop({ animatedIndex, style }: BottomSheetBackdropProps) {
   }));
   return (
     <Animated.View style={[style, styles.backdrop, shown, BACKDROP_BLUR]}>
-      <BlurBackdrop />
       <Pressable
         style={StyleSheet.absoluteFill}
         onPress={() => dismiss()}
@@ -76,20 +72,6 @@ function Backdrop({ animatedIndex, style }: BottomSheetBackdropProps) {
         focusable={false}
       />
     </Animated.View>
-  );
-}
-
-/**
- * The sheet's ground: the page's colour, square, under the handle, the form
- * and the footer, which are see-through.
- */
-function SheetBackground({ style }: BottomSheetBackgroundProps) {
-  const theme = useTheme();
-  return (
-    <View
-      pointerEvents="none"
-      style={[style, { backgroundColor: theme.background }]}
-    />
   );
 }
 
@@ -149,19 +131,13 @@ function makeFooter(
     // instead of leaving a strip where the fields show through beneath it.
     // Riding above the keyboard there is no bar to clear, so it drops.
     const keyboardShown = useKeyboardShown();
-    const theme = useTheme();
     return (
       <BottomSheetFooter {...props}>
-        {/* On the page's ground, so the fields do not show through. */}
-        <View style={{ backgroundColor: theme.background }}>
-          <DashedLine />
-          <EventEditorActions
-            editor={editor}
-            onClose={onClose}
-            card
-            bottomInset={keyboardShown ? 0 : bottomInset}
-          />
-        </View>
+        <EventEditorActions
+          editor={editor}
+          onClose={onClose}
+          bottomInset={keyboardShown ? 0 : bottomInset}
+        />
       </BottomSheetFooter>
     );
   };
@@ -178,13 +154,10 @@ function makeHandle(store: ReturnType<typeof createFooterStore>) {
     const { editor } = useSyncExternalStore(store.subscribe, store.get);
     return (
       <View>
-        {/* The grab handle sits on the header's black ground, so handle and
-            header read as one band, closed by the card's dotted edge. */}
         <View style={styles.handle}>
           <View style={styles.handleIndicator} />
         </View>
         <EventEditorHeader editor={editor} />
-        <DashedLine weight={Card.dotted} dash={Card.dot} strong />
       </View>
     );
   };
@@ -360,11 +333,14 @@ export function EventEditorSheet({
       // still and the keyboard covers the lower fields and the footer. With
       // adjustPan it measures the keyboard itself and lifts sheet + footer.
       android_keyboardInputMode="adjustPan"
-      // The settings card's frame; and square, where the library's default
-      // is rounded.
-      backgroundComponent={SheetBackground}
-      // The grab handle and the header on the card's ground, one bar over
-      // the form. Above the scroll view, not pinned inside it: a sticky header in a
+      backgroundStyle={{
+        backgroundColor: theme.background,
+        // The library rounds the sheet by default; the app is square.
+        borderRadius: 0,
+      }}
+      // The grab handle sits on the header's black ground, so handle and
+      // header read as one bar — the month header and weekday row's trick.
+      // Above the scroll view, not pinned inside it: a sticky header in a
       // sheet that also moves for the keyboard could slide off its place,
       // leaving a gap above it and the first field tucked under it.
       handleComponent={Handle}
@@ -388,14 +364,10 @@ export function EventEditorSheet({
         {Platform.OS === 'web' && (
           // Stuck to the bottom of the form while it scrolls, as the native
           // footer is: on a long event Save had scrolled out of sight.
-          <View
-            style={[styles.webActions, { backgroundColor: theme.background }]}
-          >
-            <DashedLine />
+          <View style={styles.webActions}>
             <EventEditorActions
               editor={editor}
               onClose={() => sheetRef.current?.dismiss()}
-              card
             />
           </View>
         )}
@@ -418,9 +390,9 @@ const styles = StyleSheet.create({
   },
   // The library's default handle box: 10 above and below the indicator.
   handle: {
+    backgroundColor: HEADER_GROUND,
     alignItems: 'center',
     paddingVertical: 10,
-    backgroundColor: HEADER_GROUND,
   },
   handleIndicator: {
     backgroundColor: AccentColor,

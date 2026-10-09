@@ -4,6 +4,7 @@ import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 import { AlarmField } from '@/components/calendar/alarm-field';
 import { CalendarField } from '@/components/calendar/calendar-field';
 import { LocationField } from '@/components/calendar/location-field';
+import { DayHeading } from '@/constants/heading';
 import { HEADER_GROUND } from '@/components/calendar/month-header';
 import { RecurrenceField } from '@/components/calendar/recurrence-field';
 import type { EventEditorController } from '@/components/calendar/use-event-editor';
@@ -54,10 +55,9 @@ const Bar = {
   paddingHorizontal: Spacing.four - Spacing.one,
   paddingTop: Spacing.two,
   paddingBottom: Spacing.three - Spacing.one,
-  // The settings screen's title size, so a sheet's day reads as a screen
-  // title rather than a caption.
-  titleSize: 28,
-  titleLineRatio: 1.3,
+  // The day's heading, shared with the day list's title.
+  titleSize: DayHeading.size,
+  titleLineRatio: DayHeading.lineRatio,
   subtitleSize: 14,
   labelGap: Spacing.half,
 } as const;

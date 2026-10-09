@@ -16,6 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Line } from 'react-native-svg';
 
+import { DayHeading } from '@/constants/heading';
 import { HEADER_GROUND } from '@/components/calendar/month-header';
 import {
   AlertCircleIcon,
@@ -102,6 +103,9 @@ export function SettingsHeader({ title, onBack }: HeaderProps) {
 
 type SectionProps = {
   title: string;
+  /** The title at the day heading's size (the editor's header), for a card
+   *  that is about one day. */
+  large?: boolean;
   children: ReactNode;
   testID?: string;
 };
@@ -112,10 +116,17 @@ type SectionProps = {
  * and each row draws the dashed rule above itself, so the card needs no idea
  * which of its children are rendered.
  */
-export function SettingsSection({ title, children, testID }: SectionProps) {
+export function SettingsSection({
+  title,
+  large,
+  children,
+  testID,
+}: SectionProps) {
   return (
     <CardFrame testID={testID}>
-      <ThemedText style={styles.cardTitle}>{title}</ThemedText>
+      <ThemedText style={[styles.cardTitle, large && styles.cardTitleLarge]}>
+        {title}
+      </ThemedText>
       {children}
     </CardFrame>
   );
@@ -751,6 +762,10 @@ const styles = StyleSheet.create({
     lineHeight: Math.round(Card.titleSize * 1.3),
     paddingVertical: Card.padV,
     paddingHorizontal: Card.padH,
+  },
+  cardTitleLarge: {
+    fontSize: DayHeading.size,
+    lineHeight: Math.round(DayHeading.size * DayHeading.lineRatio),
   },
   toggleRow: {
     flexDirection: 'row',
