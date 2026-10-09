@@ -220,7 +220,7 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
       .click({ position: { x: 10, y: 6 } });
     await expect(popover).toBeVisible();
     await expect(popover.getByText(/🧪 Busy/)).toHaveCount(10);
-    await popover.getByText("🧪 Busy 5").click();
+    await popover.getByRole("button", { name: "🧪 Busy 5" }).click();
     await expect(page.getByTestId("event-editor")).toBeVisible();
     await expect(page.getByTestId("editor-summary")).toHaveValue("🧪 Busy 5");
     await expect(page.getByTestId("editor-title")).toHaveText(
@@ -237,7 +237,7 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
       .click();
     await expect(popover).toBeVisible();
     await expect(popover.getByText(/🧪 Busy/)).toHaveCount(10);
-    await popover.getByText("🧪 Busy 5").click();
+    await popover.getByRole("button", { name: "🧪 Busy 5" }).click();
     await expect(page.getByTestId("editor-summary")).toHaveValue("🧪 Busy 5");
     await cancelEditor(page);
   });

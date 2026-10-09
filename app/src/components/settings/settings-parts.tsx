@@ -160,30 +160,74 @@ export function SettingsValue({
   label,
   value,
   testID,
+  labelWidth,
+  onPress,
+  pressLabel,
 }: {
-  label: string;
+  /** Text, or something of your own (the day list's mark and time). */
+  label: ReactNode;
   /** Text, or a control (SettingsToggle) in place of it. */
   value: ReactNode;
   testID?: string;
+  /** The label column's share of the row, where the card's own is too wide
+   *  or too narrow for what it holds. */
+  labelWidth?: string;
+  /** Makes the whole row a button, lit while hovered or pressed. Its own
+   *  tappable parts (a tag) are `pointerEvents: 'auto'` inside the value, and
+   *  everything else passes the press through: a button never holds another
+   *  button, which the web rejects as invalid HTML. */
+  onPress?: () => void;
+  pressLabel?: string;
 }) {
+  const theme = useTheme();
+  const passThrough = onPress ? styles.passThrough : null;
   return (
     <View testID={testID}>
       <DashedLine />
       <View style={styles.valueRow}>
-        <View style={styles.valueLabelCell}>
-          <ThemedText type="small" themeColor="textSecondary">
-            {label}
-          </ThemedText>
+        {onPress && (
+          <Pressable
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={pressLabel}
+            style={({
+              pressed,
+              hovered,
+            }: {
+              pressed: boolean;
+              hovered?: boolean;
+            }) => [
+              StyleSheet.absoluteFill,
+              (pressed || hovered) && {
+                backgroundColor: theme.backgroundSelected,
+              },
+            ]}
+          />
+        )}
+        <View
+          style={[
+            styles.valueLabelCell,
+            labelWidth ? { width: labelWidth as `${number}%` } : null,
+            passThrough,
+          ]}
+        >
+          {typeof label === 'string' ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              {label}
+            </ThemedText>
+          ) : (
+            label
+          )}
         </View>
         {/* Out of flow: a percentage-tall SVG has no height of its own to
             give, and in a browser it would set the row's height instead of
             filling it. */}
-        <View style={styles.columnRule}>
+        <View style={[styles.columnRule, passThrough]}>
           <View style={StyleSheet.absoluteFill}>
             <DashedLine vertical />
           </View>
         </View>
-        <View style={styles.valueCell}>
+        <View style={[styles.valueCell, passThrough]}>
           {typeof value === 'string' ? (
             <ThemedText type="small">{value}</ThemedText>
           ) : (
@@ -616,6 +660,10 @@ const styles = StyleSheet.create({
   },
   columnRule: {
     width: 1,
+  },
+  // Lets a press through to the row's own button beneath.
+  passThrough: {
+    pointerEvents: 'none',
   },
   valueLabelCell: {
     width: Card.labelColumn,

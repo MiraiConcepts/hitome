@@ -32,6 +32,7 @@ import {
   OnAccentColor,
   type ThemeColor,
 } from '@/constants/theme';
+import { LOCATION_FILL } from '@/constants/tags';
 import { rgbHex } from '@/utils/color';
 import { formatTime } from '@/utils/date';
 
@@ -72,11 +73,6 @@ const markerColor = (color: string | undefined) => rgbHex(color ?? AccentColor);
  *  event's source-calendar color. */
 const markerSvg = (color: string | undefined, body: string) =>
   iconSvg(markerColor(color), body);
-
-/** The location chip's fill — Firefox brand blue, fixed rather than
- *  palette.link because the dark scheme's link (#5B9DFF) is far too light to
- *  carry white text. This holds roughly 5:1 against white in either scheme. */
-const LOCATION_FILL = '#0060E0';
 
 // Shared style fragments — the widget's tiny design system. Sizes are plain
 // literals by convention (the widget is its own design surface; see the
