@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "hitome",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "android": {
       "package": "com.miraiconcepts.hitome",
       "versionCode": 16,

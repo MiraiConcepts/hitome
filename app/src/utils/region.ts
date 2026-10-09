@@ -3,7 +3,9 @@
 // that lay out the grid and format times. Imported from index.ts, so the
 // headless widget and reminder tasks get them too, along with the language
 // the widget's day and month names are written in.
+import { reloadAppAsync } from 'expo';
 import { getCalendars, getLocales } from 'expo-localization';
+import { AppState, Platform } from 'react-native';
 
 import { setWriteZone } from '@/caldav/ics';
 import { initWeekStart } from '@/config/week-start';
@@ -32,4 +34,28 @@ try {
 } catch {
   // Unknown: Monday weeks, a 24-hour clock and English names, as before.
   initWeekStart(1);
+}
+
+/** The phone's zone as Android has it now (read fresh on every call). */
+function phoneZone(): string | undefined {
+  try {
+    return getCalendars()[0]?.timeZone ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// The JS engine reads the zone's offset once, when it starts, and is never
+// told of a change: after the phone's zone changes, every local date in this
+// running app (the grid, today, event times, the widget's rows) stays in the
+// old zone. Start the app again when it next comes forward; the launch then
+// redraws the widget and reschedules reminders in the new zone.
+const launchZone = phoneZone();
+if (Platform.OS === 'android' && launchZone) {
+  AppState.addEventListener('change', (state) => {
+    if (state !== 'active') return;
+    const zone = phoneZone();
+    if (zone && zone !== launchZone)
+      reloadAppAsync('Time zone changed').catch(() => {});
+  });
 }
