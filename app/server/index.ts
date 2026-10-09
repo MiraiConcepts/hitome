@@ -133,7 +133,11 @@ async function login(req: Request): Promise<Response> {
     return json({ error: 'too-many', retryAfter: Math.ceil(wait / 1000) }, 429);
   let body: { username?: unknown; password?: unknown };
   try {
-    body = await req.json();
+    const parsed: unknown = await req.json();
+    // `null`, a number or a string is valid JSON but not a login.
+    if (typeof parsed !== 'object' || parsed === null)
+      return json({ error: 'bad-request' }, 400);
+    body = parsed;
   } catch {
     return json({ error: 'bad-request' }, 400);
   }
@@ -230,6 +234,8 @@ async function staticFile(req: Request, url: URL): Promise<Response> {
   } catch {
     return new Response(null, { status: 400 });
   }
+  // No file name holds a NUL, and Bun.file throws on one.
+  if (pathname.includes('\0')) return new Response(null, { status: 400 });
   // As the old Caddyfile's try_files: the file, the route's own .html (the
   // export writes one per route), else the app shell for client routing.
   const candidates = [
@@ -293,9 +299,22 @@ type WsData = { path: string; upstream?: WebSocket; queue: Frame[] };
 /** A calendar event is a few kilobytes; nothing here needs more than this. */
 const MAX_BODY_BYTES = 16 * 1024 * 1024;
 
+/** How long a connection may sit without a byte moving, in seconds. Bun's own
+ *  default is 10, which cut a slow calendar answer (the forward waits up to 60 s,
+ *  the login check 15 s) as an empty reply before the server could say 502. */
+const IDLE_TIMEOUT_S = 90;
+
 const server = Bun.serve<WsData>({
   port: PORT,
   maxRequestBodySize: MAX_BODY_BYTES,
+  idleTimeout: IDLE_TIMEOUT_S,
+  // Never Bun's development error page: it prints the server's source lines and
+  // paths to whoever caused the error. (Bun turns it on unless NODE_ENV says
+  // production, and the image did not set it.)
+  development: false,
+  error() {
+    return withSecurity(json({ error: 'server-error' }, 500));
+  },
   async fetch(req, srv) {
     const url = new URL(req.url);
     const path = url.pathname;

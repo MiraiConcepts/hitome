@@ -43,6 +43,7 @@ import {
   linkHost,
   type WidgetDayItem,
 } from './format';
+import { eventLink, newEventLink } from './links';
 import type { WidgetCache } from './types';
 
 type Palette = Record<ThemeColor, string>;
@@ -197,7 +198,7 @@ function EventRow({
       // resolves against a fresh fetch, and falls back to the day's list when
       // it does not — which is the truthful answer, since the event is gone.
       clickActionData={{
-        uri: `app:///?day=${day}&event=${encodeURIComponent(event.id)}`,
+        uri: eventLink(day, event.id),
       }}
       style={{
         width: 'match_parent',
@@ -480,7 +481,7 @@ function Agenda({
         <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
           <FlexWidget
             clickAction="OPEN_URI"
-            clickActionData={{ uri: `app:///?new=${now.getTime()}` }}
+            clickActionData={{ uri: newEventLink(now.getTime()) }}
             style={{ padding: 6 }}
             accessibilityLabel="Add event"
           >

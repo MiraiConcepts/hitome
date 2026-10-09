@@ -398,31 +398,34 @@ export function MonthScreen() {
   // over, so the list closes to let it show (a dialog would cover it); a
   // repeating one needs "which occurrences?", which the editor already asks,
   // so it opens there.
-  const onDeleteEvent = useCallback(
-    async (event: CalEvent) => {
-      setPopoverDay(null);
-      if (event.recurring) {
-        setEditor({ mode: 'edit', event, askDelete: true });
+  //
+  // The callback is made once, so it reaches the current onEditorDone through
+  // a ref: the one from the first render refreshes the month the app opened on,
+  // not the one on screen, and the deleted event stayed drawn under the toast.
+  const doneRef = useRef<(result: EditorResult) => void>(() => {});
+  useEffect(() => {
+    doneRef.current = onEditorDone;
+  });
+  const onDeleteEvent = useCallback(async (event: CalEvent) => {
+    setPopoverDay(null);
+    if (event.recurring) {
+      setEditor({ mode: 'edit', event, askDelete: true });
+      return;
+    }
+    try {
+      await deleteEvent(event, 'all');
+      doneRef.current({ deleted: event, scope: 'all' });
+    } catch (err) {
+      if (err instanceof ConflictError) {
+        doneRef.current('conflict');
         return;
       }
-      try {
-        await deleteEvent(event, 'all');
-        onEditorDone({ deleted: event, scope: 'all' });
-      } catch (err) {
-        if (err instanceof ConflictError) {
-          onEditorDone('conflict');
-          return;
-        }
-        setSnack({
-          message: writeFailureMessage(err, 'delete'),
-          icon: AlertCircleIcon,
-        });
-      }
-    },
-    // onEditorDone is rebuilt every render and only sets state and refreshes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
+      setSnack({
+        message: writeFailureMessage(err, 'delete'),
+        icon: AlertCircleIcon,
+      });
+    }
+  }, []);
 
   // Hold a cell anywhere, its events included — a new event on that day.
   const onCreateOnDay = useCallback(

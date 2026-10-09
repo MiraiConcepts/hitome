@@ -38,7 +38,7 @@ COPY --from=build /app/dist /srv
 # logged in.
 RUN mkdir -p /data && chown bun:bun /data
 VOLUME /data
-ENV PORT=3000 STATIC_DIR=/srv DATA_DIR=/data
+ENV NODE_ENV=production PORT=3000 STATIC_DIR=/srv DATA_DIR=/data
 USER bun
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://localhost:3000/healthz || exit 1

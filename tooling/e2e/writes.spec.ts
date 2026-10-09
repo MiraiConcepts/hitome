@@ -309,3 +309,71 @@ test("writes reach the server: create, edit, delete, undo, move, conflict", asyn
       .toBe(1);
   });
 });
+
+test("the day list's trash updates the month on screen, not the one the page opened on", async ({
+  page,
+}) => {
+  // Ten events on one day make it overflow ("+N"), which is what opens the
+  // list. The page opens on THIS month and is then paged six months on: the
+  // refresh after a delete used to be bound to the month the page opened on,
+  // so the deleted event stayed drawn (here: the counter stayed) until the
+  // 60 s poll, under a toast that said it was gone.
+  const compact = (d: Date) => dateString(d).replace(/-/g, "");
+  const uids = Array.from({ length: 10 }, (_, i) => `e2e-trash-${i + 1}`);
+  const ics = (uid: string, i: number) =>
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//hitome e2e//EN",
+      "BEGIN:VEVENT",
+      `UID:${uid}`,
+      "DTSTAMP:20260101T000000Z",
+      `SUMMARY:🧪 Trash ${i + 1}`,
+      `DTSTART:${compact(day(27))}T${pad(8 + i)}0000`,
+      `DTEND:${compact(day(27))}T${pad(8 + i)}4500`,
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n");
+  try {
+    for (const [i, uid] of uids.entries()) {
+      const res = await page.request.put(`${CAL}${uid}.ics`, {
+        headers: { "Content-Type": "text/calendar" },
+        data: ics(uid, i),
+      });
+      expect([201, 204]).toContain(res.status());
+    }
+
+    await page.goto("/");
+    const label = page.getByTestId("calendar-header-label");
+    const monthLabel = (d: Date) =>
+      d.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+    await expect(label).toHaveText(monthLabel(now), { timeout: 30_000 });
+    for (let i = 1; i <= 6; i++) {
+      await page.keyboard.press("PageDown");
+      await expect(label).toHaveText(
+        monthLabel(new Date(now.getFullYear(), now.getMonth() + i, 1)),
+        { timeout: 10_000 },
+      );
+    }
+
+    const more = grid(page).getByTestId(`more-${dateString(day(27))}`);
+    await expect(more).toHaveText(/\+\d+/);
+    const before = Number((await more.innerText()).replace("+", ""));
+
+    await grid(page)
+      .getByTestId(`day-cell-${dateString(day(27))}`)
+      .click({ position: { x: 10, y: 6 } });
+    const popover = page.getByTestId("day-popover");
+    await expect(popover.getByText(/🧪 Trash/)).toHaveCount(10);
+    await popover
+      .getByRole("button", { name: "Delete 🧪 Trash 3", exact: true })
+      .click();
+
+    await expect(page.getByText("Event deleted")).toBeVisible();
+    // Well inside the poll interval: the refresh itself did it.
+    await expect(more).toHaveText(`+${before - 1}`, { timeout: 8_000 });
+  } finally {
+    for (const uid of uids) await page.request.delete(`${CAL}${uid}.ics`);
+  }
+});
