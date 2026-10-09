@@ -10,7 +10,7 @@ import Animated, {
 import { CircleDashedIcon } from '@/components/icons';
 
 /** One revolution. Slow on purpose: this only says "working". */
-const SPIN_MS = 1400;
+const SPIN_MS = 2000;
 
 /**
  * The app's busy indicator inside a control: Tabler's dashed circle, turning

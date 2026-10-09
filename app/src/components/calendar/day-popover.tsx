@@ -19,8 +19,15 @@ import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, formatTime } from '@/utils/date';
 import { durationLabel } from '@/utils/duration';
 
-const TITLE_LINE = 24;
-const TITLE_LINE_COMPACT = 21;
+/** A row's padding: the same on the value's two sides, and the same above and
+ *  below in the time cell and the title's, so the two first lines align. */
+const ROW_PAD_X = 16;
+const ROW_PAD_Y = 12;
+/** The title and the time are one size: a row reads as one line of type. */
+const ROW_FONT = 15;
+const ROW_LINE = 21;
+const ROW_FONT_COMPACT = 14;
+const ROW_LINE_COMPACT = 20;
 /** The time column: a start time and a duration are short, so it is narrow,
  *  but wide enough for the widest ("11:00 am", bold) on one line. */
 const WHEN_COLUMN = 108;
@@ -93,7 +100,9 @@ export function DayPopover({
                     <SettingsValue
                       key={event.id}
                       labelWidth={compact ? WHEN_COLUMN_COMPACT : WHEN_COLUMN}
-                      valueInset={Spacing.one + 1}
+                      cellPaddingY={ROW_PAD_Y}
+                      valuePaddingX={ROW_PAD_X}
+                      centerValue
                       onPress={() => onPressEvent(event)}
                       pressLabel={event.summary || '(untitled)'}
                       trailing={
@@ -215,18 +224,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    lineHeight: TITLE_LINE,
+    fontSize: ROW_FONT,
+    lineHeight: ROW_LINE,
   },
   titleCompact: {
-    fontSize: 15,
-    lineHeight: TITLE_LINE_COMPACT,
+    fontSize: ROW_FONT_COMPACT,
+    lineHeight: ROW_LINE_COMPACT,
   },
   when: {
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: ROW_FONT,
+    lineHeight: ROW_LINE,
   },
   whenCompact: {
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: ROW_FONT_COMPACT,
+    lineHeight: ROW_LINE_COMPACT,
   },
 });

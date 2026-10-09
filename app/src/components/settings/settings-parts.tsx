@@ -191,7 +191,9 @@ export function SettingsValue({
   value,
   testID,
   labelWidth,
-  valueInset,
+  cellPaddingY,
+  valuePaddingX,
+  centerValue,
   onPress,
   pressLabel,
   trailing,
@@ -204,8 +206,14 @@ export function SettingsValue({
   /** The label column's share of the row, where the card's own is too wide
    *  or too narrow for what it holds. */
   labelWidth?: DimensionValue;
-  /** Extra room before the value, on top of the cell's padding. */
-  valueInset?: number;
+  /** The label's and the value's vertical padding, where the card's own is
+   *  not the room a row wants; both together, so their first lines align. */
+  cellPaddingY?: number;
+  /** The value's padding on both sides, the same either way. */
+  valuePaddingX?: number;
+  /** Centre the value up and down in its cell, for a row whose label is
+   *  taller than the value (a title beside a two-line time). */
+  centerValue?: boolean;
   /** Makes the whole row a button, lit while hovered or pressed. Its own
    *  tappable parts (a tag) are `pointerEvents: 'auto'` inside the value, and
    *  everything else passes the press through: a button never holds another
@@ -228,23 +236,13 @@ export function SettingsValue({
     <View testID={testID}>
       <DashedLine />
       <View style={styles.valueRow}>
-        {onPress && (
-          <Pressable
-            onPress={onPress}
-            accessibilityRole="button"
-            accessibilityLabel={pressLabel}
-            onHoverIn={() => setHovered(true)}
-            onHoverOut={() => setHovered(false)}
-            onPressIn={() => setPressed(true)}
-            onPressOut={() => setPressed(false)}
-            style={StyleSheet.absoluteFill}
-          />
-        )}
         <View
           style={[
             styles.valueLabelCell,
             labelWidth ? { width: labelWidth } : null,
-            passThrough,
+            cellPaddingY !== undefined
+              ? { paddingVertical: cellPaddingY }
+              : null,
           ]}
         >
           {typeof label === 'string' ? (
@@ -258,7 +256,7 @@ export function SettingsValue({
         {/* Out of flow: a percentage-tall SVG has no height of its own to
             give, and in a browser it would set the row's height instead of
             filling it. */}
-        <View style={[styles.columnRule, passThrough]}>
+        <View style={styles.columnRule}>
           <View style={StyleSheet.absoluteFill}>
             <DashedLine vertical />
           </View>
@@ -266,11 +264,31 @@ export function SettingsValue({
         <View
           style={[
             styles.valueCell,
-            valueInset ? { paddingLeft: Card.padH + valueInset } : null,
+            cellPaddingY !== undefined
+              ? { paddingVertical: cellPaddingY }
+              : null,
+            valuePaddingX !== undefined
+              ? { paddingHorizontal: valuePaddingX }
+              : null,
+            centerValue ? styles.valueCentered : null,
             passThrough,
             lit && { backgroundColor: theme.backgroundSelected },
           ]}
         >
+          {onPress && (
+            // The row's button is this cell alone: the time beside it is not
+            // a target, and neither lights nor answers a click.
+            <Pressable
+              onPress={onPress}
+              accessibilityRole="button"
+              accessibilityLabel={pressLabel}
+              onHoverIn={() => setHovered(true)}
+              onHoverOut={() => setHovered(false)}
+              onPressIn={() => setPressed(true)}
+              onPressOut={() => setPressed(false)}
+              style={[StyleSheet.absoluteFill, styles.pressTarget]}
+            />
+          )}
           {typeof value === 'string' ? (
             <ThemedText type="small">{value}</ThemedText>
           ) : (
@@ -718,10 +736,18 @@ const styles = StyleSheet.create({
   passThrough: {
     pointerEvents: 'none',
   },
+  // The button sits in a cell that passes presses through, so it takes its
+  // own.
+  pressTarget: {
+    pointerEvents: 'auto',
+  },
   valueLabelCell: {
     width: Card.labelColumn,
     paddingVertical: Card.padV,
     paddingHorizontal: Card.padH,
+  },
+  valueCentered: {
+    justifyContent: 'center',
   },
   trailingCell: {
     width: 48,
