@@ -1,5 +1,12 @@
 import { useEffect } from 'react';
-import { Modal, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import type { CalEvent } from '@/caldav/types';
 import {
@@ -11,7 +18,7 @@ import {
 import { EventEditorSheet } from '@/components/calendar/event-editor-sheet';
 import { useEventEditor } from '@/components/calendar/use-event-editor';
 import { CardFrame, DashedLine } from '@/components/settings/settings-parts';
-import { BACKDROP_BLUR } from '@/constants/backdrop';
+import { MODAL_ANIMATION, useBackdropFade } from '@/constants/backdrop';
 import { Spacing } from '@/constants/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 import { useTheme } from '@/hooks/use-theme';
@@ -78,6 +85,7 @@ function EventEditorDialog({
   askDeleteFirst,
 }: Props) {
   const theme = useTheme();
+  const fade = useBackdropFade();
   const editor = useEventEditor({ event, defaultDay, onDone, askDeleteFirst });
   // Cmd/Ctrl+Enter saves from any field, as in a mail composer; Esc goes back
   // one step through the modal: out of the repeat question, then closed. Re-subscribed whenever save changes, so the
@@ -100,10 +108,19 @@ function EventEditorDialog({
     <Modal
       visible
       transparent
-      animationType="fade"
+      animationType={MODAL_ANIMATION}
       onRequestClose={scopeAsk ? editor.cancelScope : onClose}
     >
-      <View style={[styles.backdrop, BACKDROP_BLUR]}>
+      <View style={[styles.backdrop, fade]}>
+        {/* A click outside the card steps back, as Escape does: out of the
+            repeat question first, then closed. A layer behind the card, not
+            around it, and not a keyboard stop (the popover's, too). */}
+        <Pressable
+          style={[StyleSheet.absoluteFill, styles.dismiss]}
+          onPress={scopeAsk ? editor.cancelScope : onClose}
+          focusable={false}
+          accessibilityLabel="Close"
+        />
         <CardFrame
           style={[styles.card, { backgroundColor: theme.background }]}
           testID="event-editor"
@@ -139,6 +156,12 @@ const styles = StyleSheet.create({
   // Wide enough for two columns of fields. The edge is drawn because the
   // header's black ground is the dimmed backdrop's colour: without it the
   // date title looked to float above the card.
+  // Solid at zero width: Chrome draws its 'auto' focus ring whatever the width
+  // says, so the style has to change too.
+  dismiss: {
+    outlineStyle: 'solid',
+    outlineWidth: 0,
+  },
   // When nothing in the form holds the focus (the delete question of a repeating
   // event), the dialog hands it to this scroll area, and Chrome rings it.
   fieldsScroll: {
