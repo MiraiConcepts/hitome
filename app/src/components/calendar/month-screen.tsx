@@ -24,6 +24,7 @@ import type { CalEvent } from '@/caldav/types';
 import { LARGE_SPINNER } from '@/components/boot-screen';
 import { markCalendarReady } from '@/components/calendar/calendar-ready';
 import { ConnectionProblem } from '@/components/calendar/connection-problem';
+import { DayPanel } from '@/components/calendar/day-panel';
 import { DayPopover } from '@/components/calendar/day-popover';
 import { GridSpotlight } from '@/components/calendar/grid-spotlight';
 import {
@@ -55,6 +56,7 @@ import {
 import { recheckSource } from '@/config/source';
 import { useCalendarKeys } from '@/hooks/use-calendar-keys';
 import { useDeepLink } from '@/hooks/use-deep-link';
+import { useIsWide } from '@/hooks/use-is-wide';
 import { useMonthEvents } from '@/hooks/use-month-events';
 import {
   inHiddenCalendar,
@@ -155,6 +157,10 @@ export function MonthScreen() {
   );
   const [snack, setSnack] = useState<Snack>(null);
   const [popoverDay, setPopoverDay] = useState<string | null>(null);
+  // A wide web window lists a day in a panel beside the grid; a phone, and a
+  // narrow window, keep the dialog.
+  const isWide = useIsWide();
+  const sidePanel = Platform.OS === 'web' && isWide;
   // Spins the header's refresh icon — only for button-pressed refreshes, not
   // the fetches that follow scrolling or the foreground poll.
   const [manualRefreshing, setManualRefreshing] = useState(false);
@@ -309,7 +315,8 @@ export function MonthScreen() {
   // pointing at. Held until the grid is actually visible: firing it under the
   // popover would spend the whole animation behind it. Reads the pre-update
   // popover, so the render that opens one does not also flash beneath it.
-  const overlayOpen = editor.mode !== 'closed' || popoverDay !== null;
+  const overlayOpen =
+    editor.mode !== 'closed' || (popoverDay !== null && !sidePanel);
   if (arrivedDay && !overlayOpen) {
     setPulse((prev) => ({ day: arrivedDay, nonce: (prev?.nonce ?? 0) + 1 }));
     setArrivedDay(null);
@@ -335,10 +342,15 @@ export function MonthScreen() {
   // day's full list.
   const onOpenDay = useCallback((day: string) => setPopoverDay(day), []);
 
-  const onPressEvent = useCallback((event: CalEvent) => {
-    setPopoverDay(null);
-    setEditor({ mode: 'edit', event });
-  }, []);
+  const onPressEvent = useCallback(
+    (event: CalEvent) => {
+      // The panel stays up under the editor, so closing it lands back on the
+      // day's list; the dialog gives way to it.
+      if (!sidePanel) setPopoverDay(null);
+      setEditor({ mode: 'edit', event });
+    },
+    [sidePanel]
+  );
 
   // Hold a cell anywhere, its events included — a new event on that day.
   const onCreateOnDay = useCallback(
@@ -502,8 +514,11 @@ export function MonthScreen() {
           insetting it cost every row height and shortened every scroll. The
           snackbar and the version badge sit outside this and apply the inset
           themselves, so they stay clear of the bar regardless. */}
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <View style={styles.content}>
+      <SafeAreaView
+        style={[styles.safeArea, sidePanel && styles.safeAreaWide]}
+        edges={['top', 'left', 'right']}
+      >
+        <View style={[styles.content, sidePanel && styles.contentBesidePanel]}>
           <MonthHeader
             label={monthLabel}
             monthIndex={month.year * 12 + month.month0}
@@ -573,6 +588,15 @@ export function MonthScreen() {
             )}
           </View>
         </View>
+        {sidePanel && popoverDay && (
+          <DayPanel
+            day={popoverDay}
+            events={popoverEvents}
+            onClose={() => setPopoverDay(null)}
+            onPressEvent={onPressEvent}
+            onAdd={() => setEditor({ mode: 'create', day: popoverDay })}
+          />
+        )}
       </SafeAreaView>
 
       {/* Floating, not in the grid's flow: a bar that arrived in flow
@@ -641,7 +665,7 @@ export function MonthScreen() {
         />
       )}
 
-      {popoverDay && (
+      {popoverDay && !sidePanel && (
         <DayPopover
           day={popoverDay}
           events={popoverEvents}
@@ -680,6 +704,15 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  // The grid's column and, when a day is open, its panel side by side.
+  safeAreaWide: {
+    flexDirection: 'row',
+  },
+  contentBesidePanel: {
+    width: 'auto',
+    flexShrink: 1,
+    minWidth: 0,
   },
   // Full-bleed on every platform: a month grid is a seven-column table, so the
   // window's width is the columns' width. Capping it (the 800px

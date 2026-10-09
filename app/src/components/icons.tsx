@@ -9,6 +9,7 @@ import {
   AlertCircleOutlineBody,
   CalendarEventOutlineBody,
   CheckOutlineBody,
+  CloseOutlineBody,
   ChevronLeftOutlineBody,
   InfoCircleOutlineBody,
   CircleDashedOutlineBody,
@@ -51,6 +52,10 @@ export function RefreshIcon({ size = 24, color }: IconProps) {
 
 export function AddIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(AddOutlineBody, size, color)} />;
+}
+
+export function CloseIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(CloseOutlineBody, size, color)} />;
 }
 
 export function SettingsIcon({ size = 24, color }: IconProps) {
