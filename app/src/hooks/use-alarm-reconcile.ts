@@ -20,10 +20,19 @@ export function useAlarmReconcile(): void {
   const lastRun = useRef(0);
 
   useEffect(() => {
+    let trailing: ReturnType<typeof setTimeout> | null = null;
     function kick() {
-      const now = Date.now();
-      if (now - lastRun.current < MIN_INTERVAL_MS) return;
-      lastRun.current = now;
+      const wait = lastRun.current + MIN_INTERVAL_MS - Date.now();
+      if (wait > 0) {
+        // Too soon after the last run: run once more when the interval is
+        // up, so a change made in between still gets its reminder.
+        trailing ??= setTimeout(() => {
+          trailing = null;
+          kick();
+        }, wait);
+        return;
+      }
+      lastRun.current = Date.now();
       runAlarmReconcile();
     }
 
@@ -44,6 +53,7 @@ export function useAlarmReconcile(): void {
     return () => {
       clearTimeout(timer);
       if (settle) clearTimeout(settle);
+      if (trailing) clearTimeout(trailing);
       appState.remove();
       untap();
       unwatch();

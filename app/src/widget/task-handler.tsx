@@ -2,6 +2,7 @@
 // app/index.ts (imported before the register module that pulls this in).
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 
+import { runAlarmReconcile } from '@/alarms/runner';
 import { ensureSource } from '@/config/source';
 
 import { renderAgenda } from './agenda';
@@ -26,6 +27,15 @@ export async function widgetTaskHandler(
       // only custom clickAction is the refresh tap, so every click refetches.
       const cache = await loadAgendaCache();
       props.renderWidget(renderAgenda(cache, await ensureSource()));
+      // The widget's update is the only regular run hitome gets while it is
+      // closed, so reminders for events synced in meanwhile are scheduled
+      // here. After the render, not beside it: the render's bitmaps are the
+      // big allocation (see _layout). Same ids replace, so nothing doubles.
+      try {
+        await runAlarmReconcile();
+      } catch {
+        // Best-effort; the next update or app open retries.
+      }
       return;
     }
   }

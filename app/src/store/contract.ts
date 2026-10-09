@@ -4,16 +4,35 @@
 
 const BASE = 'content://com.android.calendar';
 
+/**
+ * A row id, checked before it goes into a path. An empty or odd id would
+ * make `events/` (with no selection) address the whole Events table, so a
+ * bad one fails the write instead.
+ */
+export function rowId(id: string | number | null | undefined): string {
+  const text = typeof id === 'number' ? String(id) : id;
+  if (typeof text !== 'string' || !/^\d+$/.test(text))
+    throw new Error('That event is not one from this phone');
+  return text;
+}
+
+/** A time in ms, checked for the same reason as rowId. */
+function msPart(ms: number): string {
+  if (!Number.isSafeInteger(ms)) throw new Error('Not a time: ' + String(ms));
+  return String(ms);
+}
+
 export const URI = {
   calendars: `${BASE}/calendars`,
   events: `${BASE}/events`,
-  event: (id: string | number) => `${BASE}/events/${id}`,
+  event: (id: string | number) => `${BASE}/events/${rowId(id)}`,
   /** Insert an exception (one changed or cancelled occurrence) of a series. */
-  exceptions: (seriesId: string | number) => `${BASE}/exception/${seriesId}`,
+  exceptions: (seriesId: string | number) =>
+    `${BASE}/exception/${rowId(seriesId)}`,
   reminders: `${BASE}/reminders`,
   /** Every occurrence overlapping [begin, end), recurring series expanded. */
   instances: (begin: number, end: number) =>
-    `${BASE}/instances/when/${begin}/${end}`,
+    `${BASE}/instances/when/${msPart(begin)}/${msPart(end)}`,
 };
 
 /** Events.STATUS_CANCELED — an exception that removes its occurrence. */

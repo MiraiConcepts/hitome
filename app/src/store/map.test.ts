@@ -2,6 +2,7 @@ import { readAlarm } from '@/caldav/valarm';
 import { readRecurrence } from '@/caldav/rrule';
 
 import {
+  addExdate,
   argbToHex,
   durationMs,
   firedBefore,
@@ -10,6 +11,7 @@ import {
   remainingRule,
   rruleFor,
   seriesIdOf,
+  shiftExdate,
   timeValues,
   truncateRule,
   utcDayToLocal,
@@ -217,5 +219,51 @@ describe('small conversions', () => {
   it('drops alpha from an ARGB colour', () => {
     expect(argbToHex(0xffffbd4f | 0)).toBe('#ffbd4f');
     expect(argbToHex(null)).toBeUndefined();
+  });
+});
+
+describe('seriesIdOf', () => {
+  const base = instanceToEvent(timedRow, none);
+  it('refuses an event that is not one of the store’s', () => {
+    for (const url of [
+      '',
+      'https://dav.example/cal/a.ics',
+      'store:1/',
+      'store:1/x',
+    ])
+      expect(() => seriesIdOf({ ...base, url, etag: '' })).toThrow();
+    expect(() => seriesIdOf({ ...base, etag: 'series:' })).toThrow();
+    expect(() => seriesIdOf({ ...base, etag: 'series:1; drop' })).toThrow();
+    expect(() =>
+      seriesIdOf({ ...base, url: undefined as unknown as string, etag: '' })
+    ).toThrow();
+  });
+});
+
+describe('EXDATE text', () => {
+  const t = Date.UTC(2026, 9, 12, 1, 0, 0);
+  it('adds a UTC time or a date', () => {
+    expect(addExdate(null, t, false)).toBe('20261012T010000Z');
+    expect(addExdate('20261005T010000Z', t, false)).toBe(
+      '20261005T010000Z,20261012T010000Z'
+    );
+    expect(addExdate('', Date.UTC(2026, 9, 12), true)).toBe('20261012');
+  });
+  it('keeps a zone-prefixed line and puts ours on its own line', () => {
+    expect(addExdate('Europe/Berlin;20261005T090000', t, false)).toBe(
+      'Europe/Berlin;20261005T090000\n20261012T010000Z'
+    );
+  });
+  it('moves the values it can read by a shift', () => {
+    expect(shiftExdate('20261012,20261019', { days: 2, clockMs: 0 })).toBe(
+      '20261014,20261021'
+    );
+    expect(
+      shiftExdate('Europe/Berlin;20261005T090000\n20261012T010000Z', {
+        days: 1,
+        clockMs: 0,
+      })
+    ).toBe('Europe/Berlin;20261005T090000\n20261013T010000Z');
+    expect(shiftExdate(null, { days: 1, clockMs: 0 })).toBeNull();
   });
 });

@@ -167,4 +167,101 @@ describe('store backend', () => {
     expect(after.every((e) => e.icon === 'gift')).toBe(true);
     expect(fake.reminders.length).toBe(1);
   });
+
+  it('refuses to write for an event that is not one of the store’s', async () => {
+    const all = await weekly();
+    const before = JSON.stringify(fake.events);
+    const stray: CalEvent = {
+      ...all[0],
+      url: 'https://dav.example/home/standup.ics',
+      etag: '"abc"',
+    };
+    await expect(deleteEvent(stray, 'all')).rejects.toThrow();
+    await expect(deleteEvent(stray, 'this')).rejects.toThrow();
+    await expect(
+      updateEvent(stray, { summary: 'Everything' }, 'all')
+    ).rejects.toThrow();
+    await expect(
+      updateEvent({ ...stray, recurring: false }, { summary: 'Everything' })
+    ).rejects.toThrow();
+    await expect(moveEvent(stray, BIRTHDAYS, {})).rejects.toThrow();
+    expect(JSON.stringify(fake.events)).toBe(before);
+    expect(titled(await fetchMonth(FROM, TO), 'Standup')).toEqual([
+      5, 12, 19, 26,
+    ]);
+  });
+});
+
+describe('store backend, a series the sync app has not sent yet', () => {
+  // No _sync_id: Android finds a series' exceptions by sync id only, so a
+  // cancelled exception would take nothing out (and on the phone it made
+  // the provider drop every occurrence of the series).
+  beforeEach(() => {
+    fake = fakeStore({ synced: false });
+    setStoreForTests(fake.store);
+  });
+
+  it('an exception does not stand in for an occurrence', async () => {
+    const all = await weekly();
+    await fake.store.insert('content://com.android.calendar/exception/100', {
+      originalInstanceTime: all[1].start.getTime(),
+      eventStatus: 2,
+    });
+    expect(titled(await fetchMonth(FROM, TO), 'Standup')).toEqual([
+      5, 12, 19, 26,
+    ]);
+  });
+
+  it('deletes this occurrence with an EXDATE, and undo brings it back', async () => {
+    const all = await weekly();
+    await deleteEvent(all[2], 'this');
+    expect(titled(await fetchMonth(FROM, TO), 'Standup')).toEqual([5, 12, 26]);
+    expect(fake.events).toHaveLength(1);
+    const [series] = fake.events;
+    expect(series.exdate).toBe(
+      new Date(all[2].start).toISOString().replace(/[-:]|\.\d+/g, '')
+    );
+    expect(series.dtstart).toBe(at(5).getTime());
+    await deleteEvent(all[0], 'this');
+    expect(titled(await fetchMonth(FROM, TO), 'Standup')).toEqual([12, 26]);
+    await undoDelete(all[0], 'this');
+    await undoDelete(all[2], 'this');
+    expect(titled(await fetchMonth(FROM, TO), 'Standup')).toEqual([
+      5, 12, 19, 26,
+    ]);
+  });
+
+  it('moves an EXDATE with the whole series', async () => {
+    const all = await weekly();
+    await deleteEvent(all[1], 'this'); // no 12 Oct
+    const left = await fetchMonth(FROM, TO);
+    await updateEvent(
+      left[0],
+      { start: at(6, 11), end: at(6, 12), allDay: false },
+      'all'
+    );
+    const after = await fetchMonth(FROM, TO);
+    expect(after.map((e) => [e.start.getDate(), e.start.getHours()])).toEqual([
+      [6, 11],
+      [20, 11],
+      [27, 11],
+    ]);
+  });
+
+  it('deletes an all-day occurrence by its date', async () => {
+    await createEvent(
+      {
+        summary: 'Gym',
+        start: new Date(2026, 9, 6),
+        end: new Date(2026, 9, 6),
+        allDay: true,
+        recurrence: { preset: 'weekly', count: 3 },
+      },
+      HOME
+    );
+    const all = await fetchMonth(FROM, TO);
+    await deleteEvent(all[1], 'this');
+    expect(titled(await fetchMonth(FROM, TO), 'Gym')).toEqual([6, 20]);
+    expect(fake.events[0].exdate).toBe('20261013');
+  });
 });

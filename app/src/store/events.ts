@@ -23,6 +23,8 @@ import {
   URI,
 } from './contract';
 import {
+  addExdate,
+  addLocalDays,
   argbToHex,
   calendarIcon,
   calendarUrl,
@@ -31,9 +33,16 @@ import {
   parseCalendarUrl,
   parseEventUrl,
   remainingRule,
+  noShift,
   reminderValues,
   rruleFor,
+  sameLengthEnd,
   seriesIdOf,
+  type Shift,
+  shiftBetween,
+  shiftExdate,
+  shiftLocal,
+  shiftStoreMs,
   timeValues,
   truncateRule,
   utcDayToLocal,
@@ -236,6 +245,18 @@ async function eventRow(id: string): Promise<StoreRow> {
   return row;
 }
 
+/** Whether the sync app has given the event its id on the server yet. */
+async function hasSyncId(id: string): Promise<boolean> {
+  const [row] = await store().query(
+    URI.event(id),
+    ['_sync_id'],
+    null,
+    null,
+    null
+  );
+  return typeof row?._sync_id === 'string' && row._sync_id !== '';
+}
+
 async function exceptionRows(seriesId: string): Promise<StoreRow[]> {
   return store().query(
     URI.events,
@@ -367,6 +388,14 @@ function fieldValues(changes: EventChanges): StoreValues {
   return out;
 }
 
+/** The event's own calendar and row ids; throws for an event that is not
+ *  one of the store's rather than writing somewhere unknown. */
+function storeHandle(event: CalEvent): { calendarId: string; eventId: string } {
+  const parsed = parseEventUrl(event.url);
+  if (!parsed) throw new Error('That event is not one from this phone');
+  return parsed;
+}
+
 /** The occurrence's original start in ms (its address in its series). */
 const occurrenceMs = (event: CalEvent) =>
   (event.recurrenceStart ?? Math.floor(event.start.getTime() / 1000)) * 1000;
@@ -404,18 +433,16 @@ async function editSeries(
             changes.allDay ?? event.allDay
           );
   if (changes.recurrence !== undefined) values.rrule = rule;
-  let shift = 0;
+  let shift: Shift = { days: 0, clockMs: 0 };
   if (changes.start && changes.end) {
     const allDay = changes.allDay ?? event.allDay;
-    shift = changes.start.getTime() - event.start.getTime();
+    shift = shiftBetween(event.start, changes.start);
     const seriesStart =
       n(row.allDay) === 1
         ? utcDayToLocal(startOfSeries(row))
         : new Date(startOfSeries(row));
-    const start = new Date(seriesStart.getTime() + shift);
-    const end = new Date(
-      start.getTime() + (changes.end.getTime() - changes.start.getTime())
-    );
+    const start = shiftLocal(seriesStart, shift);
+    const end = sameLengthEnd(start, changes.start, changes.end, allDay);
     // A timed event keeps the zone it was made in (as the CalDAV writer does).
     const keep =
       !allDay && n(row.allDay) !== 1 && typeof row.eventTimezone === 'string';
@@ -435,15 +462,14 @@ async function editSeries(
     const start = event.allDay
       ? utcDayToLocal(startOfSeries(row))
       : new Date(startOfSeries(row));
-    const length = event.end.getTime() - event.start.getTime();
+    const end = sameLengthEnd(start, event.start, event.end, event.allDay);
     Object.assign(
       values,
       timeValues(
         {
           start,
-          end: new Date(
-            start.getTime() + length - (event.allDay ? 86_400_000 : 0)
-          ),
+          // An all-day event's end is exclusive; the store wants its last day.
+          end: event.allDay ? addLocalDays(end, -1) : end,
           allDay: event.allDay,
         },
         Boolean(rule),
@@ -451,22 +477,30 @@ async function editSeries(
       )
     );
   }
+  const sameKind = n(row.allDay) === ((changes.allDay ?? event.allDay) ? 1 : 0);
+  // Occurrences taken out by EXDATE (see deleteEvent) move with the series.
+  if (!noShift(shift) && sameKind && row.exdate)
+    values.exdate = shiftExdate(row.exdate as string, shift);
   if ('rrule' in values && !('dtstart' in values))
     Object.assign(values, ruleUpdate(row, values.rrule as string | null));
   await store().update(URI.event(seriesId), values, null, null);
-  if (
-    shift !== 0 &&
-    n(row.allDay) === ((changes.allDay ?? event.allDay) ? 1 : 0)
-  ) {
+  if (!noShift(shift) && sameKind) {
     // Exceptions name occurrences by their old start; move them along, or a
     // deleted occurrence comes back and a changed one loses its changes.
+    const allDay = n(row.allDay) === 1;
     for (const ex of await exceptionRows(seriesId)) {
       const moved: StoreValues = {
-        originalInstanceTime: n(ex.originalInstanceTime) + shift,
+        originalInstanceTime: shiftStoreMs(
+          n(ex.originalInstanceTime),
+          shift,
+          allDay
+        ),
       };
       if (n(ex.eventStatus) !== STATUS_CANCELED) {
-        moved.dtstart = n(ex.dtstart) + shift;
-        if (ex.dtend !== null) moved.dtend = n(ex.dtend) + shift;
+        const exAllDay = n(ex.allDay) === 1;
+        moved.dtstart = shiftStoreMs(n(ex.dtstart), shift, exAllDay);
+        if (ex.dtend !== null)
+          moved.dtend = shiftStoreMs(n(ex.dtend), shift, exAllDay);
       }
       await store().update(URI.event(String(n(ex._id))), moved, null, null);
     }
@@ -483,7 +517,7 @@ async function editOccurrence(
   event: CalEvent,
   changes: EventChanges
 ): Promise<void> {
-  const parsed = parseEventUrl(event.url)!;
+  const parsed = storeHandle(event);
   const values = fieldValues(changes);
   if (changes.start && changes.end) {
     const allDay = changes.allDay ?? event.allDay;
@@ -525,16 +559,15 @@ async function editFollowing(
 
   // The tail: the old series from this occurrence on, then the changes.
   const tailStart = allDay ? utcDayToLocal(at) : new Date(at);
-  const length = event.end.getTime() - event.start.getTime();
+  const tailEnd = sameLengthEnd(tailStart, event.start, event.end, allDay);
   const tail: Snapshot = {
     row: {
       ...snap.row,
       ...timeValues(
         {
           start: tailStart,
-          end: new Date(
-            tailStart.getTime() + length - (allDay ? 86_400_000 : 0)
-          ),
+          // An all-day event's end is exclusive; the store wants its last day.
+          end: allDay ? addLocalDays(tailEnd, -1) : tailEnd,
           allDay,
         },
         true,
@@ -557,7 +590,7 @@ async function editFollowing(
     await store().delete(URI.event(String(n(ex._id))), null, null);
   const tailId = await insertSnapshot(tail, String(n(snap.row.calendar_id)));
   // Now the tail is a series of its own: apply the changes to all of it.
-  const parsed = parseEventUrl(event.url)!;
+  const parsed = storeHandle(event);
   const onTail: CalEvent = {
     ...event,
     url: `store:${parsed.calendarId}/${tailId}`,
@@ -593,7 +626,7 @@ export async function deleteEvent(
   const seriesId = seriesIdOf(event);
   const row = event.recurring ? await eventRow(seriesId) : undefined;
   const effective = effectiveScope(event, scope, row);
-  const parsed = parseEventUrl(event.url)!;
+  const parsed = storeHandle(event);
 
   if (effective === 'this') {
     if (event.etag.startsWith('series:')) {
@@ -613,13 +646,46 @@ export async function deleteEvent(
           null
         );
       });
-    } else {
+    } else if (await hasSyncId(seriesId)) {
       const id = await store().insert(URI.exceptions(seriesId), {
         originalInstanceTime: occurrenceMs(event),
         eventStatus: STATUS_CANCELED,
       });
       undoTokens.set(event.id, async () => {
         await store().delete(URI.event(id), null, null);
+      });
+    } else {
+      // A series the sync app has not sent yet (or one in a local calendar)
+      // has no sync id, and Android matches a cancelled exception to its
+      // series by sync id only: the exception would cancel nothing, and the
+      // provider drops the series' expanded occurrences while it is
+      // written. An EXDATE on the series takes the one occurrence out.
+      const series = row ?? (await eventRow(seriesId));
+      const allDay = n(series.allDay) === 1;
+      await store().update(
+        URI.event(seriesId),
+        {
+          ...ruleUpdate(series, series.rrule as string | null),
+          exdate: addExdate(
+            series.exdate as string | null,
+            occurrenceMs(event),
+            allDay
+          ),
+        },
+        null,
+        null
+      );
+      undoTokens.set(event.id, async () => {
+        const now = await eventRow(seriesId);
+        await store().update(
+          URI.event(seriesId),
+          {
+            ...ruleUpdate(now, now.rrule as string | null),
+            exdate: series.exdate ?? null,
+          },
+          null,
+          null
+        );
       });
     }
     return;

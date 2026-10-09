@@ -1,7 +1,8 @@
 // The reconcile loop: derive desired alarms for the next 14 days and bring
-// the platform's scheduled set in line. Runs on app start, foreground, and
-// after every editor write — the "reconcile on open" cadence is also the
-// safety net against ColorOS force-stops wiping AlarmManager registrations.
+// the platform's scheduled set in line. Runs on app start, foreground, after
+// every editor write, and on Android from the widget's background update.
+// The "reconcile on open" cadence is also the safety net against ColorOS
+// force-stops wiping AlarmManager registrations.
 import { Platform } from 'react-native';
 
 import type { CalEvent } from '@/caldav/types';
@@ -12,6 +13,7 @@ import { reviveEvents } from '@/utils/event-snapshot';
 import { monthKeyOf } from '@/utils/month-events-store';
 import { readSnapshot } from '@/utils/snapshot-cache';
 
+import { coalesced } from './coalesce';
 import { desiredAlarms, HORIZON_MS } from './occurrences';
 import { planReconcile } from './reconcile';
 import {
@@ -41,36 +43,29 @@ async function eventsFromSnapshots(now: Date, end: Date): Promise<CalEvent[]> {
   return events;
 }
 
-let running: Promise<void> | null = null;
-
-/** Coalesced full reconcile — concurrent callers share one run. */
-export function runAlarmReconcile(): Promise<void> {
-  if (running) return running;
-  running = (async () => {
+/** Full reconcile, one at a time: a request made while one runs is not
+ *  dropped but runs once more after it (see coalesce). */
+export const runAlarmReconcile = coalesced(async () => {
+  try {
+    // Logged out on the web there is nothing to remind of, and asking the
+    // calendar anyway only drew refusals from the server.
+    if (Platform.OS === 'web' && !(await ensureSource())) return;
+    await ensureSetup();
+    const now = new Date();
+    const end = new Date(now.getTime() + HORIZON_MS);
+    let events: CalEvent[];
     try {
-      // Logged out on the web there is nothing to remind of, and asking the
-      // calendar anyway only drew refusals from the server.
-      if (Platform.OS === 'web' && !(await ensureSource())) return;
-      await ensureSetup();
-      const now = new Date();
-      const end = new Date(now.getTime() + HORIZON_MS);
-      let events: CalEvent[];
-      try {
-        events = await fetchMonth(now, end);
-      } catch {
-        events = await eventsFromSnapshots(now, end);
-      }
-      const plan = planReconcile(
-        desiredAlarms(events, now),
-        await listScheduledAlarmIds()
-      );
-      for (const id of plan.toCancel) await cancelAlarm(id);
-      for (const alarm of plan.toSchedule) await scheduleAlarm(alarm);
+      events = await fetchMonth(now, end);
     } catch {
-      // Best-effort by design: the next foreground/save reconcile retries.
-    } finally {
-      running = null;
+      events = await eventsFromSnapshots(now, end);
     }
-  })();
-  return running;
-}
+    const plan = planReconcile(
+      desiredAlarms(events, now),
+      await listScheduledAlarmIds()
+    );
+    for (const id of plan.toCancel) await cancelAlarm(id);
+    for (const alarm of plan.toSchedule) await scheduleAlarm(alarm);
+  } catch {
+    // Best-effort by design: the next foreground/save reconcile retries.
+  }
+});

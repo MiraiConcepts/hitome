@@ -2,6 +2,11 @@
 // src/store/events against: calendars, events with exceptions (cancelled or
 // changed occurrences), reminders, and the Instances view that expands a
 // repeating event into occurrences the way the provider does.
+//
+// `synced` (the default) stands for events the sync app has already sent:
+// they carry a _sync_id. Like Android, an exception only stands in for an
+// occurrence of its series through original_sync_id, so for an unsynced
+// series it replaces nothing.
 import ICAL from 'ical.js';
 
 import type { StoreRow, StoreValues } from '../../modules/calendar-store';
@@ -10,7 +15,7 @@ type Row = Record<string, string | number | null>;
 
 const BASE = 'content://com.android.calendar';
 
-export function fakeStore() {
+export function fakeStore({ synced = true }: { synced?: boolean } = {}) {
   let nextId = 100;
   const calendars: Row[] = [
     {
@@ -47,6 +52,26 @@ export function fakeStore() {
     return num(row.dtend) - num(row.dtstart);
   }
 
+  /** EXDATE text as the provider reads it: lines of comma-separated dates
+   *  or UTC times (zone-prefixed lines are not needed here). */
+  function exdates(text: unknown): number[] {
+    if (typeof text !== 'string' || text === '') return [];
+    return text.split('\n').flatMap((line) =>
+      line.split(',').map((v) => {
+        const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z)?$/.exec(v);
+        if (!m) throw new Error(`fake store: bad EXDATE ${v}`);
+        return Date.UTC(
+          +m[1],
+          +m[2] - 1,
+          +m[3],
+          +(m[4] ?? 0),
+          +(m[5] ?? 0),
+          +(m[6] ?? 0)
+        );
+      })
+    );
+  }
+
   /** The provider's Instances view: every occurrence overlapping [from, to). */
   function instances(from: number, to: number): Row[] {
     const out: Row[] = [];
@@ -76,6 +101,7 @@ export function fakeStore() {
         continue;
       }
       const allDay = num(row.allDay) === 1;
+      const excluded = exdates(row.exdate);
       const d = new Date(num(row.dtstart));
       const start = allDay
         ? ICAL.Time.fromData({
@@ -95,13 +121,15 @@ export function fakeStore() {
           ? Date.UTC(next.year, next.month - 1, next.day)
           : next.toJSDate().getTime();
         if (at >= to) break;
-        // An exception (changed or cancelled) stands in for this occurrence.
+        // An exception (changed or cancelled) stands in for this occurrence,
+        // found by sync id as the provider does.
         const replaced = events.some(
           (e) =>
-            num(e.original_id) === num(row._id) &&
+            e.original_sync_id != null &&
+            e.original_sync_id === row._sync_id &&
             num(e.originalInstanceTime) === at
         );
-        if (!replaced) emit(row, at, at + length);
+        if (!replaced && !excluded.includes(at)) emit(row, at, at + length);
       }
     }
     return out.sort((a, b) => num(a.begin) - num(b.begin));
@@ -125,7 +153,7 @@ export function fakeStore() {
     if (path === '/calendars') return calendars.filter((c) => c.visible === 1);
     const one = /^\/events\/(\d+)$/.exec(path);
     if (one) return [event(one[1])].filter((r): r is Row => Boolean(r));
-    if (path === '/events') {
+    if (path === '/events' || path === '/events/') {
       const ids = (args ?? []).map(Number);
       if (selection?.startsWith('original_id'))
         return events.filter(
@@ -161,7 +189,9 @@ export function fakeStore() {
       if (path === '/events') {
         events.push({
           _id: id,
+          _sync_id: synced ? `remote-${id}` : null,
           original_id: null,
+          original_sync_id: null,
           eventStatus: null,
           ...clean,
         });
@@ -182,7 +212,9 @@ export function fakeStore() {
           dtend: at + durationMs(series),
           ...clean,
           _id: id,
+          _sync_id: null,
           original_id: series._id,
+          original_sync_id: series._sync_id ?? null,
         });
         return String(id);
       }
@@ -192,8 +224,18 @@ export function fakeStore() {
       }
       throw new Error(`fake store: no insert for ${uri}`);
     },
-    async update(uri: string, values: StoreValues): Promise<number> {
-      const one = /^\/events\/(\d+)$/.exec(uri.slice(BASE.length));
+    async update(
+      uri: string,
+      values: StoreValues,
+      selection: string | null
+    ): Promise<number> {
+      const path = uri.slice(BASE.length);
+      // Like the provider: the bare table with no selection is every row.
+      if ((path === '/events' || path === '/events/') && selection === null) {
+        for (const row of events) Object.assign(row, values);
+        return events.length;
+      }
+      const one = /^\/events\/(\d+)$/.exec(path);
       const row = one && event(one[1]);
       if (!row) return 0;
       Object.assign(row, values);
@@ -201,10 +243,16 @@ export function fakeStore() {
     },
     async delete(
       uri: string,
-      _selection: string | null,
+      selection: string | null,
       args: string[] | null
     ): Promise<number> {
       const path = uri.slice(BASE.length);
+      if ((path === '/events' || path === '/events/') && selection === null) {
+        const count = events.length;
+        events.length = 0;
+        reminders.length = 0;
+        return count;
+      }
       const one = /^\/events\/(\d+)$/.exec(path);
       if (one) {
         const id = num(one[1]);

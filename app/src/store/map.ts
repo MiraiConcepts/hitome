@@ -62,6 +62,131 @@ export function localDayToUtc(d: Date): number {
   return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+/** A date `days` calendar days on, at the same local clock time. */
+export function addLocalDays(d: Date, days: number): Date {
+  const out = new Date(d.getTime());
+  out.setDate(out.getDate() + days);
+  return out;
+}
+
+/** Whole calendar days from one local date to another (a day across a
+ *  daylight-saving change is 23 or 25 hours, so ms / 86400000 is not). */
+export function localDaysBetween(from: Date, to: Date): number {
+  return Math.round((localDayToUtc(to) - localDayToUtc(from)) / 86_400_000);
+}
+
+/** Where a span as long as [from, to] ends when it starts at `start`:
+ *  whole calendar days for all-day, elapsed time for timed. */
+export function sameLengthEnd(
+  start: Date,
+  from: Date,
+  to: Date,
+  allDay: boolean
+): Date {
+  if (!allDay)
+    return new Date(start.getTime() + (to.getTime() - from.getTime()));
+  return addLocalDays(
+    new Date(start.getFullYear(), start.getMonth(), start.getDate()),
+    localDaysBetween(from, to)
+  );
+}
+
+/** A move as the editor makes it: calendar days plus a change of local
+ *  clock time, so that moving across a daylight-saving change keeps both
+ *  the weekday and the clock time (an absolute ms shift keeps neither). */
+export type Shift = { days: number; clockMs: number };
+
+const clockMs = (d: Date) =>
+  ((d.getHours() * 60 + d.getMinutes()) * 60 + d.getSeconds()) * 1000 +
+  d.getMilliseconds();
+
+export function shiftBetween(from: Date, to: Date): Shift {
+  return {
+    days: localDaysBetween(from, to),
+    clockMs: clockMs(to) - clockMs(from),
+  };
+}
+
+export const noShift = (s: Shift) => s.days === 0 && s.clockMs === 0;
+
+/** A local time moved by a shift. */
+export function shiftLocal(d: Date, s: Shift): Date {
+  return new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate() + s.days,
+    0,
+    0,
+    0,
+    clockMs(d) + s.clockMs
+  );
+}
+
+/** A store time (ms) moved by a shift: an all-day value is a UTC midnight
+ *  and moves by whole days; a timed one moves in local terms. */
+export function shiftStoreMs(ms: number, s: Shift, allDay: boolean): number {
+  if (allDay) return ms + s.days * 86_400_000;
+  return shiftLocal(new Date(ms), s).getTime();
+}
+
+/** One occurrence as the store's EXDATE text: a date for all-day, else a
+ *  UTC time (the provider reads a value with no zone prefix as UTC). */
+export function exdateValue(ms: number, allDay: boolean): string {
+  const iso = new Date(ms).toISOString();
+  const day = iso.slice(0, 10).replace(/-/g, '');
+  return allDay ? day : `${day}T${iso.slice(11, 19).replace(/:/g, '')}Z`;
+}
+
+/** EXDATE text with one more occurrence. Values with a zone prefix
+ *  ("Europe/Berlin;...") stay as they are, ours goes on a line of its own. */
+export function addExdate(
+  exdate: string | null | undefined,
+  ms: number,
+  allDay: boolean
+): string {
+  const value = exdateValue(ms, allDay);
+  if (!exdate) return value;
+  const lines = exdate.split('\n');
+  const last = lines[lines.length - 1];
+  if (last.includes(';')) return `${exdate}\n${value}`;
+  lines[lines.length - 1] = `${last},${value}`;
+  return lines.join('\n');
+}
+
+/** EXDATE text with the values we can read (dates and UTC times) moved by
+ *  a shift; values in a named zone are left as they are. */
+export function shiftExdate(
+  exdate: string | null | undefined,
+  s: Shift
+): string | null {
+  if (!exdate) return exdate ?? null;
+  return exdate
+    .split('\n')
+    .map((line) =>
+      line.includes(';')
+        ? line
+        : line
+            .split(',')
+            .map((v) => {
+              const m =
+                /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z)?$/.exec(v);
+              if (!m) return v;
+              const allDay = m[4] === undefined;
+              const ms = Date.UTC(
+                +m[1],
+                +m[2] - 1,
+                +m[3],
+                allDay ? 0 : +m[4],
+                allDay ? 0 : +m[5],
+                allDay ? 0 : +m[6]
+              );
+              return exdateValue(shiftStoreMs(ms, s, allDay), allDay);
+            })
+            .join(',')
+    )
+    .join('\n');
+}
+
 /**
  * A local wall-clock time (floating) or date. The store repeats a rule in the
  * event's own zone, so weekdays and the like are read and written in local
@@ -188,10 +313,15 @@ export function instanceToEvent(row: StoreRow, ctx: InstanceContext): CalEvent {
 }
 
 /** The series id behind a CalEvent from this backend: an exception's
- *  original, else the event itself. */
+ *  original, else the event itself. Throws for an event that is not one of
+ *  the store's: an empty id would address every event in it. */
 export function seriesIdOf(event: CalEvent): string {
-  if (event.etag.startsWith('series:')) return event.etag.slice(7);
-  return parseEventUrl(event.url)?.eventId ?? '';
+  const id = event.etag?.startsWith('series:')
+    ? event.etag.slice(7)
+    : parseEventUrl(event.url ?? '')?.eventId;
+  if (!id || !/^\d+$/.test(id))
+    throw new Error('That event is not one from this phone');
+  return id;
 }
 
 /** An RFC 2445 duration the store accepts: days for all-day, seconds else. */
