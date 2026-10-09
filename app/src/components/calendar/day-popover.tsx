@@ -23,9 +23,9 @@ const TITLE_LINE = 24;
 const TITLE_LINE_COMPACT = 21;
 /** The time column: a start time and a duration are short, so it is narrow,
  *  but wide enough for the widest ("11:00 am", bold) on one line. */
-const WHEN_COLUMN = 98;
+const WHEN_COLUMN = 108;
 /** The phone's: a notch smaller type, so the column follows. */
-const WHEN_COLUMN_COMPACT = 86;
+const WHEN_COLUMN_COMPACT = 94;
 
 type Props = {
   /** The day (dateString) whose events are listed. */
@@ -125,7 +125,7 @@ export function DayPopover({
                         <View>
                           <ThemedText
                             type="smallBold"
-                            style={compact && styles.whenCompact}
+                            style={[styles.when, compact && styles.whenCompact]}
                           >
                             {event.allDay ? 'All day' : formatTime(event.start)}
                           </ThemedText>
@@ -133,7 +133,10 @@ export function DayPopover({
                             <ThemedText
                               type="small"
                               themeColor="textSecondary"
-                              style={compact && styles.whenCompact}
+                              style={[
+                                styles.when,
+                                compact && styles.whenCompact,
+                              ]}
                             >
                               {duration}
                             </ThemedText>
@@ -221,8 +224,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: TITLE_LINE_COMPACT,
   },
+  when: {
+    fontSize: 15,
+    lineHeight: 21,
+  },
   whenCompact: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
   },
 });
