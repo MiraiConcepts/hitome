@@ -93,6 +93,7 @@ export function DayPopover({
                     <SettingsValue
                       key={event.id}
                       labelWidth={compact ? WHEN_COLUMN_COMPACT : WHEN_COLUMN}
+                      valueInset={Spacing.one + 1}
                       onPress={() => onPressEvent(event)}
                       pressLabel={event.summary || '(untitled)'}
                       trailing={
@@ -144,7 +145,7 @@ export function DayPopover({
                         </View>
                       }
                       value={
-                        <View style={styles.valueInset}>
+                        <View>
                           <ThemedText
                             style={[
                               styles.title,
@@ -212,10 +213,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  // A little more air between the time column's rule and the title.
-  valueInset: {
-    paddingLeft: Spacing.one + 1,
   },
   title: {
     lineHeight: TITLE_LINE,

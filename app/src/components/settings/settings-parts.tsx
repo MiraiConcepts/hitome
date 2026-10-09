@@ -191,6 +191,7 @@ export function SettingsValue({
   value,
   testID,
   labelWidth,
+  valueInset,
   onPress,
   pressLabel,
   trailing,
@@ -203,6 +204,8 @@ export function SettingsValue({
   /** The label column's share of the row, where the card's own is too wide
    *  or too narrow for what it holds. */
   labelWidth?: DimensionValue;
+  /** Extra room before the value, on top of the cell's padding. */
+  valueInset?: number;
   /** Makes the whole row a button, lit while hovered or pressed. Its own
    *  tappable parts (a tag) are `pointerEvents: 'auto'` inside the value, and
    *  everything else passes the press through: a button never holds another
@@ -263,6 +266,7 @@ export function SettingsValue({
         <View
           style={[
             styles.valueCell,
+            valueInset ? { paddingLeft: Card.padH + valueInset } : null,
             passThrough,
             lit && { backgroundColor: theme.backgroundSelected },
           ]}
