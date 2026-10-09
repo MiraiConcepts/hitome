@@ -15,7 +15,14 @@ import { toWidgetEvent } from '@/widget/select-upcoming';
  * widget's own snapshot, so both read an event the same way: a location that
  * is really a join link is the meeting tag, not a place.
  */
-export function EventTags({ event }: { event: CalEvent }) {
+export function EventTags({
+  event,
+  compact = false,
+}: {
+  event: CalEvent;
+  /** A notch smaller, for the phone. */
+  compact?: boolean;
+}) {
   const theme = useTheme();
   const { location, meetingLink, link } = toWidgetEvent(event);
   if (!location && !meetingLink && !link) return null;
@@ -30,6 +37,7 @@ export function EventTags({ event }: { event: CalEvent }) {
           uri={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
           background={LOCATION_FILL}
           color={Colors.dark.text}
+          compact={compact}
         />
       ) : null}
       {meetingLink ? (
@@ -39,6 +47,7 @@ export function EventTags({ event }: { event: CalEvent }) {
           uri={meetingLink}
           background={AccentColor}
           color={OnAccentColor}
+          compact={compact}
         />
       ) : null}
       {link ? (
@@ -48,6 +57,7 @@ export function EventTags({ event }: { event: CalEvent }) {
           uri={link}
           background={theme.backgroundElement}
           color={theme.text}
+          compact={compact}
         />
       ) : null}
     </View>
@@ -60,12 +70,14 @@ function Tag({
   uri,
   background,
   color,
+  compact,
 }: {
   label: string;
   text: string;
   uri: string;
   background: string;
   color: string;
+  compact: boolean;
 }) {
   return (
     <Pressable
@@ -76,7 +88,11 @@ function Tag({
     >
       {/* Wraps rather than cutting a long place short: a name is worth
           reading whole. */}
-      <ThemedText style={[styles.text, { color }]}>{text}</ThemedText>
+      <ThemedText
+        style={[styles.text, compact && styles.textCompact, { color }]}
+      >
+        {text}
+      </ThemedText>
     </Pressable>
   );
 }
@@ -97,5 +113,9 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 11,
     lineHeight: 15,
+  },
+  textCompact: {
+    fontSize: 10,
+    lineHeight: 14,
   },
 });

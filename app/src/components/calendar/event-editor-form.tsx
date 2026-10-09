@@ -612,9 +612,10 @@ const styles = StyleSheet.create({
     flex: 2,
   },
   actions: {
-    // The same all round, so the buttons sit evenly in their bar.
+    // Even above and below, and snug: a bar of the buttons' height plus a step
+    // each side, not a field's worth of room.
     paddingHorizontal: Bar.paddingHorizontal,
-    paddingVertical: Bar.paddingHorizontal,
+    paddingVertical: Spacing.two + Spacing.one,
     gap: Spacing.two,
   },
   scope: {

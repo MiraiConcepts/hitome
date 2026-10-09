@@ -15,6 +15,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BACKDROP_BLUR } from '@/constants/backdrop';
 import { AccentColor, DangerColor, Spacing } from '@/constants/theme';
+import { useIsWide } from '@/hooks/use-is-wide';
 import { useTheme } from '@/hooks/use-theme';
 import { dayLabel, formatTime } from '@/utils/date';
 
@@ -25,6 +26,9 @@ const WHEN_LINE = 20;
 /** The time column's width: the longest start and end ("→ 11:15 am") with the
  *  mark and the cell's padding, on any screen. */
 const WHEN_COLUMN = 124;
+/** The phone's: a notch smaller type, so the column and its lines follow. */
+const WHEN_COLUMN_COMPACT = 112;
+const WHEN_LINE_COMPACT = 18;
 
 type Props = {
   /** The day (dateString) whose events are listed. */
@@ -67,6 +71,7 @@ export function DayPopover({
   onAdd,
 }: Props) {
   const theme = useTheme();
+  const compact = !useIsWide();
   const sorted = [...events].sort(compareEvents);
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -90,7 +95,7 @@ export function DayPopover({
                 {sorted.map((event) => (
                   <SettingsValue
                     key={event.id}
-                    labelWidth={WHEN_COLUMN}
+                    labelWidth={compact ? WHEN_COLUMN_COMPACT : WHEN_COLUMN}
                     onPress={() => onPressEvent(event)}
                     pressLabel={event.summary || '(untitled)'}
                     trailing={
@@ -112,13 +117,21 @@ export function DayPopover({
                           },
                         ]}
                       >
-                        <TrashIcon size={20} color={DangerColor} />
+                        <TrashIcon
+                          size={compact ? 18 : 20}
+                          color={DangerColor}
+                        />
                       </Pressable>
                     }
                     label={
                       // When, with the source calendar's mark in its colour.
                       <View style={styles.when}>
-                        <View style={styles.mark}>
+                        <View
+                          style={[
+                            styles.mark,
+                            compact && { height: WHEN_LINE_COMPACT },
+                          ]}
+                        >
                           <CalendarMark
                             icon={event.icon}
                             color={event.color ?? AccentColor}
@@ -131,7 +144,10 @@ export function DayPopover({
                               key={line}
                               type="small"
                               themeColor="textSecondary"
-                              style={styles.whenLine}
+                              style={[
+                                styles.whenLine,
+                                compact && styles.whenLineCompact,
+                              ]}
                             >
                               {line}
                             </ThemedText>
@@ -141,8 +157,10 @@ export function DayPopover({
                     }
                     value={
                       <View>
-                        <ThemedText>{event.summary || '(untitled)'}</ThemedText>
-                        <EventTags event={event} />
+                        <ThemedText style={compact && styles.titleCompact}>
+                          {event.summary || '(untitled)'}
+                        </ThemedText>
+                        <EventTags event={event} compact={compact} />
                       </View>
                     }
                   />
@@ -212,5 +230,13 @@ const styles = StyleSheet.create({
   },
   whenLine: {
     lineHeight: WHEN_LINE,
+  },
+  whenLineCompact: {
+    fontSize: 12,
+    lineHeight: WHEN_LINE_COMPACT,
+  },
+  titleCompact: {
+    fontSize: 15,
+    lineHeight: 21,
   },
 });
