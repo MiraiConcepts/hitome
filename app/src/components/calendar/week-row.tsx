@@ -112,6 +112,10 @@ type WeekRowProps = {
   onCreateOnDay: (day: string) => void;
 };
 
+/** Web only (react-native-web reads `dataSet`, global.css the attribute); the
+ *  spread keeps the native Pressable's props type from objecting. */
+const DAY_CELL_DATA = { dataSet: { focusRing: 'none' } };
+
 const pct = (n: number) => `${(n / 7) * 100}%` as const;
 
 // Chip title wrap: slot layout runs before text renders, so whether a title
@@ -511,6 +515,9 @@ export const WeekRow = memo(function WeekRow({
             <Pressable
               key={dateString}
               testID={`day-cell-${dateString}`}
+              // No keyboard ring: focus returns here when a day list or editor
+              // closes, and a frame round the day read as a leftover.
+              {...DAY_CELL_DATA}
               // A screen reader names the whole date, today and the day's
               // count, and offers the hold (add an event) as an action of its
               // own.

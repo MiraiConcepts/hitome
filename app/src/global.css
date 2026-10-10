@@ -35,6 +35,12 @@ a:focus-visible,
   outline-color: #000000;
 }
 
+/* Day cells take focus back when a day list or editor closes, and the ring
+   round the day read as a leftover (the arrow keys still move the focus). */
+[data-focus-ring='none']:focus-visible {
+  outline: none;
+}
+
 /* Never let the browser fake bold by thickening letters: every bold here is
    the real Satoshi Bold file (see constants/font-faces.web.ts). Faked, it
    doubled up on text that was already bold. */
