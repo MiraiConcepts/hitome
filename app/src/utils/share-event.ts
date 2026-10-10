@@ -23,12 +23,14 @@ function copyBySelection(text: string): boolean {
   }
 }
 
-async function shareOnWeb(text: string, title: string): Promise<ShareResult> {
+async function shareOnWeb(text: string): Promise<ShareResult> {
   // The browser's own share sheet where it has one (phones, Safari, some
   // desktops); otherwise the text goes to the clipboard and the caller says so.
+  // Text only: the text opens with the title, and a separate title made macOS's
+  // sheet offer two items ("2 Images").
   if (typeof navigator.share === 'function') {
     try {
-      await navigator.share({ title, text });
+      await navigator.share({ text });
       return 'shared';
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError')
@@ -48,8 +50,7 @@ async function shareOnWeb(text: string, title: string): Promise<ShareResult> {
  *  clipboard on the web. */
 export async function shareEvent(event: CalEvent): Promise<ShareResult> {
   const text = eventShareText(event);
-  if (Platform.OS === 'web')
-    return shareOnWeb(text, event.summary.trim() || '(untitled)');
+  if (Platform.OS === 'web') return shareOnWeb(text);
   try {
     const result = await Share.share({ message: text });
     return result.action === Share.dismissedAction ? 'cancelled' : 'shared';

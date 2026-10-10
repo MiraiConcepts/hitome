@@ -14,6 +14,7 @@ import { BlurBackdrop } from '@/components/blur-backdrop';
 import { EventTags } from '@/components/calendar/event-tags';
 import { ShareIcon, TrashIcon } from '@/components/icons';
 import {
+  DashedLine,
   SettingsBlock,
   SettingsButton,
   SettingsButtonRow,
@@ -207,6 +208,11 @@ export function DayPopover({
                               color={AccentColor}
                             />
                           </Pressable>
+                          <View style={styles.actionRule}>
+                            <View style={StyleSheet.absoluteFill}>
+                              <DashedLine vertical />
+                            </View>
+                          </View>
                           <Pressable
                             onPress={() => onDelete(event)}
                             accessibilityRole="button"
@@ -320,6 +326,10 @@ const styles = StyleSheet.create({
   actions: {
     flex: 1,
     flexDirection: 'row',
+  },
+  // The row's own dashed column rule, between the two buttons.
+  actionRule: {
+    width: 1,
   },
   action: {
     flex: 1,
