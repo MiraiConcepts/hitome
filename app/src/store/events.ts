@@ -319,6 +319,35 @@ async function setReminders(eventId: string, minutes: number[]) {
     });
 }
 
+/**
+ * Set or clear the one reminder the editor shows (the soonest before the
+ * event, as fetchMonth reads it), leaving any others alone: an event synced
+ * in with two reminders, or an email one, keeps them when the alert changes.
+ */
+async function setAlarm(eventId: string, minutes: number | null) {
+  const rows = await store().query(
+    URI.reminders,
+    ['_id', 'minutes'],
+    'event_id = ?',
+    [eventId],
+    'minutes ASC'
+  );
+  const shown = [...rows].sort((a, b) => n(a.minutes) - n(b.minutes))[0];
+  if (minutes === null) {
+    if (shown) await store().delete(URI.reminder(n(shown._id)), null, null);
+    return;
+  }
+  if (shown) {
+    await store().update(URI.reminder(n(shown._id)), { minutes }, null, null);
+    return;
+  }
+  await store().insert(URI.reminders, {
+    event_id: Number(eventId),
+    minutes,
+    method: 1,
+  });
+}
+
 /** A whole series as it stands: its row, exceptions, reminders. Enough to
  *  write it elsewhere (move, the tail of a split), though only the columns
  *  in EVENT_COLUMNS: the copy is a new event to the sync app, with a new
@@ -512,10 +541,7 @@ async function editSeries(
     }
   }
   if (changes.alarm !== undefined)
-    await setReminders(
-      seriesId,
-      changes.alarm ? [changes.alarm.offsetMinutes] : []
-    );
+    await setAlarm(seriesId, changes.alarm?.offsetMinutes ?? null);
 }
 
 /** One occurrence: its exception row, edited, or created from the series. */
@@ -547,7 +573,7 @@ async function editOccurrence(
     });
   }
   if (changes.alarm !== undefined)
-    await setReminders(id, changes.alarm ? [changes.alarm.offsetMinutes] : []);
+    await setAlarm(id, changes.alarm?.offsetMinutes ?? null);
 }
 
 /** This and every later occurrence: the series stops before it, and a new

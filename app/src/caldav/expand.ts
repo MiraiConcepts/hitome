@@ -7,7 +7,13 @@ import zones from 'ical-expander/zones-compiled.json';
 
 type Occurrence = ReturnType<ICAL.Event['getOccurrenceDetails']>;
 
-export type Expansion = { events: ICAL.Event[]; occurrences: Occurrence[] };
+export type Expansion = {
+  events: ICAL.Event[];
+  occurrences: Occurrence[];
+  /** Events shown in their own right though they carry a RECURRENCE-ID: an
+   *  exception whose series is not in the object (see expandBetween). */
+  standalone: Set<ICAL.Event>;
+};
 
 // Zones for events that name a TZID without carrying its VTIMEZONE, as
 // ical-expander registered them on load.
@@ -113,7 +119,11 @@ export function expandBetween(
   const inRange = (start: number, end: number) =>
     end >= after.getTime() && start <= before.getTime();
 
-  const result: Expansion = { events: [], occurrences: [] };
+  const result: Expansion = {
+    events: [],
+    occurrences: [],
+    standalone: new Set(),
+  };
   for (const event of all) {
     if (event.isRecurrenceException() || cancelled(event)) continue;
     if (!event.isRecurring()) {
@@ -169,6 +179,20 @@ export function expandBetween(
       result.occurrences.push(occurrence);
       shown++;
     }
+  }
+  // An exception with no series of its own in the object: an invitation to
+  // one occurrence of someone else's series. It is all there is of that
+  // event here, so it is shown as an event in its own right.
+  const series = new Set(
+    all.filter((e) => !e.isRecurrenceException()).map((e) => e.uid)
+  );
+  for (const ex of all) {
+    if (!ex.isRecurrenceException() || series.has(ex.uid) || cancelled(ex))
+      continue;
+    const { start, end } = times(ex);
+    if (!inRange(start, end)) continue;
+    result.events.push(ex);
+    result.standalone.add(ex);
   }
   return result;
 }

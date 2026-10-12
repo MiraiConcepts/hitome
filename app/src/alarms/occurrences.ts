@@ -48,7 +48,11 @@ export function desiredAlarms(
   for (const event of events) {
     if (!event.alarm) continue;
     if (event.start.getTime() > horizonEnd) continue;
-    const fireDate = alarmTimeFor(event.raw, event.start);
+    const fireDate = alarmTimeFor(
+      event.raw,
+      event.start,
+      event.recurrenceStart
+    );
     if (!fireDate || fireDate.getTime() <= now.getTime()) continue;
     const id = `${ALARM_ID_PREFIX}${event.uid}:${Math.floor(event.start.getTime() / 1000)}`;
     if (seen.has(id)) continue; // overlapping fetches can repeat occurrences

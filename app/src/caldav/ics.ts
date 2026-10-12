@@ -22,7 +22,11 @@ export function expandEvents(
   rangeEnd: Date,
   source: EventSource = {}
 ): CalEvent[] {
-  const { events, occurrences } = expandBetween(ics, rangeStart, rangeEnd);
+  const { events, occurrences, standalone } = expandBetween(
+    ics,
+    rangeStart,
+    rangeEnd
+  );
 
   const map = (
     event: any,
@@ -37,7 +41,10 @@ export function expandEvents(
       vevent.getFirstPropertyValue('conference') ??
       vevent.getFirstPropertyValue('x-google-conference');
     return {
-      id: `${uid}:${startTime.toString()}`,
+      // The object's address is part of it: the same UID can sit in two
+      // calendars (a copy, or an invite saved twice), and the feed dedupes by
+      // id, so uid:start alone drew only one of them.
+      id: `${url}#${uid}:${startTime.toString()}`,
       url,
       etag,
       uid,
@@ -49,7 +56,10 @@ export function expandEvents(
       description: vevent.getFirstPropertyValue('description') ?? undefined,
       ...(link ? { link: String(link) } : {}),
       ...(conference ? { conference: String(conference) } : {}),
-      ...(vevent.hasProperty('rrule') || vevent.hasProperty('recurrence-id')
+      // An exception without its series (invited to one occurrence) has no
+      // series to edit, so it is edited and deleted as a single event.
+      ...(vevent.hasProperty('rrule') ||
+      (vevent.hasProperty('recurrence-id') && !standalone.has(event))
         ? {
             recurring: true,
             // Which occurrence this is, independent of where it now sits —

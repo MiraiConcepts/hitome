@@ -166,3 +166,54 @@ describe('alarmTimeFor', () => {
     expect(alarmTimeFor(buildIcs([]), new Date())).toBeNull();
   });
 });
+
+describe('an occurrence with its own reminder', () => {
+  // Weekly, 10 minutes before; the 13 July occurrence alone set to an hour.
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//test//EN',
+    'BEGIN:VEVENT',
+    'UID:A-1',
+    'DTSTAMP:20260601T000000Z',
+    'DTSTART:20260706T040000Z',
+    'RRULE:FREQ=WEEKLY',
+    'SUMMARY:x',
+    'BEGIN:VALARM',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:Reminder',
+    'TRIGGER:-PT10M',
+    'END:VALARM',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'UID:A-1',
+    'DTSTAMP:20260601T000000Z',
+    'RECURRENCE-ID:20260713T040000Z',
+    'DTSTART:20260713T040000Z',
+    'SUMMARY:x',
+    'BEGIN:VALARM',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:Reminder',
+    'TRIGGER:-PT1H',
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+  const own = Date.UTC(2026, 6, 13, 4) / 1000;
+  const other = Date.UTC(2026, 6, 20, 4) / 1000;
+
+  it('reads that occurrence its own reminder, the others the series', () => {
+    expect(readAlarm(ics, own)).toEqual({ offsetMinutes: 60 });
+    expect(readAlarm(ics, other)).toEqual({ offsetMinutes: 10 });
+    expect(readAlarm(ics)).toEqual({ offsetMinutes: 10 });
+  });
+
+  it('rings that occurrence by its own reminder', () => {
+    expect(alarmTimeFor(ics, new Date(own * 1000), own)?.toISOString()).toBe(
+      '2026-07-13T03:00:00.000Z'
+    );
+    expect(
+      alarmTimeFor(ics, new Date(other * 1000), other)?.toISOString()
+    ).toBe('2026-07-20T03:50:00.000Z');
+  });
+});

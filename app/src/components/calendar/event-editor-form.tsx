@@ -1,5 +1,11 @@
 import { useState, type ComponentType, type Ref } from 'react';
-import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import {
+  Platform,
+  StyleSheet,
+  TextInput,
+  View,
+  type TextInputProps,
+} from 'react-native';
 
 import { AlarmField } from '@/components/calendar/alarm-field';
 import { CalendarField } from '@/components/calendar/calendar-field';
@@ -200,7 +206,9 @@ export function EventEditorFields({
             accessibilityLabel="Title"
             autoFocus={autoFocusTitle}
             returnKeyType="done"
-            submitBehavior="blurAndSubmit"
+            // Done puts a phone's keyboard away. On the web a blur sent the
+            // focus to the page behind the open editor, so Enter keeps it.
+            submitBehavior={Platform.OS === 'web' ? 'submit' : 'blurAndSubmit'}
             testID="editor-summary"
           />
           <FieldProblem text={editor.problemFor('title')} />

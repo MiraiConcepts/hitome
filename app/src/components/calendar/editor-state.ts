@@ -88,7 +88,7 @@ export function initialFormState(
                 : { type: 'forever' },
           };
 
-  const readAlarmResult = readAlarm(event.raw);
+  const readAlarmResult = readAlarm(event.raw, event.recurrenceStart);
   const alarm: AlarmState =
     readAlarmResult === null
       ? { kind: 'none' }

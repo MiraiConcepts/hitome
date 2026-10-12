@@ -296,3 +296,38 @@ describe('cancelled events', () => {
     expect(expand(single('TENTATIVE'))).toHaveLength(1);
   });
 });
+
+describe('an exception without its series', () => {
+  // Invited to one occurrence of someone else's weekly meeting: the object
+  // holds that occurrence only.
+  const INVITE = cal(
+    'BEGIN:VEVENT',
+    'UID:their-series',
+    'DTSTAMP:20261001T000000Z',
+    'RECURRENCE-ID:20261109T090000Z',
+    'DTSTART:20261110T090000Z',
+    'DTEND:20261110T100000Z',
+    'SUMMARY:Their weekly, this once',
+    'END:VEVENT'
+  );
+  const NOV = [
+    new Date('2026-11-01T00:00:00Z'),
+    new Date('2026-12-01T00:00:00Z'),
+  ] as const;
+
+  it('is shown where it sits, as a single event', () => {
+    const [event, ...rest] = expand(INVITE, ...NOV);
+    expect(rest).toEqual([]);
+    expect(event.summary).toBe('Their weekly, this once');
+    expect(event.start.toISOString()).toBe('2026-11-10T09:00:00.000Z');
+    expect(event.recurring).toBeUndefined();
+  });
+
+  it('is not shown outside the window', () => {
+    const DEC = [
+      new Date('2026-12-01T00:00:00Z'),
+      new Date('2027-01-01T00:00:00Z'),
+    ] as const;
+    expect(expand(INVITE, ...DEC)).toEqual([]);
+  });
+});

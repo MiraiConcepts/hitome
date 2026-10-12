@@ -205,6 +205,13 @@ describe('expandEvents', () => {
   const start = new Date('2026-06-01T00:00:00Z');
   const end = new Date('2026-07-01T00:00:00Z');
 
+  it('keeps the same UID in two calendars apart', () => {
+    const [a] = expandEvents(TIMED, '/personal/x.ics', 'e1', start, end);
+    const [b] = expandEvents(TIMED, '/work/x.ics', 'e1', start, end);
+    expect(a.uid).toBe(b.uid);
+    expect(a.id).not.toBe(b.id);
+  });
+
   it('tags each event with the source calendar color + icon when provided', () => {
     const [ev] = expandEvents(TIMED, '/c/COLOR-1.ics', 'e1', start, end, {
       color: '#f8708cff',

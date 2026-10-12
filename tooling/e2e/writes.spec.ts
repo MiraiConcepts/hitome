@@ -493,6 +493,24 @@ test("an unchanged editor closes on Escape at once, and the focus goes back to t
   await expect(cell).toBeFocused();
 });
 
+test("Enter in the title keeps the focus in the editor", async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await openMonth(page);
+  const cell = grid(page).getByTestId(`day-cell-${dateString(day(22))}`);
+  await expect(async () => {
+    await cell.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("event-editor")).toBeVisible({
+      timeout: 2_000,
+    });
+  }).toPass({ timeout: 20_000 });
+  const summary = page.getByTestId("editor-summary");
+  await expect(summary).toBeFocused();
+  await summary.fill("Enter stays");
+  await page.keyboard.press("Enter");
+  await expect(summary).toBeFocused();
+});
+
 test("resizing across the breakpoint keeps the open editor and what was typed", async ({
   page,
 }) => {

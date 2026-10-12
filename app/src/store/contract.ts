@@ -30,6 +30,7 @@ export const URI = {
   exceptions: (seriesId: string | number) =>
     `${BASE}/exception/${rowId(seriesId)}`,
   reminders: `${BASE}/reminders`,
+  reminder: (id: string | number) => `${BASE}/reminders/${rowId(id)}`,
   /** Every occurrence overlapping [begin, end), recurring series expanded. */
   instances: (begin: number, end: number) =>
     `${BASE}/instances/when/${msPart(begin)}/${msPart(end)}`,

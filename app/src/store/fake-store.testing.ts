@@ -246,6 +246,13 @@ export function fakeStore({ synced = true }: { synced?: boolean } = {}) {
         for (const row of events) Object.assign(row, values);
         return events.length;
       }
+      const reminder = /^\/reminders\/(\d+)$/.exec(path);
+      if (reminder) {
+        const r = reminders.find((x) => num(x._id) === num(reminder[1]));
+        if (!r) return 0;
+        Object.assign(r, values);
+        return 1;
+      }
       const one = /^\/events\/(\d+)$/.exec(path);
       const row = one && event(one[1]);
       if (!row) return 0;
@@ -278,6 +285,13 @@ export function fakeStore({ synced = true }: { synced?: boolean } = {}) {
         for (let i = attendees.length - 1; i >= 0; i--)
           if (gone.includes(num(attendees[i].event_id))) attendees.splice(i, 1);
         return gone.length;
+      }
+      const reminder = /^\/reminders\/(\d+)$/.exec(path);
+      if (reminder) {
+        const i = reminders.findIndex((x) => num(x._id) === num(reminder[1]));
+        if (i < 0) return 0;
+        reminders.splice(i, 1);
+        return 1;
       }
       if (path === '/reminders') {
         const ids = (args ?? []).map(Number);

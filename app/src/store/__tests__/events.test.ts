@@ -161,6 +161,29 @@ describe('store backend', () => {
     expect(back.every((e) => e.alarm)).toBe(true);
   });
 
+  it('changes only the reminder the editor shows, keeping the others', async () => {
+    const all = await weekly();
+    const seriesId = Number(fake.reminders[0].event_id);
+    // An email reminder a day before, synced in from elsewhere.
+    fake.reminders.push({
+      _id: 900,
+      event_id: seriesId,
+      minutes: 1440,
+      method: 2,
+    });
+    await updateEvent(all[0], { alarm: { offsetMinutes: 30 } }, 'all');
+    expect(
+      fake.reminders
+        .map((r) => [Number(r.minutes), Number(r.method)])
+        .sort((a, b) => a[0] - b[0])
+    ).toEqual([
+      [30, 1],
+      [1440, 2],
+    ]);
+    await updateEvent(all[0], { alarm: null }, 'all');
+    expect(fake.reminders.map((r) => Number(r.minutes))).toEqual([1440]);
+  });
+
   it('moves a whole series to another calendar', async () => {
     const all = await weekly();
     await moveEvent(all[0], BIRTHDAYS, {});
