@@ -1,6 +1,6 @@
 /** A calendar-specific marker glyph, keyed off the source calendar (not the
  *  event) — e.g. the birthday calendar draws a gift instead of the all-day sun. */
-export type EventIcon = 'gift';
+export type EventIcon = 'gift' | 'confetti';
 
 /** Per-calendar rendering hints tagged onto each event during expansion. */
 export type EventSource = { color?: string; icon?: EventIcon };

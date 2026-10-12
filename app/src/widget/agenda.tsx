@@ -18,6 +18,7 @@ import {
 import {
   AddOutlineBody,
   ArrowRightOutlineBody,
+  ConfettiOutlineBody,
   GiftOutlineBody,
   RefreshOutlineBody,
   SunOutlineBody,
@@ -208,12 +209,17 @@ function EventRow({
     >
       <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
         {wholeDay ? (
-          // Birthday-calendar events get a gift; others keep the generic sun.
+          // Birthday-calendar events get a gift and holiday ones confetti;
+          // others keep the generic sun.
           // Carries the dot's spacing, since the row drops the dot itself.
           <SvgWidget
             svg={markerSvg(
               event.color,
-              event.icon === 'gift' ? GiftOutlineBody : SunOutlineBody
+              event.icon === 'gift'
+                ? GiftOutlineBody
+                : event.icon === 'confetti'
+                  ? ConfettiOutlineBody
+                  : SunOutlineBody
             )}
             style={{ ...MARKER_ICON, marginRight: 6 }}
           />

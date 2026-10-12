@@ -32,7 +32,7 @@ export type WidgetEvent = {
   alarm?: boolean;
   /** Source calendar's CalDAV color (#RRGGBBAA) — tints the row's markers. */
   color?: string;
-  /** Calendar-specific marker glyph — e.g. 'gift' swaps the all-day sun. */
+  /** Calendar-specific marker glyph — e.g. 'gift' or 'confetti' swaps the all-day sun. */
   icon?: EventIcon;
 };
 

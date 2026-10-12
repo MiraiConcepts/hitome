@@ -13,6 +13,7 @@ import type {
 import type { StoreRow, StoreValues } from '../../modules/calendar-store';
 
 const BIRTHDAY_NAME = /birthday/i;
+const HOLIDAY_NAME = /holiday/i;
 
 /** A store event's handle, carried on CalEvent.url: `store:<calendar>/<id>`.
  *  Prefixed by the calendar's own url, so hiding a calendar (a prefix match
@@ -48,7 +49,8 @@ export function argbToHex(argb: StoreRow[string]): string | undefined {
 }
 
 export function calendarIcon(name: string): EventIcon | undefined {
-  return BIRTHDAY_NAME.test(name) ? 'gift' : undefined;
+  if (BIRTHDAY_NAME.test(name)) return 'gift';
+  return HOLIDAY_NAME.test(name) ? 'confetti' : undefined;
 }
 
 /** A UTC-midnight timestamp (how the store keeps all-day days) as local

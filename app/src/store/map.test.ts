@@ -73,6 +73,20 @@ describe('instanceToEvent', () => {
     expect(e.icon).toBe('gift');
   });
 
+  it('marks a holiday calendar with confetti', () => {
+    const e = instanceToEvent(
+      {
+        ...timedRow,
+        allDay: 1,
+        begin: Date.UTC(2026, 11, 25),
+        end: Date.UTC(2026, 11, 26),
+        calendar_displayName: 'Singapore holidays',
+      },
+      none
+    );
+    expect(e.icon).toBe('confetti');
+  });
+
   it('gives an occurrence of a series its address and readable rule', () => {
     const begin = new Date(2026, 9, 12, 9, 0).getTime();
     const e = instanceToEvent(

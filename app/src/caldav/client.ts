@@ -18,10 +18,11 @@ import type { EventIcon } from './types';
 let clientPromise: Promise<DAVClient> | null = null;
 let calendarsPromise: Promise<DAVCalendar[]> | null = null;
 
-// A calendar whose name says birthdays draws a gift instead of the generic
-// sun — a name check, so it works for anyone who named the calendar what it
-// holds.
+// A calendar whose name says birthdays draws a gift, and one that says
+// holidays draws confetti, instead of the generic sun — a name check, so it
+// works for anyone who named the calendar what it holds.
 const BIRTHDAY_NAME = /birthday/i;
+const HOLIDAY_NAME = /holiday/i;
 
 /** How long one CalDAV read (PROPFIND, REPORT) may wait for an answer. */
 export const READ_TIMEOUT_MS = 30_000;
@@ -229,7 +230,9 @@ export function calendarColor(calendar: DAVCalendar): string | undefined {
 /** The calendar's marker glyph, or undefined for the generic sun/repeat/alarm
  *  markers. */
 export function calendarIcon(calendar: DAVCalendar): EventIcon | undefined {
-  return BIRTHDAY_NAME.test(calendarName(calendar)) ? 'gift' : undefined;
+  const name = calendarName(calendar);
+  if (BIRTHDAY_NAME.test(name)) return 'gift';
+  return HOLIDAY_NAME.test(name) ? 'confetti' : undefined;
 }
 
 function pickDefault(

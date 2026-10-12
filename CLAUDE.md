@@ -103,8 +103,8 @@ helper scripts.
     a browser can read it.
 - UI is square: no corner radius on cards, buttons, fields, chips, sheets or
   the widget (changed from 4px on 2026-10-04). A calendar is marked by an
-  icon in its colour (`CalendarMark`: gift for birthdays, else a calendar),
-  not a dot. Only the month grid's tap ripple stays round. This breaks
+  icon in its colour (`CalendarMark`: gift for a calendar named birthday,
+  confetti for one named holiday, else a calendar), not a dot. Only the month grid's tap ripple stays round. This breaks
   byte-identity with the notes app's `theme.ts`/`src/components/` until it
   makes the same change.
 - Ports on this Mac: 4000 is this repo's dev server (`server:dev`) and 4100
