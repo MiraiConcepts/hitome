@@ -391,6 +391,10 @@ export const WeekRow = memo(function WeekRow({
     transform: [{ scale: inkGrow.value }],
   }));
 
+  // Where the weekend split falls (by the week start), for the rule and the
+  // bars that end against it.
+  const splits = weekendBoundaries();
+
   const layout = useMemo(() => {
     const chipSpan = (event: CalEvent) =>
       chipTitleLines(event.summary, cellWidth);
@@ -594,7 +598,7 @@ export const WeekRow = memo(function WeekRow({
           cells so no row's rule chops it up, below the events so a banner
           spanning the weekend is not sliced by it. Pulled up by its own width
           to bridge the row's top border and read as one continuous line. */}
-      {weekendBoundaries().map((col) => (
+      {splits.map((col) => (
         <View
           key={col}
           pointerEvents="none"
@@ -648,6 +652,13 @@ export const WeekRow = memo(function WeekRow({
               // lines the one above happened to use. A constant gap is worth
               // more than a snug box, so the box gets the slack instead.
               height: banner.rows * SLOT_HEIGHT - EVENT_GAP,
+              // A bar that ends where the weekend starts stops short of the
+              // split, which sits on its last day's edge: covering it cut the
+              // line where a Friday holiday sat. One that runs on across it
+              // still covers it (see the split above).
+              ...(splits.includes(banner.startCol + banner.span)
+                ? { marginRight: RULE_WIDTH }
+                : null),
             }}
           />
         ))}
