@@ -207,8 +207,10 @@ export function EventEditorFields({
             autoFocus={autoFocusTitle}
             returnKeyType="done"
             // Done puts a phone's keyboard away. On the web a blur sent the
-            // focus to the page behind the open editor, so Enter keeps it.
-            submitBehavior={Platform.OS === 'web' ? 'submit' : 'blurAndSubmit'}
+            // focus to the page behind the open editor, so Enter keeps it
+            // there: react-native-web reads only the older blurOnSubmit.
+            submitBehavior="blurAndSubmit"
+            {...(Platform.OS === 'web' ? { blurOnSubmit: false } : null)}
             testID="editor-summary"
           />
           <FieldProblem text={editor.problemFor('title')} />
