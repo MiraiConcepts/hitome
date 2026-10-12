@@ -133,14 +133,14 @@ const titleWidth = (title: string) => measureTitle(title, EVENT_FONT_SIZE);
 
 /** Title lines a chip needs against the full cell width (time, when shown,
  *  sits on its own line and never competes with the title). */
-function chipTitleLines(summary: string, cellWidth: number): number {
+export function chipTitleLines(summary: string, cellWidth: number): number {
   return titleWidth(summary || '(untitled)') > cellWidth - CHIP_CHROME_PX
     ? 2
     : 1;
 }
 
 /** Title lines a banner needs over its full width. */
-function bannerTitleLines(summary: string, widthPx: number): number {
+export function bannerTitleLines(summary: string, widthPx: number): number {
   return titleWidth(summary || '(untitled)') > widthPx - BANNER_CHROME_PX
     ? 2
     : 1;

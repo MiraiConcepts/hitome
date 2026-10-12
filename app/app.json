@@ -57,6 +57,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "expo-sharing",
       "./plugins/with-widget-ripple",
       [
         "expo-notifications",

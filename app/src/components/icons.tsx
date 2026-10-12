@@ -34,6 +34,7 @@ import {
   GiftOutlineBody,
   ConfettiOutlineBody,
   CalendarPlusOutlineBody,
+  CalendarShareOutlineBody,
   ShareOutlineBody,
   TrashOutlineBody,
   WifiOffOutlineBody,
@@ -153,6 +154,10 @@ export function BugIcon({ size = 24, color }: IconProps) {
 
 export function ConfettiIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(ConfettiOutlineBody, size, color)} />;
+}
+
+export function CalendarShareIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(CalendarShareOutlineBody, size, color)} />;
 }
 
 export function GiftIcon({ size = 24, color }: IconProps) {

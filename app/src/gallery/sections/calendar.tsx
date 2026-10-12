@@ -102,6 +102,7 @@ function Header(
       onToday={noop}
       onRefresh={noop}
       onAdd={() => openEditor({ event: null, defaultDay: TODAY })}
+      onShareMonth={noop}
       onSettings={noop}
     />
   );

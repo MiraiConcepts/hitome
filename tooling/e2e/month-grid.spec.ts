@@ -1,3 +1,5 @@
+import { writeFileSync } from "node:fs";
+
 import { expect, test, type Page } from "@playwright/test";
 
 /** The editor sheet slides away before it unmounts; on a slow CI runner that
@@ -659,4 +661,56 @@ test("a11y: the location input has a name", async ({ page }) => {
     timeout: 30_000,
   });
   await expect(page.getByRole("textbox", { name: "Location" })).toBeVisible();
+});
+
+test("the header copies the month as a picture, every event in it", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.goto(`/?day=${dateString(target(1))}`);
+  await expect(page.getByTestId("calendar-header-label")).toHaveText(
+    monthTitle(target(1)),
+    { timeout: 30_000 },
+  );
+  await expect(
+    grid(page).getByTestId(`more-${dateString(target(27))}`),
+  ).toHaveText(/\+\d+/, { timeout: 30_000 });
+
+  // Plain http here has no clipboard API: stand one in that keeps the PNG.
+  await page.evaluate(() => {
+    const w = window as unknown as Record<string, unknown>;
+    w.ClipboardItem = class {
+      constructor(public items: Record<string, Promise<Blob>>) {}
+    };
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async () => {},
+        write: async (items: { items: Record<string, Promise<Blob>> }[]) => {
+          const blob = await items[0].items["image/png"];
+          const bytes = new Uint8Array(await blob.arrayBuffer());
+          let text = "";
+          for (let i = 0; i < bytes.length; i += 0x8000)
+            text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+          w.__picture = btoa(text);
+        },
+      },
+    });
+  });
+  await page.getByTestId("calendar-share-month").click();
+  await expect(page.getByText("Month copied as a picture")).toBeVisible({
+    timeout: 20_000,
+  });
+  const png = Buffer.from(
+    await page.evaluate(
+      () => (window as unknown as { __picture: string }).__picture,
+    ),
+    "base64",
+  );
+  writeFileSync("artifacts/month-picture.png", png);
+  // A PNG, at the picture's width (1200) at twice the pixels.
+  expect(png.subarray(1, 4).toString()).toBe("PNG");
+  expect(png.readUInt32BE(16)).toBe(2400);
+  // Taller than six of the grid's rows: the busy day's events all fit.
+  expect(png.readUInt32BE(20)).toBeGreaterThan(1200);
 });

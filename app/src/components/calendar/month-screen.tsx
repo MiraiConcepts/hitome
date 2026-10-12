@@ -40,6 +40,7 @@ import {
   type MonthGridHandle,
 } from '@/components/calendar/month-grid';
 import { HEADER_GROUND, MonthHeader } from '@/components/calendar/month-header';
+import { MonthPicture } from '@/components/calendar/month-picture';
 import {
   AlertCircleIcon,
   CalendarPlusIcon,
@@ -69,6 +70,11 @@ import {
 import { getFirstDayOfWeek, type MonthAnchor } from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
 import { shareEvent } from '@/utils/share-event';
+import {
+  captureMonth,
+  deliverMonth,
+  type MonthPicture as Picture,
+} from '@/utils/share-month';
 import { refreshAgendaWidget } from '@/widget/app-refresh';
 
 type EditorState =
@@ -493,6 +499,58 @@ export function MonthScreen() {
     }
   }, []);
 
+  // The header's month picture. Delivery starts at the tap (the web's
+  // clipboard must be asked within it) and is handed the picture while it is
+  // still being drawn: the picture view mounts off screen, and the effect
+  // below captures it once it has been laid out.
+  const pictureRef = useRef<View>(null);
+  const pictureWait = useRef<{
+    resolve: (picture: Picture) => void;
+    reject: (err: unknown) => void;
+  } | null>(null);
+  const [picturing, setPicturing] = useState(false);
+  const onShareMonth = useCallback(async () => {
+    if (pictureWait.current) return;
+    const picture = new Promise<Picture>((resolve, reject) => {
+      pictureWait.current = { resolve, reject };
+    });
+    setPicturing(true);
+    const title = new Date(
+      settledMonth.year,
+      settledMonth.month0,
+      1
+    ).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const result = await deliverMonth(picture, title);
+    pictureWait.current = null;
+    setPicturing(false);
+    if (result === 'copied')
+      setSnack({ message: 'Month copied as a picture', icon: CheckIcon });
+    else if (result === 'saved')
+      setSnack({ message: 'Month saved as a picture', icon: CheckIcon });
+    else if (result === 'failed')
+      setSnack({
+        message: 'Couldn’t make a picture of this month',
+        icon: AlertCircleIcon,
+      });
+  }, [settledMonth]);
+  useEffect(() => {
+    if (!picturing) return;
+    // Two frames: one to mount the picture, one for it to be laid out.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        const view = pictureRef.current;
+        const wait = pictureWait.current;
+        if (!wait) return;
+        if (!view) {
+          wait.reject(new Error('No picture view'));
+          return;
+        }
+        captureMonth(view).then(wait.resolve, wait.reject);
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [picturing]);
+
   // Hold a cell anywhere, its events included — a new event on that day.
   const onCreateOnDay = useCallback(
     (day: string) => setEditor({ mode: 'create', day }),
@@ -677,6 +735,7 @@ export function MonthScreen() {
               onToday={goToday}
               onRefresh={onManualRefresh}
               onAdd={() => setEditor({ mode: 'create', day: addDay })}
+              onShareMonth={onShareMonth}
               onSettings={() => router.navigate('/settings')}
             />
 
@@ -779,6 +838,15 @@ export function MonthScreen() {
           />
         )}
       </BlurTarget>
+
+      {picturing && (
+        <MonthPicture
+          ref={pictureRef}
+          month={settledMonth}
+          events={events}
+          todayStr={today}
+        />
+      )}
 
       {popoverDay && (
         <DayPopover

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -11,6 +11,7 @@ import Animated, {
 import {
   AddIcon,
   CalendarEventIcon,
+  CalendarShareIcon,
   RefreshIcon,
   SettingsIcon,
 } from '@/components/icons';
@@ -43,6 +44,8 @@ type Props = {
   onToday: () => void;
   onRefresh: () => void;
   onAdd: () => void;
+  /** The month as a picture: copied on the web, shared on Android. */
+  onShareMonth: () => void;
   onSettings: () => void;
 };
 
@@ -106,6 +109,7 @@ export function MonthHeader({
   onToday,
   onRefresh,
   onAdd,
+  onShareMonth,
   onSettings,
 }: Props) {
   // The displayed label trails the prop through a directional slide-fade:
@@ -209,6 +213,18 @@ export function MonthHeader({
         </View>
       </View>
       <View style={styles.controls}>
+        <Pressable
+          testID="calendar-share-month"
+          onPress={onShareMonth}
+          hitSlop={8}
+          style={styles.iconButton}
+          accessibilityRole="button"
+          accessibilityLabel={
+            Platform.OS === 'web' ? 'Copy month as picture' : 'Share month'
+          }
+        >
+          <CalendarShareIcon size={Bar.iconSize} color={AccentColor} />
+        </Pressable>
         <Pressable
           testID="calendar-add"
           onPress={onAdd}
