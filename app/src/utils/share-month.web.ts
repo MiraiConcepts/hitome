@@ -1,3 +1,4 @@
+import { Asset } from 'expo-asset';
 import { toBlob } from 'html-to-image';
 import type { View } from 'react-native';
 
@@ -9,6 +10,47 @@ export type MonthShareResult = 'shared' | 'copied' | 'saved' | 'failed';
 /** Pixels per CSS pixel: sharp on a high-density screen, and when zoomed. */
 const PIXEL_RATIO = 2;
 
+async function dataUrl(uri: string): Promise<string> {
+  const blob = await (await fetch(uri)).blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+let fontCss: Promise<string> | null = null;
+
+/**
+ * Satoshi for the picture, both its faces, written out here. A picture is
+ * drawn apart from the page and sees only the fonts handed to it; left to
+ * find them itself, the library found only the bold face (font-faces.web.ts
+ * declares it in a stylesheet, while expo-font registers the regular one
+ * where a stylesheet search cannot see it), and drew every word bold, wider
+ * than the grid had measured, so titles were cut short.
+ */
+function satoshiCss(): Promise<string> {
+  fontCss ??= Promise.all([
+    dataUrl(Asset.fromModule(require('../../assets/fonts/Satoshi.otf')).uri),
+    dataUrl(
+      Asset.fromModule(require('../../assets/fonts/Satoshi_bold.otf')).uri
+    ),
+  ]).then(([regular, bold]) => {
+    const face = (family: string, src: string, weight: number) =>
+      `@font-face{font-family:${JSON.stringify(family)};src:url(${src});font-weight:${weight}}`;
+    return (
+      face('Satoshi', regular, 400) +
+      face('Satoshi', bold, 700) +
+      face('Satoshi_bold', bold, 700)
+    );
+  });
+  fontCss.catch(() => {
+    fontCss = null;
+  });
+  return fontCss;
+}
+
 /** Draw the mounted picture view (see MonthPicture) into a PNG. */
 export async function captureMonth(view: View): Promise<MonthPicture> {
   // react-native-web hands back the element itself.
@@ -18,6 +60,7 @@ export async function captureMonth(view: View): Promise<MonthPicture> {
   await document.fonts?.ready;
   const blob = await toBlob(node, {
     pixelRatio: PIXEL_RATIO,
+    fontEmbedCSS: await satoshiCss(),
     width: node.offsetWidth,
     height: node.offsetHeight,
     // The view waits off screen; in the picture it sits at the origin.

@@ -666,7 +666,7 @@ test("a11y: the location input has a name", async ({ page }) => {
 test("the header copies the month as a picture, every event in it", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 1000, height: 800 });
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(`/?day=${dateString(target(1))}`);
   await expect(page.getByTestId("calendar-header-label")).toHaveText(
     monthTitle(target(1)),
