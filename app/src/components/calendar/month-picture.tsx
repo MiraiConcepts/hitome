@@ -8,7 +8,7 @@ import {
 } from '@/components/calendar/month-header';
 import {
   bannerTitleLines,
-  chipTitleLines,
+  chipSlots,
   DAY_NUMBER_HEIGHT,
   SLOT_HEIGHT,
   WeekRow,
@@ -25,10 +25,18 @@ import {
 } from '@/utils/calendar-grid';
 import { toDateString } from '@/utils/date';
 
-/** The picture's width, whatever the screen: a desktop's month, so titles have
- *  room and it reads the same pasted anywhere. */
-export const PICTURE_WIDTH = 1200;
+/** The picture's size, whatever the screen: 4:3, landscape, so titles have
+ *  room and it reads the same pasted anywhere, from the phone too. A month
+ *  whose busiest week needs more room makes it taller instead of hiding
+ *  events. */
+export const PICTURE_WIDTH = 1024;
+export const PICTURE_HEIGHT = 768;
 const CELL_WIDTH = PICTURE_WIDTH / 7;
+
+/** The month name's bar and the weekday row, at fixed heights so the weeks
+ *  can be given the rest. */
+const TITLE_BAR_HEIGHT = 82;
+const WEEKDAY_ROW_HEIGHT = 28;
 
 /** A week with nothing in it still gets a cell of about the grid's shape. */
 const MIN_SLOTS = 3;
@@ -54,7 +62,7 @@ function slotsNeeded(weekStart: Date, events: CalEvent[]): number {
     events,
     // More than any day could fill, so nothing overflows.
     events.length * 2 + 1,
-    (event) => chipTitleLines(event.summary, CELL_WIDTH),
+    (event) => chipSlots(event.summary, CELL_WIDTH),
     (event, span) => bannerTitleLines(event.summary, span * CELL_WIDTH),
     false
   );
@@ -98,6 +106,8 @@ export function MonthPicture({ month, events, todayStr, ref }: Props) {
     )
   );
 
+  const weeksRoom = PICTURE_HEIGHT - TITLE_BAR_HEIGHT - WEEKDAY_ROW_HEIGHT;
+
   return (
     <View
       ref={ref}
@@ -119,14 +129,28 @@ export function MonthPicture({ month, events, todayStr, ref }: Props) {
           </View>
         ))}
       </View>
-      {weeks.map((week) => {
+      {weeks.map((week, index) => {
         const weekEvents = inWeek(events, week);
-        const slots = slotsNeeded(week, weekEvents);
+        const needed =
+          DAY_NUMBER_HEIGHT +
+          slotsNeeded(week, weekEvents) * SLOT_HEIGHT +
+          ROW_FOOT;
+        // The weeks share what the bars leave of 4:3; the last takes the
+        // odd pixels.
+        const share = Math.floor(weeksRoom / weeks.length);
+        const fair =
+          index === weeks.length - 1
+            ? weeksRoom - share * (weeks.length - 1)
+            : share;
+        const rowHeight = Math.max(needed, fair);
+        const slots = Math.floor(
+          (rowHeight - DAY_NUMBER_HEIGHT - ROW_FOOT) / SLOT_HEIGHT
+        );
         return (
           <WeekRow
             key={toDateString(week)}
             weekStart={toDateString(week)}
-            rowHeight={DAY_NUMBER_HEIGHT + slots * SLOT_HEIGHT + ROW_FOOT}
+            rowHeight={rowHeight}
             cellWidth={CELL_WIDTH}
             slotCount={slots}
             counterNeedsSlot={false}
@@ -154,9 +178,10 @@ const styles = StyleSheet.create({
     width: PICTURE_WIDTH,
   },
   header: {
+    height: TITLE_BAR_HEIGHT,
+    justifyContent: 'flex-end',
     backgroundColor: HEADER_GROUND,
     paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.four,
     paddingBottom: Spacing.three,
   },
   title: {
@@ -165,9 +190,9 @@ const styles = StyleSheet.create({
     color: AccentColor,
   },
   weekdays: {
+    height: WEEKDAY_ROW_HEIGHT,
     flexDirection: 'row',
     backgroundColor: HEADER_GROUND,
-    paddingBottom: Spacing.two,
   },
   weekdayCell: {
     flex: 1,

@@ -42,8 +42,11 @@ type PressProps = {
 
 type ChipProps = PressProps & {
   event: CalEvent;
-  /** Show the start time — only when cells are wide enough to afford it. */
-  /** Title lines the layout granted this chip; >1 renders the stacked form. */
+  /** The start time, shown above the title in the calendar's colour; only
+   *  where cells are wide enough to afford the line (see week-row). */
+  time?: string;
+  /** Title lines the layout granted this chip; >1 renders the stacked form.
+   *  With a time, 0 means one line for both: the time leads the title. */
   titleLines: number;
   /** Absolute slot position, supplied by the week row. */
   style?: StyleProp<ViewStyle>;
@@ -55,8 +58,15 @@ type ChipProps = PressProps & {
  * to the granted lines. Without a time it's the title alone, wrapping only
  * when granted extra lines.
  */
-export function EventChip({ event, titleLines, style, ...press }: ChipProps) {
+export function EventChip({
+  event,
+  time,
+  titleLines,
+  style,
+  ...press
+}: ChipProps) {
   const title = event.summary || '(untitled)';
+  const tint = event.color ?? AccentColor;
   const dimmed = hoveredOccurrence.useDimmed(event.id);
   return (
     <Pressable
@@ -78,13 +88,38 @@ export function EventChip({ event, titleLines, style, ...press }: ChipProps) {
     >
       {/* Accent bar tinted by the source calendar (falls back to the
           theme accent). */}
-      <View
-        style={[
-          styles.chipBar,
-          { backgroundColor: event.color ?? AccentColor },
-        ]}
-      />
-      {titleLines > 1 ? (
+      <View style={[styles.chipBar, { backgroundColor: tint }]} />
+      {time && titleLines === 0 ? (
+        <ThemedText
+          type="small"
+          numberOfLines={1}
+          textBreakStrategy="simple"
+          style={styles.chipTitle}
+        >
+          <ThemedText style={[styles.chipTime, { color: tint }]}>
+            {time}
+          </ThemedText>{' '}
+          {title}
+        </ThemedText>
+      ) : time ? (
+        <View style={styles.chipStack}>
+          <ThemedText
+            type="small"
+            numberOfLines={1}
+            style={[styles.chipTime, { color: tint }]}
+          >
+            {time}
+          </ThemedText>
+          <ThemedText
+            type="small"
+            numberOfLines={titleLines}
+            textBreakStrategy="simple"
+            style={styles.chipTitleWrapped}
+          >
+            {title}
+          </ThemedText>
+        </View>
+      ) : titleLines > 1 ? (
         <View style={styles.chipStack}>
           <ThemedText
             type="small"
@@ -300,6 +335,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: EVENT_FONT_SIZE,
     lineHeight: EVENT_LINE_HEIGHT,
+  },
+  chipTime: {
+    fontSize: EVENT_FONT_SIZE,
+    lineHeight: EVENT_LINE_HEIGHT,
+    fontWeight: '700',
   },
   chipTitleWrapped: {
     fontSize: EVENT_FONT_SIZE,

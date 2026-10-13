@@ -35,7 +35,7 @@ import {
   layoutWeek,
   weekendBoundaries,
 } from '@/utils/calendar-grid';
-import { eventDays, parseDay, toDateString } from '@/utils/date';
+import { eventDays, formatTime, parseDay, toDateString } from '@/utils/date';
 import { dayCellLabel } from '@/utils/day-cell-label';
 
 /** Height of one banner/chip slot inside a day cell: one line of event text
@@ -137,6 +137,20 @@ export function chipTitleLines(summary: string, cellWidth: number): number {
   return titleWidth(summary || '(untitled)') > cellWidth - CHIP_CHROME_PX
     ? 2
     : 1;
+}
+
+/** From this cell width a timed event shows its start time above its title
+ *  (a desktop window, and the month picture); a phone's cells have no room
+ *  for the extra line. */
+export const TIME_MIN_CELL_WIDTH = 140;
+
+/** Slots a timed event takes: its title lines, and the time's line where the
+ *  cells show times. */
+export function chipSlots(summary: string, cellWidth: number): number {
+  return (
+    chipTitleLines(summary, cellWidth) +
+    (cellWidth >= TIME_MIN_CELL_WIDTH ? 1 : 0)
+  );
 }
 
 /** Title lines a banner needs over its full width. */
@@ -394,10 +408,10 @@ export const WeekRow = memo(function WeekRow({
   // Where the weekend split falls (by the week start), for the rule and the
   // bars that end against it.
   const splits = weekendBoundaries();
+  const showTimes = cellWidth >= TIME_MIN_CELL_WIDTH;
 
   const layout = useMemo(() => {
-    const chipSpan = (event: CalEvent) =>
-      chipTitleLines(event.summary, cellWidth);
+    const chipSpan = (event: CalEvent) => chipSlots(event.summary, cellWidth);
     const bannerRows = (event: CalEvent, spanCols: number) =>
       bannerTitleLines(event.summary, spanCols * cellWidth);
     return layoutWeek(
@@ -666,7 +680,13 @@ export const WeekRow = memo(function WeekRow({
           <EventChip
             key={chip.event.id}
             event={chip.event}
-            titleLines={Math.min(2, chip.span)}
+            {...(showTimes
+              ? {
+                  time: formatTime(chip.event.start),
+                  // The time takes the first slot; one slot left holds both.
+                  titleLines: chip.span - 1,
+                }
+              : { titleLines: Math.min(2, chip.span) })}
             onPress={() => pressEvent(chip.event, chip.col)}
             onLongPress={() => holdOn(chip.col)}
             onPressIn={(e) =>

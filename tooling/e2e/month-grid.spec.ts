@@ -708,9 +708,9 @@ test("the header copies the month as a picture, every event in it", async ({
     "base64",
   );
   writeFileSync("artifacts/month-picture.png", png);
-  // A PNG, at the picture's width (1200) at twice the pixels.
+  // A PNG, 4:3 at 1024 x 768 at twice the pixels; the busy week makes it
+  // taller rather than hide any of its events.
   expect(png.subarray(1, 4).toString()).toBe("PNG");
-  expect(png.readUInt32BE(16)).toBe(2400);
-  // Taller than six of the grid's rows: the busy day's events all fit.
-  expect(png.readUInt32BE(20)).toBeGreaterThan(1200);
+  expect(png.readUInt32BE(16)).toBe(2048);
+  expect(png.readUInt32BE(20)).toBeGreaterThan(1536);
 });
