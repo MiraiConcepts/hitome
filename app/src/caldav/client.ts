@@ -2,6 +2,11 @@ import { DAVClient, type DAVCalendar } from 'tsdav';
 
 import { ensureDefaultCalendar } from '@/config/calendar-pref';
 import {
+  ensureCalendarRoles,
+  roleOf,
+  type CalendarRoles,
+} from '@/config/calendar-visibility';
+import {
   CONNECT_TIMEOUT_MS,
   ConnectTimeoutError,
   NoCalendarsError,
@@ -237,25 +242,33 @@ export function calendarIcon(calendar: DAVCalendar): EventIcon | undefined {
 
 function pickDefault(
   calendars: DAVCalendar[],
-  preferred: string | null
+  preferred: string | null,
+  roles: CalendarRoles
 ): DAVCalendar {
   // CalDAV exposes no "default calendar" flag, so the choice is the app's:
-  // whatever was picked in settings, else discovery order.
+  // whatever was picked in settings, else discovery order. Never a tray
+  // calendar: its events belong to whatever fills it.
+  const writable = calendars.filter((c) => roleOf(c.url, roles) !== 'tray');
   const chosen = preferred
-    ? calendars.find((c) => c.url === preferred)
+    ? writable.find((c) => c.url === preferred)
     : undefined;
-  return chosen ?? calendars[0];
+  const pick = chosen ?? writable[0];
+  // Every calendar a discover one: nothing to write into, rather than
+  // writing into what a feed fills.
+  if (!pick) throw new Error('No calendar to add events to');
+  return pick;
 }
 
 /** Default calendar for writes: the one chosen in settings, else the first
  *  discovered. A stored choice that no longer exists on the server (renamed,
  *  deleted, different account) falls through to the same fallback. */
 export async function getDefaultCalendar(): Promise<DAVCalendar> {
-  const [calendars, preferred] = await Promise.all([
+  const [calendars, preferred, roles] = await Promise.all([
     getCalendars(),
     ensureDefaultCalendar(),
+    ensureCalendarRoles(),
   ]);
-  return pickDefault(calendars, preferred);
+  return pickDefault(calendars, preferred, roles);
 }
 
 /**
@@ -269,7 +282,11 @@ export function getCalendarFor(url: string): Promise<DAVCalendar> {
       .filter((c) => url.startsWith(c.url))
       .sort((a, b) => b.url.length - a.url.length)[0];
     if (owning) return owning;
-    return pickDefault(calendars, await ensureDefaultCalendar());
+    const [preferred, roles] = await Promise.all([
+      ensureDefaultCalendar(),
+      ensureCalendarRoles(),
+    ]);
+    return pickDefault(calendars, preferred, roles);
   });
 }
 

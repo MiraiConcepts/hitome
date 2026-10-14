@@ -16,11 +16,14 @@ import type { EditorResult } from '@/components/calendar/use-event-editor';
 import {
   CalendarPlusIcon,
   CheckIcon,
+  TelescopeIcon,
   RefreshIcon,
   TrashIcon,
 } from '@/components/icons';
 
 import { shareEvent } from '@/utils/share-event';
+
+import { Messages } from '@/constants/messages';
 
 import { SampleEventEditor } from './editor-shells';
 import { useGalleryToast } from './parts';
@@ -30,7 +33,8 @@ import { TODAY } from './sample-data';
 type EditorRequest = Omit<SampleEditorOptions, 'onDone'>;
 
 type Overlays = {
-  openDay: (day: string, events: CalEvent[]) => void;
+  /** `discover`: the list as discover mode shows it (going boxes). */
+  openDay: (day: string, events: CalEvent[], discover?: boolean) => void;
   openEditor: (request: EditorRequest) => void;
 };
 
@@ -43,33 +47,34 @@ export function useOverlays() {
   return useContext(OverlayContext);
 }
 
-/** What the month screen says after the editor closes. */
+/** What the month screen says after the editor closes (sample calendar:
+ *  Personal). */
 export function toastFor(result: EditorResult) {
   if (result === 'created')
-    return { message: 'Event added', icon: CalendarPlusIcon };
-  if (result === 'updated') return { message: 'Saved', icon: CheckIcon };
+    return { message: Messages.added('Personal'), icon: CalendarPlusIcon };
+  if (result === 'updated')
+    return { message: Messages.saved('Personal'), icon: CheckIcon };
   if (result === 'conflict')
-    return {
-      message: 'Event changed elsewhere. List refreshed',
-      icon: RefreshIcon,
-    };
+    return { message: Messages.changedElsewhere, icon: RefreshIcon };
   return {
     icon: TrashIcon,
     message:
-      result.scope === 'this'
-        ? 'Occurrence deleted'
-        : result.scope === 'following'
-          ? 'Following occurrences deleted'
-          : 'Event deleted',
+      result.scope === 'all'
+        ? Messages.deleted('Personal')
+        : Messages.removed('Personal'),
     action: 'Undo',
   };
 }
 
 export function OverlayHost({ children }: { children: ReactNode }) {
   const toast = useGalleryToast();
-  const [day, setDay] = useState<{ day: string; events: CalEvent[] } | null>(
-    null
-  );
+  const [day, setDay] = useState<{
+    day: string;
+    events: CalEvent[];
+    discover?: boolean;
+  } | null>(null);
+  // Discover mode's answers on this page only, by event id.
+  const [going, setGoing] = useState<Record<string, boolean>>({});
   const [editor, setEditor] = useState<
     (EditorRequest & { key: number }) | null
   >(null);
@@ -79,7 +84,7 @@ export function OverlayHost({ children }: { children: ReactNode }) {
   }, []);
   const value = useMemo<Overlays>(
     () => ({
-      openDay: (d, events) => setDay({ day: d, events }),
+      openDay: (d, events, discover) => setDay({ day: d, events, discover }),
       openEditor,
     }),
     [openEditor]
@@ -101,7 +106,7 @@ export function OverlayHost({ children }: { children: ReactNode }) {
             setDay(null);
             toast({
               icon: TrashIcon,
-              message: 'Event deleted',
+              message: Messages.deleted('Personal'),
               action: 'Undo',
             });
           }}
@@ -109,10 +114,33 @@ export function OverlayHost({ children }: { children: ReactNode }) {
             // The real share: the system sheet, or the clipboard (then a toast).
             if ((await shareEvent(event)) === 'copied') {
               setDay(null);
-              toast({ icon: CheckIcon, message: 'Copied to clipboard' });
+              toast({ icon: CheckIcon, message: Messages.eventCopied });
             }
           }}
           onAdd={() => openEditor({ event: null, defaultDay: day.day })}
+          discover={
+            day.discover
+              ? {
+                  isGoing: (event) => going[event.id] ?? !event.free,
+                  onToggle: (event) => {
+                    const next = !(going[event.id] ?? !event.free);
+                    setGoing((g) => ({ ...g, [event.id]: next }));
+                    toast({
+                      icon: next ? CheckIcon : TelescopeIcon,
+                      message: (next ? Messages.going : Messages.notGoing)(
+                        event.summary
+                      ),
+                      action: 'Undo',
+                    });
+                  },
+                  onOpen: (event) =>
+                    toast({
+                      icon: CheckIcon,
+                      message: `Opens ${event.summary}'s page`,
+                    }),
+                }
+              : undefined
+          }
         />
       )}
       {editor && (

@@ -23,8 +23,14 @@ import {
   EVENT_LINE_HEIGHT,
   EventBanner,
   EventChip,
+  type EventLook,
 } from '@/components/calendar/event-chip';
-import { GRID_SCALE, scaled } from '@/components/calendar/grid-scale';
+import {
+  GRID_SCALE,
+  RULE_WIDTH,
+  scaled,
+} from '@/components/calendar/grid-scale';
+import { TodayMark } from '@/components/calendar/today-mark';
 import { titleWidth as measureTitle } from '@/components/calendar/title-width';
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, Spacing } from '@/constants/theme';
@@ -66,13 +72,13 @@ const COUNTER_HEIGHT = scaled(14);
  *  month-grid to decide whether a slot has to be surrendered for it. */
 export const COUNTER_FOOTPRINT = COUNTER_HEIGHT + MORE_BOTTOM_INSET;
 
-/** Height of the day-number line at the top of each cell — the number's own
- *  box plus the gap that holds the first event off it. */
 /** A wide window's cells have room to spare: the day number is set in from the
  *  corner by the digit's own ink, about 8px each way (the phone's is 6.5), not
  *  by its box (which carries padding, and centres a single digit in a wider
  *  space). */
 const WIDE = GRID_SCALE > 1;
+/** Height of the day-number line at the top of each cell — the number's own
+ *  box plus the gap that holds the first event off it. */
 export const DAY_NUMBER_HEIGHT = scaled(24);
 
 type WeekRowProps = {
@@ -110,7 +116,38 @@ type WeekRowProps = {
    *  cell, over its events included, so the gesture is the cell's and not the
    *  empty space's. */
   onCreateOnDay: (day: string) => void;
+  /** How each event is drawn (discover mode); every one `normal` without. */
+  eventLook?: (event: CalEvent) => EventLook;
+  /** A hold on an event, before the cell's own hold: true when it took the
+   *  hold (discover mode opens the event's page), so no event is created. */
+  onHoldEvent?: (event: CalEvent) => boolean;
+  /** Discover mode is on: today's fill turns orange. */
+  discover?: boolean;
 };
+
+/** How far a multi-day event's trail fades toward the ground by its last
+ *  day in the row: most of the way, so the end is still there to see. */
+const TRAIL_END = 0.8;
+
+/**
+ * A multi-day event's piece on day `col`. Its first day in the row carries
+ * the title on the full colour (so a run into a new week names itself
+ * again); the later days carry no title and share one fade, each day
+ * taking its stretch, so the run reads as one bar trailing off.
+ */
+function trailOf(
+  startCol: number,
+  span: number,
+  col: number
+): { from: number; to: number } | undefined {
+  const step = col - startCol;
+  if (step === 0) return undefined;
+  const later = span - 1;
+  return {
+    from: ((step - 1) / later) * TRAIL_END,
+    to: (step / later) * TRAIL_END,
+  };
+}
 
 /** Web only (react-native-web reads `dataSet`, global.css the attribute); the
  *  spread keeps the native Pressable's props type from objecting. */
@@ -133,7 +170,7 @@ const titleWidth = (title: string) => measureTitle(title, EVENT_FONT_SIZE);
 
 /** Title lines a chip needs against the full cell width (time, when shown,
  *  sits on its own line and never competes with the title). */
-export function chipTitleLines(summary: string, cellWidth: number): number {
+function chipTitleLines(summary: string, cellWidth: number): number {
   return titleWidth(summary || '(untitled)') > cellWidth - CHIP_CHROME_PX
     ? 2
     : 1;
@@ -142,11 +179,11 @@ export function chipTitleLines(summary: string, cellWidth: number): number {
 /** From this cell width a timed event shows its start time above its title
  *  (a desktop window, and the month picture); a phone's cells have no room
  *  for the extra line. */
-export const TIME_MIN_CELL_WIDTH = 140;
+const TIME_MIN_CELL_WIDTH = 140;
 
 /** Slots a timed event takes: its title lines, and the time's line where the
  *  cells show times. */
-export function chipSlots(summary: string, cellWidth: number): number {
+function chipSlots(summary: string, cellWidth: number): number {
   return (
     chipTitleLines(summary, cellWidth) +
     (cellWidth >= TIME_MIN_CELL_WIDTH ? 1 : 0)
@@ -154,17 +191,16 @@ export function chipSlots(summary: string, cellWidth: number): number {
 }
 
 /** Title lines a banner needs over its full width. */
-export function bannerTitleLines(summary: string, widthPx: number): number {
+function bannerTitleLines(summary: string, widthPx: number): number {
   return titleWidth(summary || '(untitled)') > widthPx - BANNER_CHROME_PX
     ? 2
     : 1;
 }
 
 // Cell fills, solid rather than translucent washes so each cell renders
-// exactly its stated color whatever sits behind it. Today outranks the
-// neighbouring months — it keeps the blue even when it falls on their page —
-// and every other day, weekend included, is left to the screen's background.
-export const TODAY_FILL = '#0060E0';
+// exactly its stated color whatever sits behind it. A neighbouring month's
+// days are shaded; every other day, weekend included, is left to the
+// screen's background (today's is filled, see TodayMark).
 const OTHER_MONTH_FILL = '#2E3135';
 
 /** How long a neighbouring month's shading takes to settle in or out. */
@@ -195,7 +231,7 @@ const EVENT_INK_DELAY_MS = 150;
 /** The ink itself. Fixed rather than a palette token, for the same reason as
  *  the fills above: it has to read on the bare background, on a neighbouring
  *  month's grey AND on today's blue, and one value does all three — the dark
- *  scheme's link blue, light enough to lift even off TODAY_FILL. */
+ *  scheme's link blue, light enough to lift even off a blue event. */
 const INK_COLOR = '#5B9DFF';
 /** The ink at full strength. */
 const INK_OPACITY = 0.28;
@@ -213,8 +249,8 @@ const monthOrdOf = (d: Date) => d.getFullYear() * 12 + d.getMonth();
 
 // Grid rules — every line in the grid.
 //
-// Opaque and a whole dp wide, both deliberately, so every line renders
-// identically. A translucent rule composites with the cell wash behind it, and
+// Opaque and whole pixels wide (RULE_WIDTH), both deliberately, so every
+// line renders identically. A translucent rule composites with the cell wash behind it, and
 // a hairline lands on a fractional device pixel — row height is the pane over
 // six — so it is drawn at partial coverage and blends with that wash anyway.
 // Either alone leaves the lines visibly disagreeing across plain, weekend,
@@ -222,13 +258,6 @@ const monthOrdOf = (d: Date) => d.getFullYear() * 12 + d.getMonth();
 // color. One value serves both schemes: a mid grey reads against either
 // background, so there is nothing left for the scheme to decide.
 export const GRID_RULE = '#60646C';
-
-/** Rule thickness. A border only covers a whole pixel once it spans two of
- *  them; anything thinner straddles a boundary, is antialiased into the cell
- *  behind it, and the lines stop matching. Two pixels needs 0.77dp at 2.625x
- *  and 0.58dp at 3.5x, so a whole dp clears it on any screen at 2x or denser
- *  — every modern phone — with room to spare rather than by a hair. */
-export const RULE_WIDTH = 1;
 
 /** Declared per row rather than on the list, because only the rows a month
  *  starts in are snap positions — that is what makes the browser page by
@@ -253,6 +282,9 @@ export const WeekRow = memo(function WeekRow({
   onOpenDay,
   onPressEvent,
   onCreateOnDay,
+  eventLook,
+  onHoldEvent,
+  discover,
 }: WeekRowProps) {
   const theme = useTheme();
 
@@ -412,19 +444,23 @@ export const WeekRow = memo(function WeekRow({
 
   const layout = useMemo(() => {
     const chipSpan = (event: CalEvent) => chipSlots(event.summary, cellWidth);
-    const bannerRows = (event: CalEvent, spanCols: number) =>
-      bannerTitleLines(event.summary, spanCols * cellWidth);
+    // Each day's piece carries the title (see the cells below), so it wraps
+    // to one day's width, not the span's.
+    const bannerRows = (event: CalEvent) =>
+      bannerTitleLines(event.summary, cellWidth);
     return layoutWeek(
       days[0],
       events,
       slotCount,
       chipSpan,
       bannerRows,
-      counterNeedsSlot
+      counterNeedsSlot,
+      eventLook && ((event) => eventLook(event) === 'going')
     );
-  }, [days, events, slotCount, counterNeedsSlot, cellWidth]);
+  }, [days, events, slotCount, counterNeedsSlot, cellWidth, eventLook]);
 
   const dayAt = useCallback((col: number) => toDateString(days[col]), [days]);
+  const todayCol = days.findIndex((d) => toDateString(d) === todayStr);
 
   /** Tap: the day's list. An empty day has no list, so a tap there starts a
    *  new event on it, on the phone as on the web (a hold does the same, on a
@@ -480,18 +516,30 @@ export const WeekRow = memo(function WeekRow({
     [layout, openDay, onPressEvent]
   );
 
-  /** The column under the finger inside a banner, which may span several. Its
-   *  box starts at its own first column, so the offset is measured from there.
-   *  A banner is one bar but the day beneath it is still what is being
-   *  pressed — holding the third day of a span creates on the third day. */
-  const bannerCol = useCallback(
-    (e: GestureResponderEvent, startCol: number, span: number) => {
-      const x = e.nativeEvent.locationX;
-      const offset =
-        cellWidth > 0 && Number.isFinite(x) ? Math.floor(x / cellWidth) : 0;
-      return startCol + Math.min(Math.max(offset, 0), span - 1);
-    },
-    [cellWidth]
+  // What each day draws: the piece of every all-day or multi-day event
+  // crossing it, its own timed events, and how many did not fit.
+  const byCol = useMemo(
+    () =>
+      days.map((_, col) => ({
+        banners: layout.banners.filter(
+          (b) => col >= b.startCol && col < b.startCol + b.span
+        ),
+        chips: layout.chips.filter((c) => c.col === col),
+        overflow: layout.overflow[col],
+      })),
+    [days, layout]
+  );
+
+  /** A press going down on an event: the cell's ink (delayed), from where
+   *  the finger is in the cell. */
+  const eventPressIn = useCallback(
+    (col: number, slot: number, e: GestureResponderEvent) =>
+      pressInEvent(
+        col,
+        e.nativeEvent.locationX,
+        DAY_NUMBER_HEIGHT + slot * SLOT_HEIGHT + e.nativeEvent.locationY
+      ),
+    [pressInEvent]
   );
 
   return (
@@ -515,6 +563,30 @@ export const WeekRow = memo(function WeekRow({
             style={[styles.monthFill, { left: pct(split), right: 0 }, lastFill]}
           />
         )}
+        {todayCol >= 0 && (
+          <TodayMark
+            discover={discover ?? false}
+            style={[styles.todayFill, { left: pct(todayCol) }]}
+          />
+        )}
+        {/* Under the cells: over the fills, under the day number and the
+            events, so a chip pressed through stays crisp on top of it. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.inkWell, inkWellStyle]}
+        >
+          <Animated.View
+            style={[
+              styles.ink,
+              {
+                width: inkRadius * 2,
+                height: inkRadius * 2,
+                borderRadius: inkRadius,
+              },
+              inkStyle,
+            ]}
+          />
+        </Animated.View>
         {days.map((day, col) => {
           const dateString = toDateString(day);
           const isToday = dateString === todayStr;
@@ -524,11 +596,13 @@ export const WeekRow = memo(function WeekRow({
           // Today keeps a month's weight and ink wherever it sits, so it
           // reads as today even from a neighbouring month's grid.
           const muted = !isToday && !inMonth;
-          const tint = isToday ? TODAY_FILL : undefined;
           const label =
             day.getDate() === 1
               ? `1 ${day.toLocaleDateString(undefined, { month: 'short' })}`
               : `${day.getDate()}`;
+          // The weekend split is this day's own right-hand rule, in orange.
+          const beforeSplit = splits.includes(col + 1);
+          const own = byCol[col];
           return (
             <Pressable
               key={dateString}
@@ -563,10 +637,11 @@ export const WeekRow = memo(function WeekRow({
               // a glow that follows the pointer across the cells.
               style={[
                 styles.cell,
-                tint != null && { backgroundColor: tint },
                 col < 6 && styles.cellRule,
+                beforeSplit && styles.cellSplit,
               ]}
             >
+              {beforeSplit && <View style={styles.splitBridge} />}
               <View style={styles.dayNumberWrap}>
                 <ThemedText
                   type="small"
@@ -585,168 +660,105 @@ export const WeekRow = memo(function WeekRow({
                   {label}
                 </ThemedText>
               </View>
+              {/* The day's events, inside its own box: placed over the row
+                  instead, the strips and the boxes rounded to pixels apart
+                  and strips covered the lines between days. An event over
+                  several days draws a piece in each (see trailOf). Each
+                  carries the cell's two gestures itself; the box-none layer
+                  lets a press between them reach the cell. */}
+              <View style={styles.events}>
+                {own.banners.map((banner) => (
+                  <EventBanner
+                    key={banner.event.id}
+                    placement={banner}
+                    titleLines={banner.rows > 1 ? 2 : 1}
+                    fade={trailOf(banner.startCol, banner.span, col)}
+                    onPress={() => pressEvent(banner.event, col)}
+                    look={eventLook?.(banner.event)}
+                    onLongPress={() => {
+                      if (onHoldEvent?.(banner.event)) return;
+                      holdOn(col);
+                    }}
+                    onPressIn={(e) => eventPressIn(col, banner.slot, e)}
+                    onPressOut={pressOutEvent}
+                    delayLongPress={LONG_PRESS_MS}
+                    unstable_pressDelay={PRESS_DELAY_MS}
+                    style={[
+                      styles.strip,
+                      {
+                        top: banner.slot * SLOT_HEIGHT,
+                        // Fixed to the slots reserved, NOT to the lines that
+                        // render. Sizing to content looks tidier per strip
+                        // and is wrong in aggregate: the leftover of an
+                        // over-granted strip turns into gap, so the space
+                        // between two events depended on how many lines the
+                        // one above happened to use. A constant gap is worth
+                        // more than a snug box, so the box gets the slack.
+                        height: banner.rows * SLOT_HEIGHT - EVENT_GAP,
+                      },
+                    ]}
+                  />
+                ))}
+                {own.chips.map((chip) => (
+                  <EventChip
+                    key={chip.event.id}
+                    event={chip.event}
+                    {...(showTimes
+                      ? {
+                          time: formatTime(chip.event.start),
+                          // The time takes the first slot; one slot left
+                          // holds both.
+                          titleLines: chip.span - 1,
+                        }
+                      : { titleLines: Math.min(2, chip.span) })}
+                    look={eventLook?.(chip.event)}
+                    onPress={() => pressEvent(chip.event, col)}
+                    onLongPress={() => {
+                      if (onHoldEvent?.(chip.event)) return;
+                      holdOn(col);
+                    }}
+                    onPressIn={(e) => eventPressIn(col, chip.slot, e)}
+                    onPressOut={pressOutEvent}
+                    delayLongPress={LONG_PRESS_MS}
+                    unstable_pressDelay={PRESS_DELAY_MS}
+                    style={[
+                      styles.strip,
+                      {
+                        top: chip.slot * SLOT_HEIGHT,
+                        // Fixed to its slots, as for banners above — and the
+                        // bar stretches to it, so a one-line chip and a
+                        // one-line banner beside it stand the same height.
+                        height: chip.span * SLOT_HEIGHT - EVENT_GAP,
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+              {own.overflow > 0 ? (
+                // A label, not a target: the cell owns both the tap and the
+                // long press, so the counter must not swallow either. Hidden
+                // from screen readers, which hear the count in the cell's
+                // own name instead.
+                <View
+                  testID={`more-${dateString}`}
+                  pointerEvents="none"
+                  aria-hidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={[
+                    styles.moreBox,
+                    counterSpot(slotCount) === 'bottom'
+                      ? { bottom: MORE_BOTTOM_INSET, height: COUNTER_HEIGHT }
+                      : styles.moreBesideDayNumber,
+                  ]}
+                >
+                  <ThemedText numberOfLines={1} style={styles.more}>
+                    +{own.overflow}
+                  </ThemedText>
+                </View>
+              ) : null}
             </Pressable>
           );
         })}
-        {/* Last in the cells layer: over the fills and the day number, under
-            the events — a chip pressed through stays crisp on top of it. */}
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.inkWell, inkWellStyle]}
-        >
-          <Animated.View
-            style={[
-              styles.ink,
-              {
-                width: inkRadius * 2,
-                height: inkRadius * 2,
-                borderRadius: inkRadius,
-              },
-              inkStyle,
-            ]}
-          />
-        </Animated.View>
-      </View>
-
-      {/* The weekend split, drawn between the cells and the events: above the
-          cells so no row's rule chops it up, below the events so a banner
-          spanning the weekend is not sliced by it. Pulled up by its own width
-          to bridge the row's top border and read as one continuous line. */}
-      {splits.map((col) => (
-        <View
-          key={col}
-          pointerEvents="none"
-          style={[styles.weekSplit, { left: cellWidth * col - RULE_WIDTH }]}
-        />
-      ))}
-
-      {/* box-none: empty-area presses fall through to the day cells. Chips and
-          banners do capture their own pixels, but they carry the cell's two
-          gestures themselves, so covering a strip of a cell costs it nothing.
-          The overflow counter stays a plain label — no handlers to carry. */}
-      <View style={styles.overlay}>
-        {layout.banners.map((banner) => (
-          <EventBanner
-            key={banner.event.id}
-            placement={banner}
-            titleLines={banner.rows > 1 ? 2 : 1}
-            onPress={(e) =>
-              pressEvent(
-                banner.event,
-                bannerCol(e, banner.startCol, banner.span)
-              )
-            }
-            onLongPress={(e) =>
-              holdOn(bannerCol(e, banner.startCol, banner.span))
-            }
-            onPressIn={(e) => {
-              const col = bannerCol(e, banner.startCol, banner.span);
-              pressInEvent(
-                col,
-                e.nativeEvent.locationX - (col - banner.startCol) * cellWidth,
-                DAY_NUMBER_HEIGHT +
-                  banner.slot * SLOT_HEIGHT +
-                  e.nativeEvent.locationY
-              );
-            }}
-            onPressOut={pressOutEvent}
-            delayLongPress={LONG_PRESS_MS}
-            unstable_pressDelay={PRESS_DELAY_MS}
-            style={{
-              position: 'absolute',
-              left: pct(banner.startCol),
-              // left+right (not width) so the banner's own margins inset its
-              // edges instead of shifting the whole bar sideways.
-              right: pct(7 - banner.startCol - banner.span),
-              top: banner.slot * SLOT_HEIGHT,
-              // Fixed to the slots reserved, NOT to the lines that render.
-              // Sizing to content looks tidier per strip and is wrong in
-              // aggregate: the leftover of an over-granted strip turns into
-              // gap, so the space between two events depended on how many
-              // lines the one above happened to use. A constant gap is worth
-              // more than a snug box, so the box gets the slack instead.
-              height: banner.rows * SLOT_HEIGHT - EVENT_GAP,
-              // A bar that ends where the weekend starts stops short of the
-              // split, which sits on its last day's edge: covering it cut the
-              // line where a Friday holiday sat. One that runs on across it
-              // still covers it (see the split above).
-              ...(splits.includes(banner.startCol + banner.span)
-                ? { marginRight: RULE_WIDTH }
-                : null),
-            }}
-          />
-        ))}
-        {layout.chips.map((chip) => (
-          <EventChip
-            key={chip.event.id}
-            event={chip.event}
-            {...(showTimes
-              ? {
-                  time: formatTime(chip.event.start),
-                  // The time takes the first slot; one slot left holds both.
-                  titleLines: chip.span - 1,
-                }
-              : { titleLines: Math.min(2, chip.span) })}
-            onPress={() => pressEvent(chip.event, chip.col)}
-            onLongPress={() => holdOn(chip.col)}
-            onPressIn={(e) =>
-              pressInEvent(
-                chip.col,
-                e.nativeEvent.locationX,
-                DAY_NUMBER_HEIGHT +
-                  chip.slot * SLOT_HEIGHT +
-                  e.nativeEvent.locationY
-              )
-            }
-            onPressOut={pressOutEvent}
-            delayLongPress={LONG_PRESS_MS}
-            unstable_pressDelay={PRESS_DELAY_MS}
-            style={{
-              position: 'absolute',
-              left: pct(chip.col),
-              width: pct(1),
-              top: chip.slot * SLOT_HEIGHT,
-              // Fixed to its slots, as for banners above — and the bar
-              // stretches to it, so a one-line chip and a one-line banner
-              // beside it still stand the same height.
-              height: chip.span * SLOT_HEIGHT - EVENT_GAP,
-            }}
-          />
-        ))}
-        {layout.overflow.map((count, col) =>
-          count > 0 ? (
-            // A label, not a target: the cell underneath owns both the tap
-            // and the long press, so the counter must not swallow either.
-            // Hidden from screen readers, which hear the count in the
-            // cell's own name instead.
-            <View
-              key={`more-${col}`}
-              testID={`more-${toDateString(days[col])}`}
-              pointerEvents="none"
-              aria-hidden
-              importantForAccessibility="no-hide-descendants"
-              style={[
-                {
-                  position: 'absolute',
-                  left: pct(col),
-                  width: pct(1),
-                  justifyContent: 'center',
-                  // Trailing corner: the day number holds the leading one, and
-                  // every strip is left-aligned, so the count sits where
-                  // nothing else in the cell does.
-                  alignItems: 'flex-end',
-                },
-                counterSpot(slotCount) === 'bottom'
-                  ? { bottom: MORE_BOTTOM_INSET, height: COUNTER_HEIGHT }
-                  : styles.moreBesideDayNumber,
-              ]}
-            >
-              <ThemedText numberOfLines={1} style={styles.more}>
-                +{count}
-              </ThemedText>
-            </View>
-          ) : null
-        )}
       </View>
     </View>
   );
@@ -761,14 +773,24 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
   },
+  /** Behind today's cell, over a neighbouring month's shading. */
+  todayFill: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: pct(1),
+  },
   monthFill: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     backgroundColor: OTHER_MONTH_FILL,
   },
+  // Exactly a seventh each, not `flex: 1`: with flex, the six cells that
+  // carry a rule counted it before the space was shared out, so each came
+  // out a pixel wider and Sunday narrower.
   cell: {
-    flex: 1,
+    width: pct(1),
     paddingTop: WIDE ? 4 : 2,
     alignItems: 'flex-start',
   },
@@ -803,14 +825,22 @@ const styles = StyleSheet.create({
     backgroundColor: INK_COLOR,
     opacity: INK_OPACITY,
   },
-  weekSplit: {
+  /** The weekend split: the day before it draws its rule in orange. */
+  cellSplit: {
+    borderRightColor: AccentColor,
+  },
+  /** The split's dot in the row's top rule, so it reads as one continuous
+   *  line down the grid rather than broken grey at every week. */
+  splitBridge: {
     position: 'absolute',
     top: -RULE_WIDTH,
-    bottom: 0,
+    right: -RULE_WIDTH,
     width: RULE_WIDTH,
+    height: RULE_WIDTH,
     backgroundColor: AccentColor,
   },
-  overlay: {
+  /** Inside the cell's border, under the day number. */
+  events: {
     position: 'absolute',
     top: DAY_NUMBER_HEIGHT,
     left: 0,
@@ -818,11 +848,26 @@ const styles = StyleSheet.create({
     bottom: 0,
     pointerEvents: 'box-none',
   },
+  /** A chip or a day's piece of a banner: the cell's width, edge to edge
+   *  inside its rules. */
+  strip: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+  },
+  moreBox: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    justifyContent: 'center',
+    // Trailing corner: the day number holds the leading one, and every strip
+    // is left-aligned, so the count sits where nothing else in the cell does.
+    alignItems: 'flex-end',
+  },
   /** No slot under the day number: the counter shares its line instead, in
-   *  the opposite corner (the overlay starts under the day number, so it is
-   *  pulled back up by that much, then set down by the cell's top inset). */
+   *  the opposite corner, set down by the cell's top inset. */
   moreBesideDayNumber: {
-    top: -DAY_NUMBER_HEIGHT + (WIDE ? 4 : 2),
+    top: WIDE ? 4 : 2,
     // The day number's line (the `small` type's).
     height: 20,
   },

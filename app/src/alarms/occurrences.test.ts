@@ -60,6 +60,14 @@ describe('desiredAlarms', () => {
     expect(desiredAlarms([past, far, noAlarm], NOW)).toHaveLength(0);
   });
 
+  it('never rings for a cancelled event', () => {
+    const cancelled = makeEvent({
+      start: new Date('2026-07-20T09:00:00Z'),
+      cancelled: true,
+    });
+    expect(desiredAlarms([cancelled], NOW)).toHaveLength(0);
+  });
+
   it('dedupes repeated occurrences from overlapping fetches', () => {
     const occ = makeEvent({ start: new Date('2026-07-20T09:00:00Z') });
     expect(desiredAlarms([occ, { ...occ }], NOW)).toHaveLength(1);

@@ -358,6 +358,33 @@ describe('isBanner', () => {
 describe('layoutWeek', () => {
   const SLOTS = 10; // roomy default so packing tests aren’t clipped
 
+  it('puts the events picked as first ahead of earlier ones, in day and bar', () => {
+    const early = ev(
+      'early',
+      new Date(2026, 6, 9, 9),
+      new Date(2026, 6, 9, 10)
+    );
+    const late = ev('late', new Date(2026, 6, 9, 20), new Date(2026, 6, 9, 21));
+    const longBar = ev('long', day('2026-07-06'), day('2026-07-10'), true);
+    const shortBar = ev('short', day('2026-07-08'), day('2026-07-09'), true);
+    const layout = layoutWeek(
+      WEEK,
+      [early, late, longBar, shortBar],
+      SLOTS,
+      undefined,
+      undefined,
+      true,
+      (e) => e.id === 'late' || e.id === 'short'
+    );
+    expect(layout.banners.map((b) => [b.event.id, b.slot])).toEqual([
+      ['short', 0],
+      ['long', 1],
+    ]);
+    const col3 = layout.chips.filter((c) => c.col === 3);
+    expect(col3.map((c) => c.event.id)).toEqual(['late', 'early']);
+    expect(col3[0].slot).toBeLessThan(col3[1].slot);
+  });
+
   it('places a timed event as a chip in its column', () => {
     const layout = layoutWeek(
       WEEK,

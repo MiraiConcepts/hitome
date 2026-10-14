@@ -19,6 +19,15 @@ export const SAMPLE_CALENDARS: CalendarChoice[] = [
   },
 ];
 
+/** A calendar a backend fills with things to do, set to discover.
+ *  Kept out of SAMPLE_CALENDARS: tray calendars are never offered to write
+ *  into, so pickers must not list it. */
+export const SAMPLE_TRAY_CALENDAR: CalendarChoice = {
+  url: 'gallery://things-to-do/',
+  name: 'Things to do',
+  color: '#FF505FFF',
+};
+
 const [PERSONAL, WORK, FAMILY, BIRTHDAYS] = SAMPLE_CALENDARS;
 
 /** Today, at midnight, local. */
@@ -127,6 +136,59 @@ function event(spec: Spec): CalEvent {
 }
 
 const ZOOM = 'https://us02web.zoom.us/j/81234567890?pwd=gallery';
+
+/** Events in the sample tray calendar, as a feed writes them: free (not
+ *  going) unless marked, the booking link as URL or first in the notes. One
+ *  already past, one going, one clashing with the dentist. */
+export const SAMPLE_TRAY_EVENTS: CalEvent[] = [
+  {
+    ...event({
+      id: 'tray-market',
+      summary: 'Lantern night market',
+      start: at(-3, 18),
+      end: at(-3, 22),
+      calendar: SAMPLE_TRAY_CALENDAR,
+      location: 'Riverside promenade',
+      link: 'https://example.com/lantern-market',
+    }),
+    free: true,
+  },
+  {
+    ...event({
+      id: 'tray-violinist',
+      summary: 'The Violinist',
+      start: at(0, 16, 45),
+      end: at(0, 18, 39),
+      calendar: SAMPLE_TRAY_CALENDAR,
+      location: 'Filmhouse',
+      description:
+        'Book: https://filmhouse.sg/filmhouse-singapore/booknow/1813\nFilm: https://filmhouse.sg/film/195/the-violinist',
+    }),
+    free: true,
+  },
+  {
+    ...event({
+      id: 'tray-jazz',
+      summary: 'Jazz trio',
+      start: at(3, 20),
+      end: at(3, 22),
+      calendar: SAMPLE_TRAY_CALENDAR,
+      location: 'Blue Note bar',
+      link: 'https://example.com/jazz-trio',
+      alarm: 30,
+    }),
+  },
+  {
+    ...event({
+      id: 'tray-photo-walk',
+      summary: 'Night photo walk, old town gate to the river and back',
+      start: at(6, 19),
+      end: at(6, 21),
+      calendar: SAMPLE_TRAY_CALENDAR,
+    }),
+    free: true,
+  },
+];
 
 export const SAMPLE = {
   standup: event({

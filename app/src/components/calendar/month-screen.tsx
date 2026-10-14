@@ -7,15 +7,28 @@ import {
   useState,
   type ComponentType,
 } from 'react';
-import { AppState, Platform, Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import {
+  AppState,
+  BackHandler,
+  Linking,
+  PanResponder,
+  Platform,
+  StyleSheet,
+  View,
+} from 'react-native';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 
 import { runAlarmReconcile } from '@/alarms/runner';
-import { CardFrame, DashedLine } from '@/components/settings/settings-parts';
 import {
   commitDeletes,
   ConflictError,
@@ -23,6 +36,9 @@ import {
   undoDelete as undoDeleteOnServer,
   type EditScope,
   requestSync,
+  setGoing,
+  listCalendars,
+  type CalendarChoice,
 } from '@/data/events';
 import type { CalEvent } from '@/caldav/types';
 import { BlurTarget } from '@/components/blur-backdrop';
@@ -30,6 +46,15 @@ import { LARGE_SPINNER } from '@/components/boot-screen';
 import { markCalendarReady } from '@/components/calendar/calendar-ready';
 import { ConnectionProblem } from '@/components/calendar/connection-problem';
 import { DayPopover } from '@/components/calendar/day-popover';
+import {
+  DiscoverGround,
+  useDiscoverFade,
+} from '@/components/calendar/discover-fade';
+import {
+  CASCADE_DONE_MS,
+  CascadeCover,
+} from '@/components/calendar/cascade-cover';
+import type { EventLook } from '@/components/calendar/event-chip';
 import { GridSpotlight } from '@/components/calendar/grid-spotlight';
 import {
   EventEditor,
@@ -41,34 +66,43 @@ import {
 } from '@/components/calendar/month-grid';
 import { HEADER_GROUND, MonthHeader } from '@/components/calendar/month-header';
 import { MonthPicture } from '@/components/calendar/month-picture';
+import { SNACK_MS, SNACK_SPOT, SnackBar } from '@/components/snack-bar';
 import {
   AlertCircleIcon,
   CalendarPlusIcon,
+  InfoCircleIcon,
   CheckIcon,
   type IconProps,
   RefreshIcon,
+  TelescopeIcon,
   TrashIcon,
   WifiOffIcon,
 } from '@/components/icons';
 import { Spinner } from '@/components/spinner';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { AccentColor, Colors, DangerColor, Spacing } from '@/constants/theme';
+import { AccentColor, OnAccentColor, Spacing } from '@/constants/theme';
+import { Messages } from '@/constants/messages';
+import { useTheme } from '@/hooks/use-theme';
 import {
   classifyConnectError,
   webConnectionProblem,
   writeFailureMessage,
 } from '@/config/dav-config';
 import { recheckSource } from '@/config/source';
+import { ensureDefaultAlert } from '@/config/alert-pref';
 import { useCalendarKeys } from '@/hooks/use-calendar-keys';
+import { useEscapeKey } from '@/hooks/use-escape-key';
 import { useDeepLink } from '@/hooks/use-deep-link';
 import { useMonthEvents } from '@/hooks/use-month-events';
 import {
-  inHiddenCalendar,
-  useHiddenCalendars,
+  onCalendar,
+  roleOf,
+  useCalendarRoles,
 } from '@/config/calendar-visibility';
 import { getFirstDayOfWeek, type MonthAnchor } from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
+import { trayLink } from '@/utils/discover';
 import { shareEvent } from '@/utils/share-event';
 import {
   captureMonth,
@@ -82,83 +116,13 @@ type EditorState =
   | { mode: 'create'; day: string }
   | { mode: 'edit'; event: CalEvent; askDelete?: boolean };
 
-/**
- * The toast, as the settings card: the accent edge and dotted top, what
- * happened (a glyph, then a sentence), and when there is something to do
- * about it, a ruled cell for that beside it.
- */
-export function SnackBar({
-  icon: Icon,
-  message,
-  action,
-  urgent = false,
-  testID,
-}: {
-  icon: ComponentType<IconProps>;
-  message: string;
-  action?: { label: string; onPress: () => void };
-  /** A problem that stops the calendar (the connection banner): read out at
-   *  once, over whatever a screen reader was saying. */
-  urgent?: boolean;
-  testID?: string;
-}) {
-  return (
-    <Animated.View
-      entering={FadeIn.duration(SNACK_FADE_MS)}
-      exiting={FadeOut.duration(SNACK_FADE_MS)}
-      style={styles.snack}
-      // Read out as it appears, Undo included: a screen reader user would
-      // otherwise never learn the toast, or its eight seconds, were there.
-      role={urgent ? 'alert' : 'status'}
-      aria-live={urgent ? 'assertive' : 'polite'}
-      testID={testID}
-    >
-      <CardFrame style={styles.snackCard}>
-        <View style={styles.snackRow}>
-          <View style={styles.snackBody}>
-            <View style={styles.snackIcon}>
-              <Icon
-                size={18}
-                color={Icon === TrashIcon ? DangerColor : AccentColor}
-              />
-            </View>
-            <ThemedText type="small" style={styles.snackText} numberOfLines={2}>
-              {message}
-            </ThemedText>
-          </View>
-          {action && (
-            <>
-              <View style={styles.snackRule}>
-                <View style={StyleSheet.absoluteFill}>
-                  <DashedLine vertical />
-                </View>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                style={styles.snackAction}
-                onPress={action.onPress}
-              >
-                <ThemedText type="smallBold" style={styles.snackActionText}>
-                  {action.label}
-                </ThemedText>
-              </Pressable>
-            </>
-          )}
-        </View>
-      </CardFrame>
-    </Animated.View>
-  );
-}
-
-/** The toast's fade in and out: long enough to read as easing, short
- *  enough that a tap on Undo never waits on it. */
-const SNACK_FADE_MS = 150;
-
 type Snack = {
   message: string;
   /** What happened, as a glyph on the toast's accent block. */
   icon: ComponentType<IconProps>;
   undo?: { event: CalEvent; scope: EditScope };
+  /** Undo for anything but a delete: puts the change back (going ↔ not). */
+  revert?: () => void;
 } | null;
 
 /** A widget row tapped and not yet resolved: the id to look for, the day to
@@ -337,15 +301,79 @@ export function MonthScreen() {
     refresh,
     fetchedAt,
   } = useMonthEvents(settledDate);
-  // Calendars hidden in settings stay fetched and cached — only drawn less.
-  const hiddenCalendars = useHiddenCalendars();
+  // Calendars hidden in settings, or discover ones, stay fetched and
+  // cached: only drawn less.
+  const calendarRoles = useCalendarRoles();
+  // The calendars' names, for messages ("Deleted from Personal").
+  const [calendarList, setCalendarList] = useState<CalendarChoice[]>([]);
+  useEffect(() => {
+    listCalendars()
+      .then(setCalendarList)
+      .catch(() => {});
+  }, [calendarRoles]);
+  const calendarNameOf = (event: CalEvent) =>
+    calendarList.find((c) => event.url.startsWith(c.url))?.name;
+  // For the callbacks made once (onDeleteEvent): the names as they are now.
+  const calendarNameRef = useRef(calendarNameOf);
+  calendarNameRef.current = calendarNameOf;
+  // For the callbacks made once (onPressEvent): the roles as they are now.
+  const rolesRef = useRef(calendarRoles);
+  rolesRef.current = calendarRoles;
+  const hasDiscover = calendarRoles.tray.length > 0;
+
+  // Discover mode: the grid shows only the discover calendars' events,
+  // filled in their colour until you are going (then inverted, see
+  // event-chip's discoverFace), and changes over to it under the
+  // cascade (CascadeCover). `discover` is what the grid shows.
+  const [discover, setDiscover] = useState(false);
+  // The header and weekday row answer the tap at once; the grid follows
+  // when the cascade has its picture (a beat later).
+  const [headerDiscover, setHeaderDiscover] = useState(false);
+  // The weekday row fades with the header bar above it, in step.
+  const weekdayFade = useDiscoverFade(headerDiscover);
+  const [cascade, setCascade] = useState<{ run: number; to: boolean } | null>(
+    null
+  );
+  const discoverRef = useRef(discover);
+  discoverRef.current = discover;
+  // What a tap has asked for and the next fetch has not shown yet, by event
+  // id, so a chip fills (or empties) at once. A new fetch is the truth again.
+  const [asked, setAsked] = useState<Record<string, boolean>>({});
+  const [askedOf, setAskedOf] = useState(allEvents);
+  if (askedOf !== allEvents) {
+    setAskedOf(allEvents);
+    setAsked({});
+  }
+  const isGoing = useCallback((e: CalEvent) => asked[e.id] ?? !e.free, [asked]);
+  if (discover && !hasDiscover && !cascade) {
+    setDiscover(false);
+    setHeaderDiscover(false);
+  }
+
   const events = useMemo(
     () =>
-      hiddenCalendars.length === 0
-        ? allEvents
-        : allEvents.filter((e) => !inHiddenCalendar(e.url, hiddenCalendars)),
-    [allEvents, hiddenCalendars]
+      allEvents.filter((e) =>
+        discover
+          ? roleOf(e.url, calendarRoles) === 'tray' && !e.cancelled
+          : onCalendar(e, calendarRoles)
+      ),
+    [allEvents, calendarRoles, discover]
   );
+  const eventLook = useMemo(
+    () =>
+      discover
+        ? (e: CalEvent): EventLook => (isGoing(e) ? 'going' : 'open')
+        : undefined,
+    [discover, isGoing]
+  );
+  // The latest fetch, for an Undo that runs after it: the event as first
+  // read carries an etag the change itself has since made stale.
+  const pictureEvents = useMemo(
+    () => allEvents.filter((e) => onCalendar(e, calendarRoles)),
+    [allEvents, calendarRoles]
+  );
+  const latestEvents = useRef(allEvents);
+  latestEvents.current = allEvents;
 
   // A widget row's id, resolved against the month's events — reconciled during
   // render like the other deep links above, not in an effect.
@@ -365,7 +393,8 @@ export function MonthScreen() {
       // looking at the very thing you tapped. Flashing on dismissal answers a
       // question nobody asked.
       setPendingEvent(null);
-      setEditor({ mode: 'edit', event: match });
+      if (roleOf(match.url, calendarRoles) === 'tray') openPage(match);
+      else setEditor({ mode: 'edit', event: match });
     } else if (fetchedAt !== pendingEvent.since) {
       // Missing is not yet gone — the month may simply not have loaded. Only a
       // fetch that landed since the tap settles it, and this one has.
@@ -398,11 +427,19 @@ export function MonthScreen() {
     setArrivedDay(null);
   }
 
+  // The message last raised while the day list was open (see its onClose).
+  const snackInList = useRef<Snack>(null);
+  useEffect(() => {
+    if (snack && popoverDay) snackInList.current = snack;
+    // Only a new message is marked, not one the list opened over.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snack]);
+
   // Auto-dismiss the snackbar — after 8s, so Undo is still there once the
   // grid has visibly changed and the mistake sinks in.
   useEffect(() => {
     if (!snack) return;
-    const timer = setTimeout(() => setSnack(null), 8000);
+    const timer = setTimeout(() => setSnack(null), SNACK_MS);
     return () => clearTimeout(timer);
   }, [snack]);
 
@@ -446,8 +483,19 @@ export function MonthScreen() {
   const onOpenDay = useCallback((day: string) => setPopoverDay(day), []);
 
   const onPressEvent = useCallback((event: CalEvent) => {
+    // A discover calendar's events are written by whatever fills it, which
+    // would put an edit back on its next run, so none opens in the editor.
+    // In discover mode every tap opens the day's list, where each event has
+    // its going box: nothing is answered from the grid itself. On the
+    // calendar it opens the event's page.
+    if (discoverRef.current) {
+      setPopoverDay(toDateString(event.start));
+      return;
+    }
     setPopoverDay(null);
-    setEditor({ mode: 'edit', event });
+    if (roleOf(event.url, rolesRef.current) === 'tray')
+      openPageRef.current(event);
+    else setEditor({ mode: 'edit', event });
   }, []);
 
   // The day list's trash. A plain event goes at once and the Undo bar takes
@@ -458,11 +506,16 @@ export function MonthScreen() {
   // The callback is made once, so it reaches the current onEditorDone through
   // a ref: the one from the first render refreshes the month the app opened on,
   // not the one on screen, and the deleted event stayed drawn under the toast.
-  const doneRef = useRef<(result: EditorResult) => void>(() => {});
+  const doneRef = useRef<(result: EditorResult, calendarName?: string) => void>(
+    () => {}
+  );
   useEffect(() => {
     doneRef.current = onEditorDone;
   });
   const onDeleteEvent = useCallback(async (event: CalEvent) => {
+    // Never a tray event (the day list offers no delete for one): deleted on
+    // the server, the next feed run would only write it back, unmarked.
+    if (roleOf(event.url, rolesRef.current) === 'tray') return;
     setPopoverDay(null);
     if (event.recurring) {
       setEditor({ mode: 'edit', event, askDelete: true });
@@ -470,7 +523,10 @@ export function MonthScreen() {
     }
     try {
       await deleteEvent(event, 'all');
-      doneRef.current({ deleted: event, scope: 'all' });
+      doneRef.current(
+        { deleted: event, scope: 'all' },
+        calendarNameRef.current(event)
+      );
     } catch (err) {
       if (err instanceof ConflictError) {
         doneRef.current('conflict');
@@ -489,11 +545,11 @@ export function MonthScreen() {
     const result = await shareEvent(event);
     if (result === 'copied') {
       setPopoverDay(null);
-      setSnack({ message: 'Copied to clipboard', icon: CheckIcon });
+      setSnack({ message: Messages.eventCopied, icon: CheckIcon });
     } else if (result === 'failed') {
       setPopoverDay(null);
       setSnack({
-        message: 'Couldn’t share this event',
+        message: Messages.eventShareFailed,
         icon: AlertCircleIcon,
       });
     }
@@ -524,12 +580,12 @@ export function MonthScreen() {
     pictureWait.current = null;
     setPicturing(false);
     if (result === 'copied')
-      setSnack({ message: 'Month copied as a picture', icon: CheckIcon });
+      setSnack({ message: Messages.agendaCopied, icon: CheckIcon });
     else if (result === 'saved')
-      setSnack({ message: 'Month saved as a picture', icon: CheckIcon });
+      setSnack({ message: Messages.agendaSaved, icon: CheckIcon });
     else if (result === 'failed')
       setSnack({
-        message: 'Couldn’t make a picture of this month',
+        message: Messages.agendaShareFailed,
         icon: AlertCircleIcon,
       });
   }, [settledMonth]);
@@ -565,6 +621,130 @@ export function MonthScreen() {
       ? toDateString(new Date(month.year, month.month0, 1))
       : today;
 
+  // Into discover mode and back: the cascade covers the grid, the grid and
+  // header change under it, and it turns away again.
+  const reduceMotion = useReducedMotion();
+  const theme = useTheme();
+  // A tap while the days are still turning is not dropped: it waits for the
+  // turn to finish, then turns them back (a second tap cancels it again).
+  const turning = useRef(false);
+  const flipQueued = useRef(false);
+  function flipDiscover() {
+    if (turning.current) {
+      flipQueued.current = !flipQueued.current;
+      return;
+    }
+    const to = !discoverRef.current;
+    // The whole screen changes in the tap's own frame; the cascade's tiles,
+    // mounted in the same render, cover the grid and then clear day by day.
+    discoverRef.current = to;
+    setHeaderDiscover(to);
+    setDiscover(to);
+    if (reduceMotion) return;
+    turning.current = true;
+    const run = Date.now();
+    setCascade({ run, to });
+    setTimeout(() => {
+      setCascade((c) => (c?.run === run ? null : c));
+      turning.current = false;
+      if (flipQueued.current) {
+        flipQueued.current = false;
+        flipDiscoverRef.current();
+      }
+    }, CASCADE_DONE_MS);
+  }
+  // Escape (web) and Back (Android) leave discover mode before anything else
+  // would: the day list and the editor sit over it and take their own.
+  useEscapeKey(() => flipDiscover(), discover && !overlayOpen);
+  useEffect(() => {
+    if (!discover || overlayOpen || Platform.OS !== 'android') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      flipDiscoverRef.current();
+      return true;
+    });
+    return () => sub.remove();
+  }, [discover, overlayOpen]);
+
+  /** A discover event's page (its URL, else the first link in its notes). */
+  function openPage(event: CalEvent) {
+    const link = trayLink(event);
+    if (link) Linking.openURL(link).catch(() => {});
+    else setSnack({ message: Messages.linkMissing, icon: InfoCircleIcon });
+  }
+
+  /** Discover mode's tap: going, or no longer. The chip changes at once. */
+  function toggleGoing(event: CalEvent) {
+    const next = !isGoing(event);
+    setAsked((a) => ({ ...a, [event.id]: next }));
+    onSetGoing(event, next).catch(() =>
+      setAsked((a) => {
+        const { [event.id]: _, ...rest } = a;
+        return rest;
+      })
+    );
+  }
+
+  /** Discover mode's hold, and a hold on a discover event anywhere: its page.
+   *  True when the hold was the event's, so the cell makes nothing. */
+  function holdEvent(event: CalEvent): boolean {
+    if (roleOf(event.url, rolesRef.current) === 'tray') {
+      openPage(event);
+      return true;
+    }
+    return discoverRef.current;
+  }
+
+  // The once-made callbacks (onPressEvent) reach these as they are now.
+  const openPageRef = useRef(openPage);
+  openPageRef.current = openPage;
+  const flipDiscoverRef = useRef(flipDiscover);
+  flipDiscoverRef.current = flipDiscover;
+  const holdEventRef = useRef(holdEvent);
+  holdEventRef.current = holdEvent;
+  // Stable, so the week rows are not redrawn for it on every render.
+  const onHoldEvent = useCallback(
+    (event: CalEvent) => holdEventRef.current(event),
+    []
+  );
+
+  /** Mark a discover event going (busy, with the default reminder) or not,
+   *  with an Undo that marks it back. Throws when it could not be written,
+   *  after saying why, so the chip goes back. */
+  async function onSetGoing(event: CalEvent, going: boolean): Promise<void> {
+    try {
+      await setGoing(event, going, going ? await ensureDefaultAlert() : null);
+    } catch (err) {
+      refresh();
+      setSnack(
+        err instanceof ConflictError
+          ? {
+              message: Messages.changedElsewhere,
+              icon: RefreshIcon,
+            }
+          : {
+              message: Messages.updateFailed,
+              icon: AlertCircleIcon,
+            }
+      );
+      throw err;
+    }
+    await refresh();
+    refreshAgendaWidget();
+    runAlarmReconcile();
+    setSnack({
+      message: (going ? Messages.going : Messages.notGoing)(
+        event.summary || 'this event'
+      ),
+      icon: going ? CheckIcon : TelescopeIcon,
+      revert: () => {
+        setSnack(null);
+        const fresh =
+          latestEvents.current.find((e) => e.id === event.id) ?? event;
+        onSetGoing(fresh, !going).catch(() => {});
+      },
+    });
+  }
+
   function goToday() {
     const target = monthOfDay(null, new Date());
     gridRef.current?.scrollToMonth(target.year, target.month0, true);
@@ -591,20 +771,73 @@ export function MonthScreen() {
     },
   });
 
-  function onManualRefresh() {
+  function onManualRefresh(): Promise<unknown> {
     setManualRefreshing(true);
     // Android: ask DAVx⁵ to sync now (what lands then redraws the grid by
     // itself); web: nothing to ask. Either way, read what is there now.
     requestSync().catch(() => {});
     // Held for a beat at least: reading the phone's own store takes a few
     // milliseconds, and a bar that only flashes reads as nothing happening.
-    Promise.all([
+    return Promise.all([
       refresh(),
       new Promise((resolve) => setTimeout(resolve, MIN_REFRESH_BAR_MS)),
     ]).finally(() => setManualRefreshing(false));
   }
 
-  function onEditorDone(result: EditorResult) {
+  // Pull to refresh (the phone): a pull down from the header moves the whole
+  // screen with the finger and the app's spinner fades in, in the gap
+  // above; let go once it is fully there and the screen holds a little
+  // down, the spinner turning, until the refresh is done. The grid itself cannot offer this: it never sits at
+  // its own top.
+  const pull = useSharedValue(0);
+  const pullBusy = useRef(false);
+  // The spinner is mounted only while a pull is under way (it turns for as
+  // long as it is mounted), and leaves once the screen is back up.
+  const [pullShown, setPullShown] = useState(false);
+  const settle = useCallback(() => {
+    pull.value = withTiming(0, { duration: PULL_BACK_MS }, (done) => {
+      if (done) runOnJS(setPullShown)(false);
+    });
+  }, [pull]);
+  const refreshRef = useRef(onManualRefresh);
+  refreshRef.current = onManualRefresh;
+  const pullResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, g) =>
+          !pullBusy.current && g.dy > 8 && g.dy > Math.abs(g.dx) * 2,
+        onPanResponderGrant: () => setPullShown(true),
+        onPanResponderMove: (_, g) => {
+          // Heavier the further it goes, as a pull does.
+          pull.value = Math.min(PULL_MAX, Math.max(0, g.dy * PULL_DRAG));
+        },
+        onPanResponderRelease: () => {
+          if (pull.value < PULL_TRIGGER) {
+            settle();
+            return;
+          }
+          pullBusy.current = true;
+          pull.value = withTiming(PULL_HOLD, { duration: PULL_BACK_MS });
+          refreshRef.current().finally(() => {
+            settle();
+            pullBusy.current = false;
+          });
+        },
+        onPanResponderTerminate: settle,
+      }),
+    [pull, settle]
+  );
+  const pulledDown = useAnimatedStyle(() => ({
+    transform: [{ translateY: pull.value }],
+  }));
+  // Centred in the gap the pull opens, and fully there once letting go
+  // would refresh.
+  const pullSpinner = useAnimatedStyle(() => ({
+    opacity: Math.min(1, pull.value / PULL_TRIGGER),
+    transform: [{ translateY: pull.value / 2 - PULL_SPINNER_SIZE / 2 }],
+  }));
+
+  function onEditorDone(result: EditorResult, calendarName?: string) {
     setEditor({ mode: 'closed' });
     refresh();
     // The home-screen widget has no other way to learn about this mutation
@@ -614,23 +847,25 @@ export function MonthScreen() {
     refreshAgendaWidget();
     runAlarmReconcile();
     if (result === 'created')
-      setSnack({ message: 'Event added', icon: CalendarPlusIcon });
+      setSnack({
+        message: Messages.added(calendarName),
+        icon: CalendarPlusIcon,
+      });
     else if (result === 'updated')
-      setSnack({ message: 'Saved', icon: CheckIcon });
+      setSnack({ message: Messages.saved(calendarName), icon: CheckIcon });
     else if (result === 'conflict') {
       setSnack({
-        message: 'Event changed elsewhere. List refreshed',
+        message: Messages.changedElsewhere,
         icon: RefreshIcon,
       });
     } else
       setSnack({
         icon: TrashIcon,
+        // A whole event is deleted; dates taken out of a series are removed.
         message:
-          result.scope === 'this'
-            ? 'Occurrence deleted'
-            : result.scope === 'following'
-              ? 'Following occurrences deleted'
-              : 'Event deleted',
+          result.scope === 'all'
+            ? Messages.deleted(calendarName ?? calendarNameOf(result.deleted))
+            : Messages.removed(calendarName ?? calendarNameOf(result.deleted)),
         undo: { event: result.deleted, scope: result.scope },
       });
   }
@@ -652,9 +887,9 @@ export function MonthScreen() {
       refresh();
       refreshAgendaWidget();
       runAlarmReconcile();
-    } catch (err) {
+    } catch {
       setSnack({
-        message: err instanceof Error ? err.message : 'Could not restore event',
+        message: Messages.restoreFailed,
         icon: AlertCircleIcon,
       });
     }
@@ -710,6 +945,22 @@ export function MonthScreen() {
     year: 'numeric',
   });
 
+  // The message bar: here, or over the day list while it is open (its blur
+  // would cover it here).
+  const snackBar = snack && (
+    <SnackBar
+      icon={snack.icon}
+      message={snack.message}
+      action={
+        snack.undo
+          ? { label: 'Undo', onPress: () => undoDelete(snack.undo!) }
+          : snack.revert
+            ? { label: 'Undo', onPress: snack.revert }
+            : undefined
+      }
+    />
+  );
+
   return (
     <ThemedView style={styles.container}>
       {/* Out of TalkBack's reach while the day list or the editor is over it:
@@ -722,12 +973,23 @@ export function MonthScreen() {
           snackbar sits outside this and applies the inset itself, so it stays
           clear of the bar regardless. */}
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-          <View style={styles.content}>
+          {pullShown && (
+            <Animated.View
+              pointerEvents="none"
+              // Below the status bar: the safe area pads its children,
+              // but a positioned one starts at the screen's top.
+              style={[styles.pullSpinner, { top: insets.top }, pullSpinner]}
+            >
+              <Spinner color={AccentColor} size={PULL_SPINNER_SIZE} />
+            </Animated.View>
+          )}
+          <Animated.View style={[styles.content, pulledDown]}>
             <MonthHeader
               label={monthLabel}
               monthIndex={month.year * 12 + month.month0}
               loading={loading && events.length === 0}
-              refreshing={manualRefreshing}
+              // A pull's refresh shows its spinner, not the bar too.
+              refreshing={manualRefreshing && !pullShown}
               today={today}
               offline={Boolean(error)}
               authFailed={authFailed}
@@ -737,16 +999,35 @@ export function MonthScreen() {
               onAdd={() => setEditor({ mode: 'create', day: addDay })}
               onShareMonth={onShareMonth}
               onSettings={() => router.navigate('/settings')}
+              pullHandlers={
+                Platform.OS === 'web' ? undefined : pullResponder.panHandlers
+              }
+              discover={
+                hasDiscover
+                  ? { open: headerDiscover, onPress: flipDiscover }
+                  : undefined
+              }
             />
 
             <View style={styles.weekdays}>
+              <DiscoverGround style={weekdayFade.ground} />
+              {/* Over the grid's top rule, in discover mode: a grey hairline
+                  between the orange bar and the dark grid read as a red
+                  edge. */}
+              <DiscoverGround style={weekdayFade.ground} seam />
               {weekdayLabels.map((label) => (
                 // The column is the View, as in the grid's own rows. Putting flex
                 // on the Text instead sizes each label to its own word plus an
                 // equal share of the slack, which spaces the labels evenly from
                 // each other rather than aligning them to the columns beneath.
                 <View key={label} style={styles.weekdayCell}>
-                  <ThemedText type="small" style={styles.weekday}>
+                  <ThemedText
+                    type="small"
+                    style={[
+                      styles.weekday,
+                      weekdayFade.inkOn && styles.weekdayDiscover,
+                    ]}
+                  >
                     {label}
                   </ThemedText>
                 </View>
@@ -779,10 +1060,25 @@ export function MonthScreen() {
                   pulse={pulse}
                   onOpenDay={onOpenDay}
                   onPressEvent={onPressEvent}
-                  onCreateOnDay={onCreateOnDay}
+                  // Discover mode is for answering, not writing: no new event
+                  // from a hold or a tap on an empty day.
+                  onCreateOnDay={discover ? ignoreDay : onCreateOnDay}
+                  eventLook={eventLook}
+                  onHoldEvent={onHoldEvent}
+                  // With the header: today's outline fades to orange as the
+                  // bar does.
+                  discover={headerDiscover}
                 />
               )}
-              <GridSpotlight />
+              <GridSpotlight discover={headerDiscover} />
+              {cascade && gridSize && (
+                <CascadeCover
+                  key={cascade.run}
+                  width={gridSize.width}
+                  height={gridSize.height}
+                  color={theme.background}
+                />
+              )}
               {(!gridAnchored || !gridSize) && (
                 // The spinner only shows if anchoring is actually slow.
                 <ThemedView style={styles.gridCover}>
@@ -792,7 +1088,7 @@ export function MonthScreen() {
                 </ThemedView>
               )}
             </View>
-          </View>
+          </Animated.View>
         </SafeAreaView>
 
         {/* Floating, not in the grid's flow: a bar that arrived in flow
@@ -800,7 +1096,7 @@ export function MonthScreen() {
           years off (Jul 2022 for an October start). */}
         {/* Always mounted (it lays out nothing when empty), so a bar leaving
           can fade out rather than vanish with its parent. */}
-        <View style={[styles.snackWrapper, { bottom: bottomInset }]}>
+        <View style={[SNACK_SPOT, { bottom: bottomInset }]}>
           {error && !neverLoaded && (
             <SnackBar
               icon={authFailed ? AlertCircleIcon : WifiOffIcon}
@@ -817,17 +1113,7 @@ export function MonthScreen() {
               testID="error-banner"
             />
           )}
-          {snack && (
-            <SnackBar
-              icon={snack.icon}
-              message={snack.message}
-              action={
-                snack.undo
-                  ? { label: 'Undo', onPress: () => undoDelete(snack.undo!) }
-                  : undefined
-              }
-            />
-          )}
+          {!popoverDay && snackBar}
         </View>
 
         {neverLoaded && problem && (
@@ -843,7 +1129,9 @@ export function MonthScreen() {
         <MonthPicture
           ref={pictureRef}
           month={settledMonth}
-          events={events}
+          // Always the calendar as it is, discover mode or not: the picture
+          // draws no discover looks, so a discover month read as your own.
+          events={pictureEvents}
           todayStr={today}
         />
       )}
@@ -852,9 +1140,37 @@ export function MonthScreen() {
         <DayPopover
           day={popoverDay}
           events={popoverEvents}
-          onClose={() => setPopoverDay(null)}
+          // A message raised in the list goes with it: left on its timer, it
+          // faded in a second time over the calendar once the list closed.
+          // One from before the list opened (a delete's Undo) stays.
+          onClose={() => {
+            setPopoverDay(null);
+            setSnack((prev) => (prev === snackInList.current ? null : prev));
+          }}
           onPressEvent={onPressEvent}
           onDelete={onDeleteEvent}
+          canDelete={(event) => roleOf(event.url, calendarRoles) !== 'tray'}
+          toast={
+            snackBar ? (
+              <View
+                pointerEvents="box-none"
+                style={[SNACK_SPOT, { bottom: bottomInset }]}
+              >
+                {snackBar}
+              </View>
+            ) : null
+          }
+          discover={
+            discover
+              ? {
+                  isGoing,
+                  // Stays open: several of the day's events can be answered
+                  // in one visit.
+                  onToggle: toggleGoing,
+                  onOpen: openPage,
+                }
+              : undefined
+          }
           onShare={onShareEvent}
           onAdd={() => {
             setPopoverDay(null);
@@ -878,6 +1194,16 @@ export function MonthScreen() {
 }
 
 const COVER_SPINNER_DELAY_MS = 600;
+/** Pull to refresh: how the finger's travel becomes the screen's, the most
+ *  it moves, how far it must go to refresh, where it holds while refreshing,
+ *  and how fast it goes back. */
+const PULL_DRAG = 0.5;
+const PULL_MAX = 120;
+const PULL_TRIGGER = 72;
+const PULL_HOLD = 64;
+const PULL_BACK_MS = 200;
+const PULL_SPINNER_SIZE = 24;
+const ignoreDay = () => {};
 const MIN_REFRESH_BAR_MS = 900;
 
 const styles = StyleSheet.create({
@@ -895,12 +1221,20 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
   },
+  // In the gap a pull opens above the header: the app's own spinner, bare.
+  pullSpinner: {
+    position: 'absolute',
+    alignSelf: 'center',
+  },
+
   // Continues the accent bar above it, so the header reads as one block down
   // to the grid. No separator of its own: the grid's first row already draws a
   // rule directly beneath, and a second line would double it.
   weekdays: {
     flexDirection: 'row',
     backgroundColor: HEADER_GROUND,
+    // Over the grid, for the seam below it.
+    zIndex: 1,
     paddingBottom: Spacing.two,
   },
   weekdayCell: {
@@ -914,6 +1248,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: AccentColor,
   },
+  // Discover mode: the orange bar runs on down through the weekdays.
+  weekdayDiscover: {
+    color: OnAccentColor,
+  },
   gridWrap: {
     flex: 1,
   },
@@ -925,58 +1263,5 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  snackWrapper: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    // Bottom right, clear of the thumb's reach for the grid's middle.
-    alignItems: 'flex-end',
-    paddingHorizontal: Spacing.three,
-    gap: Spacing.two,
-    pointerEvents: 'box-none',
-  },
-  snack: {
-    maxWidth: 480,
-  },
-  // The card's own ground in both schemes: the toast keeps the dark palette.
-  // No shadow: the card frame's own is switched off (it floats over the grid,
-  // which is edge enough).
-  snackCard: {
-    backgroundColor: Colors.dark.background,
-    boxShadow: '0px 0px 0px rgba(0, 0, 0, 0)',
-  },
-  snackRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  snackBody: {
-    flexShrink: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.three - Spacing.one,
-    paddingHorizontal: Spacing.three - Spacing.one,
-  },
-  // Its own size, whatever the message: a long one wraps beside it and must
-  // not squeeze the glyph.
-  snackIcon: {
-    width: 18,
-    height: 18,
-    flexShrink: 0,
-  },
-  snackText: {
-    color: Colors.dark.text,
-    flexShrink: 1,
-  },
-  snackRule: {
-    width: 1,
-  },
-  snackAction: {
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.three,
-  },
-  snackActionText: {
-    color: AccentColor,
   },
 });

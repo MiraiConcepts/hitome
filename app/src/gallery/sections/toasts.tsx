@@ -2,17 +2,16 @@
 // toasts and its connection bar, and the widget.
 import { StyleSheet, View } from 'react-native';
 
-import { SnackBar } from '@/components/calendar/month-screen';
+import { SnackBar } from '@/components/snack-bar';
 import {
   AlertCircleIcon,
   CalendarPlusIcon,
-  CheckIcon,
-  RefreshIcon,
   TrashIcon,
   WifiOffIcon,
 } from '@/components/icons';
 import { SettingsButton } from '@/components/settings/settings-parts';
 import { webConnectionProblem } from '@/config/dav-config';
+import { MESSAGE_SAMPLES } from '@/constants/messages';
 import { Spacing } from '@/constants/theme';
 
 import { Note, Row, Section, Specimen, Tag, useGalleryToast } from '../parts';
@@ -20,19 +19,19 @@ import { WidgetPreviewCard } from '../widget-preview';
 
 const noop = () => {};
 
+// Every message the app's bar shows (constants/messages), then a failed
+// write's, which explains the fix.
 const TOASTS = [
-  ['Event added', CalendarPlusIcon, undefined],
-  ['Saved', CheckIcon, undefined],
-  ['Event deleted', TrashIcon, 'Undo'],
-  ['Occurrence deleted', TrashIcon, 'Undo'],
-  ['Following occurrences deleted', TrashIcon, 'Undo'],
-  ['Event changed elsewhere. List refreshed', RefreshIcon, undefined],
+  ...MESSAGE_SAMPLES.map(
+    ({ message, icon, undo }) =>
+      [message, icon, undo ? 'Undo' : undefined] as const
+  ),
   [
     'Not deleted. The calendar server didn’t answer. Try again in a moment.',
     AlertCircleIcon,
     undefined,
-  ],
-] as const;
+  ] as const,
+];
 
 export function ToastsSection() {
   const toast = useGalleryToast();

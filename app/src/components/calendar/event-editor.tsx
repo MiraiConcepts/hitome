@@ -35,7 +35,7 @@ type Props = {
   /** Default day (dateString) for a new event. */
   defaultDay: string;
   onClose: () => void;
-  onDone: (result: EditorResult) => void;
+  onDone: (result: EditorResult, calendarName?: string) => void;
   /** Open on a repeating event's delete question. */
   askDeleteFirst?: boolean;
 };

@@ -56,6 +56,19 @@ describe('instanceToEvent', () => {
     expect(seriesIdOf(e)).toBe('41');
   });
 
+  it('reads busy or free, and a cancelled event', () => {
+    expect(
+      instanceToEvent({ ...timedRow, availability: 0 }, none).free
+    ).toBeUndefined();
+    expect(instanceToEvent({ ...timedRow, availability: 1 }, none).free).toBe(
+      true
+    );
+    expect(instanceToEvent(timedRow, none).cancelled).toBeUndefined();
+    expect(
+      instanceToEvent({ ...timedRow, eventStatus: 2 }, none).cancelled
+    ).toBe(true);
+  });
+
   it('reads an all-day day from UTC midnight as that local date', () => {
     const e = instanceToEvent(
       {

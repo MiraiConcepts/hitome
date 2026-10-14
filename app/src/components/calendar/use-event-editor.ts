@@ -21,6 +21,7 @@ import {
   updateEvent,
 } from '@/data/events';
 import { getDefaultAlert } from '@/config/alert-pref';
+import { ensureCalendarRoles, roleOf } from '@/config/calendar-visibility';
 import { writeFailureMessage } from '@/config/dav-config';
 import type {
   AlarmInput,
@@ -57,7 +58,9 @@ export type EditorResult =
 type Options = {
   event: CalEvent | null;
   defaultDay: string;
-  onDone: (result: EditorResult) => void;
+  /** How it ended, and the calendar it ended in (for the screen's message:
+   *  "Added to Personal"); undefined when the list never loaded. */
+  onDone: (result: EditorResult, calendarName?: string) => void;
   /** Open on the delete question ("which occurrences?") of a repeating event:
    *  the day list's trash button hands such an event over here. */
   askDeleteFirst?: boolean;
@@ -132,6 +135,8 @@ export function useEventEditor({
   const [originalCalendarUrl, setOriginalCalendarUrl] = useState<
     string | undefined
   >(undefined);
+  const nameOf = (url: string | undefined) =>
+    calendars.find((c) => c.url === url)?.name;
   // The calendar selected when the list arrived, a new event's included: the
   // baseline a changed calendar is told from.
   const [loadedCalendarUrl, setLoadedCalendarUrl] = useState<
@@ -147,10 +152,15 @@ export function useEventEditor({
     Promise.all([
       listCalendars(),
       event ? calendarUrlOf(event) : defaultCalendarUrl(),
+      ensureCalendarRoles(),
     ])
-      .then(([list, url]) => {
+      .then(([list, url, roles]) => {
         if (!alive) return;
-        setCalendars(list);
+        // Tray calendars are filled from elsewhere, so they are not offered
+        // to write into (an event already in one keeps its own).
+        setCalendars(
+          list.filter((c) => c.url === url || roleOf(c.url, roles) !== 'tray')
+        );
         setCalendarUrl(url);
         setLoadedCalendarUrl(url);
         if (event) setOriginalCalendarUrl(url);
@@ -355,7 +365,7 @@ export function useEventEditor({
         setProblem(null);
         try {
           await moveEvent(event, calendarUrl, changes);
-          onDone('updated');
+          onDone('updated', nameOf(calendarUrl));
         } catch (err) {
           if (err instanceof ConflictError) {
             onDone('conflict');
@@ -367,7 +377,7 @@ export function useEventEditor({
         return;
       }
       if (Object.keys(changes).length === 0) {
-        onDone('updated');
+        onDone('updated', nameOf(calendarUrl));
         return;
       }
       if (event.recurring && !scope) {
@@ -400,12 +410,12 @@ export function useEventEditor({
           },
           calendarUrl
         );
-        onDone('created');
+        onDone('created', nameOf(calendarUrl));
         return;
       }
 
       await updateEvent(event, changes, scope);
-      onDone('updated');
+      onDone('updated', nameOf(calendarUrl));
     } catch (err) {
       if (err instanceof ConflictError) {
         onDone('conflict');
@@ -429,7 +439,10 @@ export function useEventEditor({
     setProblem(null);
     try {
       await deleteEvent(event, scope ?? 'all');
-      onDone({ deleted: event, scope: scope ?? 'all' });
+      onDone(
+        { deleted: event, scope: scope ?? 'all' },
+        nameOf(originalCalendarUrl)
+      );
     } catch (err) {
       if (err instanceof ConflictError) {
         onDone('conflict');

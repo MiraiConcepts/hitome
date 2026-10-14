@@ -1,6 +1,6 @@
 import type { CalendarChoice } from '@/data/events';
 import { ChipRow } from '@/components/fields/chip-row';
-import { AccentColor } from '@/constants/theme';
+import { calendarTint } from '@/utils/calendar-tint';
 
 type Props = {
   calendars: CalendarChoice[];
@@ -21,7 +21,7 @@ export function CalendarField({ calendars, value, onChange, testID }: Props) {
   const options = calendars.map((c) => ({
     value: c.url,
     label: c.name,
-    color: c.color ?? AccentColor,
+    color: calendarTint(c.color),
     icon: c.icon,
   }));
   return (

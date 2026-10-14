@@ -59,5 +59,6 @@ export function toWidgetEvent(e: CalEvent): WidgetEvent {
     ...(e.alarm ? { alarm: true } : {}),
     ...(e.color ? { color: e.color } : {}),
     ...(e.icon ? { icon: e.icon } : {}),
+    ...(e.cancelled ? { cancelled: true } : {}),
   };
 }

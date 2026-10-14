@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  type GestureResponderHandlers,
+} from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -11,13 +17,23 @@ import Animated, {
 import {
   AddIcon,
   CalendarEventIcon,
-  CalendarShareIcon,
+  PhotoShareIcon,
   RefreshIcon,
   SettingsIcon,
+  TelescopeIcon,
 } from '@/components/icons';
+import {
+  DiscoverGround,
+  useDiscoverFade,
+} from '@/components/calendar/discover-fade';
 import { LoadingBar } from '@/components/loading-bar';
 import { ThemedText } from '@/components/themed-text';
-import { AccentColor, FontFamilyBold, Spacing } from '@/constants/theme';
+import {
+  AccentColor,
+  FontFamilyBold,
+  OnAccentColor,
+  Spacing,
+} from '@/constants/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 import { agoLabel, longDayLabel } from '@/utils/date';
 
@@ -29,7 +45,7 @@ type Props = {
   monthIndex: number;
   /** Sweep the loading bar along the top edge (initial fetch only). */
   loading: boolean;
-  /** Spin the refresh icon (a button-pressed refresh is in flight). */
+  /** A refresh asked for with the button is in flight: the loading bar runs. */
   refreshing: boolean;
   /** Today's dateString — the header's second line when all is well. Passed
    *  in rather than read here so it cannot disagree with the grid's today. */
@@ -47,6 +63,12 @@ type Props = {
   /** The month as a picture: copied on the web, shared on Android. */
   onShareMonth: () => void;
   onSettings: () => void;
+  /** The discover button, shown when some calendar is a discover one, and
+   *  whether discover mode is on (the bar then turns orange). */
+  discover?: { open: boolean; onPress: () => void };
+  /** The phone's pull to refresh, which the screen runs (it moves the whole
+   *  screen); the bar is where the pull starts. */
+  pullHandlers?: GestureResponderHandlers;
 };
 
 /**
@@ -63,7 +85,8 @@ const Bar = {
    *  box shorter than the font clips the glyphs. Satoshi's own box is 1.25em;
    *  this rounds up from it for descender room. */
   titleLineRatio: 1.3,
-  subtitleSize: 14,
+  /** Today's date under the title: read at a glance (14 read small). */
+  subtitleSize: 18,
   labelGap: 4,
   iconSize: 24,
   iconPadding: 6,
@@ -111,6 +134,8 @@ export function MonthHeader({
   onAdd,
   onShareMonth,
   onSettings,
+  discover,
+  pullHandlers,
 }: Props) {
   // The displayed label trails the prop through a directional slide-fade:
   // scrolling to a later month carries the old label up and out and the new
@@ -159,11 +184,23 @@ export function MonthHeader({
   }));
 
   const wide = useIsWide();
+  // Discover mode turns the bar orange, its ink black: which side of the
+  // calendar you are on, at a glance. Faded, not switched.
+  const inDiscover = discover?.open ?? false;
+  const { ground, inkOn } = useDiscoverFade(inDiscover);
+  const ink = inkOn ? OnAccentColor : AccentColor;
   return (
-    <View style={[styles.header, wide && styles.headerWide]}>
+    <View
+      style={[styles.header, wide && styles.headerWide]}
+      // The phone has no refresh button: a pull down from here refreshes
+      // instead. The web keeps the button; nobody pulls with a mouse.
+      {...pullHandlers}
+    >
+      <DiscoverGround style={ground} />
       {/* Progress along the very top of the screen: the first fetch, and a
-          refresh asked for with the button (the icon itself stays still). */}
-      <LoadingBar visible={loading || refreshing} />
+          refresh asked for with the button (the icon itself stays still).
+          A pull shows the spinner above instead. */}
+      <LoadingBar visible={loading || refreshing} color={ink} />
       <View style={styles.labelColumn}>
         <View style={styles.labelWrap}>
           <Pressable
@@ -179,7 +216,7 @@ export function MonthHeader({
               <ThemedText
                 type="subtitle"
                 testID="calendar-header-label"
-                style={styles.label}
+                style={[styles.label, { color: ink }]}
               >
                 {shown.label}
               </ThemedText>
@@ -195,11 +232,15 @@ export function MonthHeader({
         <View style={styles.updatedRow}>
           {!offline && (
             // Marks the line as today's date rather than the visible month's.
-            <CalendarEventIcon size={Bar.subtitleSize} color={AccentColor} />
+            <CalendarEventIcon size={Bar.subtitleSize} color={ink} />
           )}
           <ThemedText
             testID="calendar-updated"
-            style={[styles.updated, offline && styles.updatedOffline]}
+            style={[
+              styles.updated,
+              { color: ink },
+              offline && styles.updatedOffline,
+            ]}
           >
             {!offline
               ? longDayLabel(today)
@@ -213,6 +254,20 @@ export function MonthHeader({
         </View>
       </View>
       <View style={styles.controls}>
+        {discover && (
+          <Pressable
+            testID="calendar-discover"
+            onPress={discover.onPress}
+            hitSlop={8}
+            style={styles.iconButton}
+            accessibilityRole="button"
+            aria-pressed={discover.open}
+            accessibilityLabel="Discover"
+          >
+            {/* No mark of its own when on: the bar turning orange is it. */}
+            <TelescopeIcon size={Bar.iconSize} color={ink} />
+          </Pressable>
+        )}
         <Pressable
           testID="calendar-share-month"
           onPress={onShareMonth}
@@ -223,7 +278,7 @@ export function MonthHeader({
             Platform.OS === 'web' ? 'Copy month as picture' : 'Share month'
           }
         >
-          <CalendarShareIcon size={Bar.iconSize} color={AccentColor} />
+          <PhotoShareIcon size={Bar.iconSize} color={ink} />
         </Pressable>
         <Pressable
           testID="calendar-add"
@@ -233,17 +288,19 @@ export function MonthHeader({
           accessibilityRole="button"
           accessibilityLabel="Add event"
         >
-          <AddIcon size={Bar.iconSize} color={AccentColor} />
+          <AddIcon size={Bar.iconSize} color={ink} />
         </Pressable>
-        <Pressable
-          onPress={onRefresh}
-          hitSlop={8}
-          style={styles.iconButton}
-          accessibilityRole="button"
-          accessibilityLabel="Refresh"
-        >
-          <RefreshIcon size={Bar.iconSize} color={AccentColor} />
-        </Pressable>
+        {Platform.OS === 'web' && (
+          <Pressable
+            onPress={onRefresh}
+            hitSlop={8}
+            style={styles.iconButton}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh"
+          >
+            <RefreshIcon size={Bar.iconSize} color={ink} />
+          </Pressable>
+        )}
         <Pressable
           testID="calendar-settings"
           onPress={onSettings}
@@ -252,7 +309,7 @@ export function MonthHeader({
           accessibilityRole="button"
           accessibilityLabel="Settings"
         >
-          <SettingsIcon size={Bar.iconSize} color={AccentColor} />
+          <SettingsIcon size={Bar.iconSize} color={ink} />
         </Pressable>
       </View>
     </View>

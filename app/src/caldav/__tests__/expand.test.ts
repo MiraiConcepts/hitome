@@ -280,7 +280,7 @@ describe('cancelled events', () => {
     expect(expand(ics, ...NOV)).toHaveLength(0);
   });
 
-  it('leaves out a cancelled single event', () => {
+  it('keeps a cancelled single event, flagged', () => {
     const single = (status: string) =>
       cal(
         'BEGIN:VEVENT',
@@ -292,8 +292,43 @@ describe('cancelled events', () => {
         `STATUS:${status}`,
         'END:VEVENT'
       );
-    expect(expand(single('CANCELLED'))).toHaveLength(0);
-    expect(expand(single('TENTATIVE'))).toHaveLength(1);
+    const [cancelled] = expand(single('CANCELLED'));
+    expect(cancelled.cancelled).toBe(true);
+    const [tentative] = expand(single('TENTATIVE'));
+    expect(tentative.cancelled).toBeUndefined();
+  });
+});
+
+describe('busy or free', () => {
+  // A Filmhouse showing as the feed writes it (radicale/feeds), unmarked;
+  // marking it going sets TRANSP:OPAQUE and adds a VALARM.
+  const SHOWING = (transp: string) =>
+    cal(
+      'BEGIN:VEVENT',
+      'UID:filmhouse-1813@hitome',
+      'DTSTAMP:20261012T024500Z',
+      'DTSTART:20261013T084500Z',
+      'DTEND:20261013T103900Z',
+      'SUMMARY:The Violinist',
+      'URL:https://filmhouse.sg/filmhouse-singapore/booknow/1813',
+      'DESCRIPTION:Book: https://filmhouse.sg/filmhouse-singapore/booknow/1813\\nFi',
+      ' lm: https://filmhouse.sg/film/195/the-violinist\\n114 min · PG',
+      'STATUS:CONFIRMED',
+      ...(transp ? [`TRANSP:${transp}`] : []),
+      'END:VEVENT'
+    );
+
+  it('reads TRANSPARENT as free', () => {
+    const [e] = expand(SHOWING('TRANSPARENT'));
+    expect(e.free).toBe(true);
+    expect(e.link).toBe(
+      'https://filmhouse.sg/filmhouse-singapore/booknow/1813'
+    );
+  });
+
+  it('reads OPAQUE, or no TRANSP at all, as busy', () => {
+    expect(expand(SHOWING('OPAQUE'))[0].free).toBeUndefined();
+    expect(expand(SHOWING(''))[0].free).toBeUndefined();
   });
 });
 

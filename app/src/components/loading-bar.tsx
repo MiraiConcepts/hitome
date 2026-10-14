@@ -28,7 +28,15 @@ const LOADING_BAR_HEIGHT = 3;
  * Absolutely positioned and pointer-transparent, so showing and hiding it
  * never moves anything.
  */
-export function LoadingBar({ visible }: { visible: boolean }) {
+export function LoadingBar({
+  visible,
+  color = AccentColor,
+}: {
+  visible: boolean;
+  /** The segment's colour (the accent unless it would vanish on its
+   *  ground, as on discover mode's orange bar). */
+  color?: string;
+}) {
   const [width, setWidth] = useState(0);
   const sweep = useSharedValue(0);
   const opacity = useSharedValue(visible ? 1 : 0);
@@ -76,7 +84,11 @@ export function LoadingBar({ visible }: { visible: boolean }) {
     >
       <View style={styles.clip}>
         <Animated.View
-          style={[styles.segment, { width: width * SEGMENT }, segment]}
+          style={[
+            styles.segment,
+            { width: width * SEGMENT, backgroundColor: color },
+            segment,
+          ]}
         />
       </View>
     </Animated.View>
@@ -97,6 +109,5 @@ const styles = StyleSheet.create({
   },
   segment: {
     height: LOADING_BAR_HEIGHT,
-    backgroundColor: AccentColor,
   },
 });

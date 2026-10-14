@@ -32,6 +32,12 @@ export type CalEvent = {
   recurrenceStart?: number;
   /** True when a reminder is armed (the VEVENT carries a VALARM). */
   alarm?: boolean;
+  /** Shown as free (TRANSP:TRANSPARENT / Events.AVAILABILITY_FREE). In a
+   *  tray calendar, free means not going and busy means going. */
+  free?: boolean;
+  /** STATUS:CANCELLED on a single event (a cancelled occurrence of a series
+   *  is never read at all). Only drawn in tray calendars, crossed out. */
+  cancelled?: boolean;
   /** Source calendar's CalDAV color (#RRGGBBAA), or undefined for the accent. */
   color?: string;
   /** Calendar-specific marker glyph (e.g. gift for the birthday calendar). */

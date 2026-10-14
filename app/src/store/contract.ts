@@ -41,6 +41,10 @@ export const STATUS_CANCELED = 2;
 /** Events.STATUS_CONFIRMED — what an un-cancelled exception goes back to
  *  (the provider refuses a null status). */
 export const STATUS_CONFIRMED = 1;
+/** Events.AVAILABILITY_BUSY / AVAILABILITY_FREE — TRANSP OPAQUE /
+ *  TRANSPARENT, as DAVx⁵ maps them. */
+export const AVAILABILITY_BUSY = 0;
+export const AVAILABILITY_FREE = 1;
 /** Reminders.METHOD_ALERT. */
 export const METHOD_ALERT = 1;
 /** Calendars.CAL_ACCESS_CONTRIBUTOR — the least access that may write. */
@@ -66,6 +70,7 @@ export const INSTANCE_COLUMNS = [
   'duration',
   'eventTimezone',
   'eventStatus',
+  'availability',
 ];
 
 /** The series fields a copy (move, undo, split) carries across. */

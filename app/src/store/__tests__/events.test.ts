@@ -6,6 +6,7 @@ import {
   deleteEvent,
   fetchMonth,
   moveEvent,
+  setGoing,
   setStoreForTests,
   undoDelete,
   updateEvent,
@@ -52,6 +53,61 @@ async function weekly(title = 'Standup', count = 4) {
 }
 
 describe('store backend', () => {
+  it('marks an event going with a reminder, and back', async () => {
+    await createEvent(
+      { summary: 'Gig', start: at(9, 20), end: at(9, 22), allDay: false },
+      HOME
+    );
+    const [gig] = await fetchMonth(FROM, TO);
+    await setGoing(gig, false, null);
+    const [free] = await fetchMonth(FROM, TO);
+    expect(free.free).toBe(true);
+    await setGoing(free, true, 30);
+    const [going] = await fetchMonth(FROM, TO);
+    expect(going.free).toBeUndefined();
+    expect(going.alarm).toBe(true);
+    await setGoing(going, false, 30);
+    const [back] = await fetchMonth(FROM, TO);
+    expect(back.free).toBe(true);
+    expect(back.alarm).toBeUndefined();
+  });
+
+  it('clears every reminder when no longer going', async () => {
+    await createEvent(
+      { summary: 'Gig', start: at(9, 20), end: at(9, 22), allDay: false },
+      HOME
+    );
+    const [gig] = await fetchMonth(FROM, TO);
+    await setGoing(gig, true, 30);
+    // A second reminder, as a sync could bring in.
+    await fake.store.insert('content://com.android.calendar/reminders', {
+      event_id: Number(gig.url.slice(HOME.length)),
+      minutes: 60,
+      method: 1,
+    });
+    await setGoing(gig, false, 30);
+    const [after] = await fetchMonth(FROM, TO);
+    expect(after.alarm).toBeUndefined();
+  });
+
+  it('keeps a cancelled one-off event, flagged, and reads free', async () => {
+    await createEvent(
+      { summary: 'Gig', start: at(9, 20), end: at(9, 22), allDay: false },
+      HOME
+    );
+    const [gig] = await fetchMonth(FROM, TO);
+    expect(gig.free).toBeUndefined();
+    const id = gig.url.slice(HOME.length);
+    await fake.store.update(
+      `content://com.android.calendar/events/${id}`,
+      { eventStatus: 2, availability: 1 },
+      null
+    );
+    const [after] = await fetchMonth(FROM, TO);
+    expect(after.cancelled).toBe(true);
+    expect(after.free).toBe(true);
+  });
+
   it('creates a one-off event where it was asked to', async () => {
     await createEvent(
       { summary: 'Dentist', start: at(7, 16), end: at(7, 17), allDay: false },

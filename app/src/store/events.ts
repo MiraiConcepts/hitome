@@ -6,6 +6,7 @@
 import type { EditScope } from '@/caldav/ics';
 import type { CalEvent, EventChanges, EventInput } from '@/caldav/types';
 import { ensureDefaultCalendar } from '@/config/calendar-pref';
+import { ensureCalendarRoles, roleOf } from '@/config/calendar-visibility';
 import { isStoreDisconnected } from '@/config/store-connection';
 
 import {
@@ -18,6 +19,8 @@ import {
   CALENDAR_COLUMNS,
   EVENT_COLUMNS,
   INSTANCE_COLUMNS,
+  AVAILABILITY_BUSY,
+  AVAILABILITY_FREE,
   STATUS_CANCELED,
   STATUS_CONFIRMED,
   URI,
@@ -146,13 +149,21 @@ export async function listCalendars(): Promise<CalendarChoice[]> {
 }
 
 export async function defaultCalendarUrl(): Promise<string> {
-  const [list, preferred] = await Promise.all([
+  const [all, preferred, roles] = await Promise.all([
     listCalendars(),
     ensureDefaultCalendar(),
+    ensureCalendarRoles(),
   ]);
+  // Never a tray calendar: its events belong to whatever fills it.
+  const list = all.filter((c) => roleOf(c.url, roles) !== 'tray');
   const chosen = preferred && list.find((c) => c.url === preferred);
   const first = chosen || list[0];
-  if (!first) throw new StoreUnavailableError('No calendars on this phone');
+  // Every calendar a discover one: nothing to write into, rather than
+  // writing into what a feed fills.
+  if (!first)
+    throw new StoreUnavailableError(
+      all.length ? 'No calendar to add events to' : 'No calendars on this phone'
+    );
   return first.url;
 }
 
@@ -179,7 +190,11 @@ export async function fetchMonth(
       rangeEnd.getTime() + 86_400_000
     ),
     INSTANCE_COLUMNS,
-    `calendar_id IN (${marks}) AND (eventStatus IS NULL OR eventStatus != ${STATUS_CANCELED})`,
+    // A cancelled occurrence of a series is gone (an exception row may carry
+    // only its series' sync id until the sync app fills in original_id); a
+    // cancelled single event is kept, flagged, for the display rule (calendar-visibility) to draw
+    // only in tray calendars.
+    `calendar_id IN (${marks}) AND (eventStatus IS NULL OR eventStatus != ${STATUS_CANCELED} OR (rrule IS NULL AND original_id IS NULL AND original_sync_id IS NULL))`,
     ids,
     'begin ASC'
   );
@@ -642,6 +657,30 @@ export async function updateEvent(
   if (effective === 'this') return editOccurrence(event, changes);
   if (effective === 'following') return editFollowing(event, changes);
   return editSeries(event, changes);
+}
+
+/**
+ * Mark a tray event going (busy, with `alertMinutes` as its reminder when it
+ * has none) or not (free, its reminder removed). DAVx⁵ writes AVAILABILITY
+ * up as TRANSP and the reminder as a VALARM, both of which the feed keeps.
+ */
+export async function setGoing(
+  event: CalEvent,
+  going: boolean,
+  alertMinutes: number | null
+): Promise<void> {
+  const seriesId = seriesIdOf(event);
+  await store().update(
+    URI.event(seriesId),
+    { availability: going ? AVAILABILITY_BUSY : AVAILABILITY_FREE },
+    null,
+    null
+  );
+  // Every reminder, not just the soonest (setAlarm): a discover event's
+  // reminders are only ever hitome's, and one left behind still rang.
+  if (!going) await setReminders(seriesId, []);
+  else if (alertMinutes !== null && !event.alarm)
+    await setAlarm(seriesId, alertMinutes);
 }
 
 /**

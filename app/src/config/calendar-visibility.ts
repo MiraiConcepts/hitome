@@ -1,80 +1,142 @@
 import { useSyncExternalStore } from 'react';
 
+import type { CalEvent } from '@/caldav/types';
 import { readSnapshot, writeSnapshot } from '@/utils/snapshot-cache';
 
 import { subscribeDavConfig } from './dav-store';
 
 /**
- * Calendars kept off the month grid and the widget. Display only: their
- * events are still fetched and cached (so showing one again is instant) and
- * their reminders still ring. Kept in the snapshot cache like the default
- * calendar (see calendar-pref.ts), and cleared with it when the server changes
- * — a calendar URL means nothing on another account.
+ * Where each calendar's events appear. `shown` (the default) is the month grid
+ * and the widget; `tray` keeps a calendar off both and lists its events in the
+ * discover mode instead (a calendar a backend fills with things to do);
+ * `hidden` keeps it off everything. Display only: every calendar's events are
+ * still fetched and cached (so changing a role is instant) and their reminders
+ * still ring.
+ *
+ * Kept in the snapshot cache like the default calendar (see calendar-pref.ts),
+ * as two lists of calendar URLs, and cleared with it when the server changes
+ * — a calendar URL means nothing on another account. The hidden list keeps
+ * the key it had before the tray existed, so earlier choices carry over.
  */
-const KEY = 'prefs-hidden-calendars';
+export type CalendarRole = 'shown' | 'tray' | 'hidden';
+
+export type CalendarRoles = {
+  readonly hidden: readonly string[];
+  readonly tray: readonly string[];
+};
+
+const HIDDEN_KEY = 'prefs-hidden-calendars';
+const TRAY_KEY = 'prefs-tray-calendars';
+
+const NONE: CalendarRoles = { hidden: [], tray: [] };
 
 let loaded = false;
-let hidden: readonly string[] = [];
-let loading: Promise<readonly string[]> | null = null;
+let roles: CalendarRoles = NONE;
+let loading: Promise<CalendarRoles> | null = null;
 const listeners = new Set<() => void>();
 
-function publish(next: readonly string[]) {
-  hidden = next;
+function publish(next: CalendarRoles) {
+  roles = next;
   loaded = true;
   for (const listener of listeners) listener();
 }
 
-export function ensureHiddenCalendars(): Promise<readonly string[]> {
-  if (!loading) {
-    loading = readSnapshot<string[]>(KEY).then((stored) => {
-      publish(
-        Array.isArray(stored)
-          ? stored.filter((u): u is string => typeof u === 'string')
-          : []
-      );
-      return hidden;
-    });
-  }
-  // The load runs once, but its promise holds the list as first read: answer
-  // with the current one, or a hide made since (setCalendarHidden) would not
-  // reach the widget's fetch until the app restarted.
-  return loading.then(() => hidden);
+function urls(stored: unknown): string[] {
+  return Array.isArray(stored)
+    ? stored.filter((u): u is string => typeof u === 'string')
+    : [];
 }
 
-export function setCalendarHidden(url: string, hide: boolean): void {
-  const next = hide
-    ? [...hidden.filter((u) => u !== url), url]
-    : hidden.filter((u) => u !== url);
-  writeSnapshot(KEY, next);
+export function ensureCalendarRoles(): Promise<CalendarRoles> {
+  if (!loading) {
+    loading = Promise.all([
+      readSnapshot<string[]>(HIDDEN_KEY),
+      readSnapshot<string[]>(TRAY_KEY),
+    ]).then(([hidden, tray]) => {
+      publish({ hidden: urls(hidden), tray: urls(tray) });
+      return roles;
+    });
+  }
+  // The load runs once, but its promise holds the roles as first read: answer
+  // with the current ones, or a change made since (setCalendarRole) would not
+  // reach the widget's fetch until the app restarted.
+  return loading.then(() => roles);
+}
+
+export function setCalendarRole(url: string, role: CalendarRole): void {
+  // Before the stored roles are in, both lists would be written from empty
+  // ones, wiping every other calendar's choice: wait for them.
+  if (!loaded) {
+    void ensureCalendarRoles().then(() => setCalendarRole(url, role));
+    return;
+  }
+  const without = (list: readonly string[]) => list.filter((u) => u !== url);
+  const next: CalendarRoles = {
+    hidden:
+      role === 'hidden'
+        ? [...without(roles.hidden), url]
+        : without(roles.hidden),
+    tray: role === 'tray' ? [...without(roles.tray), url] : without(roles.tray),
+  };
+  writeSnapshot(HIDDEN_KEY, next.hidden);
+  writeSnapshot(TRAY_KEY, next.tray);
   publish(next);
 }
 
-/** True when an event (by its object URL) belongs to a hidden calendar. */
-export function inHiddenCalendar(
-  eventUrl: string,
-  hiddenUrls: readonly string[]
-): boolean {
-  return hiddenUrls.some((url) => eventUrl.startsWith(url));
+/** The role of the calendar that holds `url` — a calendar's own URL or one
+ *  of its events' object URLs. */
+export function roleOf(url: string, current: CalendarRoles): CalendarRole {
+  if (current.hidden.some((c) => url.startsWith(c))) return 'hidden';
+  if (current.tray.some((c) => url.startsWith(c))) return 'tray';
+  return 'shown';
 }
 
-function getHidden(): readonly string[] {
-  return hidden;
+/**
+ * True when an event is drawn on the month grid and the widget. Shown
+ * calendars: every event but a cancelled one. Tray calendars: only events
+ * you are going to (marked busy), and a cancelled one of those, crossed out,
+ * until its day has passed. Hidden calendars: nothing.
+ */
+export function onCalendar(
+  event: Pick<CalEvent, 'url' | 'end' | 'free' | 'cancelled'>,
+  current: CalendarRoles,
+  now = new Date()
+): boolean {
+  switch (roleOf(event.url, current)) {
+    case 'shown':
+      return !event.cancelled;
+    case 'tray': {
+      if (event.free) return false;
+      if (!event.cancelled) return true;
+      const today = new Date(now);
+      today.setHours(0, 0, 0, 0);
+      // End is exclusive: an all-day event ends at the next midnight, and
+      // one ending at today's has already passed.
+      return event.end > today;
+    }
+    case 'hidden':
+      return false;
+  }
+}
+
+function getRoles(): CalendarRoles {
+  return roles;
 }
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  if (!loaded) ensureHiddenCalendars();
+  if (!loaded) ensureCalendarRoles();
   return () => {
     listeners.delete(listener);
   };
 }
 
-export function useHiddenCalendars(): readonly string[] {
-  return useSyncExternalStore(subscribe, getHidden, getHidden);
+export function useCalendarRoles(): CalendarRoles {
+  return useSyncExternalStore(subscribe, getRoles, getRoles);
 }
 
 subscribeDavConfig(() => {
   loading = null;
-  publish([]);
+  publish(NONE);
   loaded = false;
 });

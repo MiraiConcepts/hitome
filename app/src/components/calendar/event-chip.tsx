@@ -11,11 +11,12 @@ import {
 
 import type { CalEvent } from '@/caldav/types';
 import { ThemedText } from '@/components/themed-text';
-import { AccentColor, Spacing } from '@/constants/theme';
+import { FontFamilyMedium, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { BannerPlacement } from '@/utils/calendar-grid';
 import { mixHex, readableTextColor } from '@/utils/color';
 import { scaled } from '@/components/calendar/grid-scale';
+import { calendarTint } from '@/utils/calendar-tint';
 
 /**
  * An event carries the same two gestures as the day cell beneath it, so
@@ -40,8 +41,17 @@ type PressProps = {
   unstable_pressDelay: number;
 };
 
+/**
+ * How an event is drawn. `normal` everywhere but discover mode, where the
+ * discover calendars' events (the only ones shown there) are `open` (filled
+ * with the calendar's colour: not going) or `going` (inverted: a light fill
+ * with the title in the calendar's colour).
+ */
+export type EventLook = 'normal' | 'open' | 'going';
+
 type ChipProps = PressProps & {
   event: CalEvent;
+  look?: EventLook;
   /** The start time, shown above the title in the calendar's colour; only
    *  where cells are wide enough to afford the line (see week-row). */
   time?: string;
@@ -60,14 +70,25 @@ type ChipProps = PressProps & {
  */
 export function EventChip({
   event,
+  look = 'normal',
   time,
   titleLines,
   style,
   ...press
 }: ChipProps) {
   const title = event.summary || '(untitled)';
-  const tint = event.color ?? AccentColor;
+  const tint = calendarTint(event.color);
   const dimmed = hoveredOccurrence.useDimmed(event.id);
+  // A tray event you were going to that was called off: crossed out until
+  // its day has passed (see onCalendar).
+  // Discover mode: filled with the calendar's colour while not going,
+  // inverted once going (see discoverFace).
+  const theme = useTheme();
+  const face = look === 'normal' ? null : discoverFace(look, tint, theme);
+  const struck = [
+    event.cancelled && styles.cancelled,
+    face && { color: face.ink },
+  ];
   return (
     <Pressable
       {...press}
@@ -76,11 +97,12 @@ export function EventChip({
         if (hoveredOccurrence.get() === event.id) hoveredOccurrence.set(null);
       }}
       accessibilityRole="button"
-      accessibilityLabel={event.summary}
+      accessibilityLabel={label(event, look)}
       style={({ pressed }: { pressed: boolean }) => [
         styles.chip,
         style,
         FOCUS_MOTION,
+        face && { backgroundColor: face.fill },
         dimmed && styles.unfocused,
         pressed && styles.chipPressed,
       ]}
@@ -88,15 +110,21 @@ export function EventChip({
     >
       {/* Accent bar tinted by the source calendar (falls back to the
           theme accent). */}
-      <View style={[styles.chipBar, { backgroundColor: tint }]} />
+      {/* Only an ordinary event: a filled one drew the bar inside its own
+          fill, as a stray stripe. */}
+      {look === 'normal' && (
+        <View style={[styles.chipBar, { backgroundColor: tint }]} />
+      )}
       {time && titleLines === 0 ? (
         <ThemedText
           type="small"
           numberOfLines={1}
           textBreakStrategy="simple"
-          style={styles.chipTitle}
+          style={[styles.chipTitle, struck]}
         >
-          <ThemedText style={[styles.chipTime, { color: tint }]}>
+          <ThemedText
+            style={[styles.chipTime, { color: face ? face.ink : tint }]}
+          >
             {time}
           </ThemedText>{' '}
           {title}
@@ -106,7 +134,7 @@ export function EventChip({
           <ThemedText
             type="small"
             numberOfLines={1}
-            style={[styles.chipTime, { color: tint }]}
+            style={[styles.chipTime, { color: face ? face.ink : tint }]}
           >
             {time}
           </ThemedText>
@@ -114,7 +142,7 @@ export function EventChip({
             type="small"
             numberOfLines={titleLines}
             textBreakStrategy="simple"
-            style={styles.chipTitleWrapped}
+            style={[styles.chipTitleWrapped, struck]}
           >
             {title}
           </ThemedText>
@@ -125,7 +153,7 @@ export function EventChip({
             type="small"
             numberOfLines={titleLines}
             textBreakStrategy="simple"
-            style={styles.chipTitleWrapped}
+            style={[styles.chipTitleWrapped, struck]}
           >
             {title}
           </ThemedText>
@@ -135,7 +163,7 @@ export function EventChip({
           type="small"
           numberOfLines={1}
           textBreakStrategy="simple"
-          style={styles.chipTitle}
+          style={[styles.chipTitle, struck]}
         >
           {title}
         </ThemedText>
@@ -146,23 +174,22 @@ export function EventChip({
 
 type BannerProps = PressProps & {
   placement: BannerPlacement<CalEvent>;
+  look?: EventLook;
   /** Title lines the layout granted this banner (>1 when it wraps). */
   titleLines: number;
+  /** A later day of a multi-day event: no title, and the fill fading toward
+   *  the ground, `from` at the left edge to `to` at the right (0 is the full
+   *  colour, 1 the ground). */
+  fade?: { from: number; to: number };
   /** Absolute slot position + horizontal extent, supplied by the week row. */
   style?: StyleProp<ViewStyle>;
 };
 
 /**
- * An all-day/multi-day event drawn as one filled bar across its covered day
- * cells — flush left, inset a hairline on the right so the end cell's border
- * stays visible. Past a week edge the event continues over, it bleeds to the
- * pane edge instead.
- */
-/**
- * The occurrence under the finger, shared by every strip of it. A banner that
- * crosses a week edge is drawn once per week row, and each strip is its own
- * Pressable, so a pressed state kept per strip lit only the week touched — the
- * rest of the event stayed dark. Keyed by occurrence id, so another
+ * The occurrence under the finger, shared by every strip of it. A banner is
+ * drawn once per day it covers, and each piece is its own Pressable, so a
+ * pressed state kept per piece lit only the day touched — the rest of the
+ * event stayed dark. Keyed by occurrence id, so another
  * occurrence of the same series beside it does not light up too; a selector
  * per strip means a press re-renders only that event's strips, not the grid.
  */
@@ -201,15 +228,60 @@ const pressedOccurrence = sharedOccurrence();
  *  multi-day one stays lit, in every week it crosses. */
 const hoveredOccurrence = sharedOccurrence();
 
+/** How far going's title leans from the calendar's colour toward the dark
+ *  ground, so it reads on the light fill. */
+const GOING_INK_TO_GROUND = 0.45;
+
+/**
+ * Discover mode's two faces. Not going: filled with the calendar's colour,
+ * the title picked for contrast, as an all-day event is. Going: inverted, a
+ * light fill (the text colour) with the title in the calendar's colour, so
+ * what you picked stands out among what is on offer. (Tried before for not
+ * going: dashes all round, a bar, a soft wash, dotted lines top and bottom,
+ * and diagonal stripes, which made the titles hard to read.)
+ */
+function discoverFace(
+  look: 'open' | 'going',
+  color: string,
+  theme: { text: string; background: string }
+): { fill: string; ink: string } {
+  return look === 'going'
+    ? {
+        fill: theme.text,
+        ink: mixHex(color, theme.background, GOING_INK_TO_GROUND),
+      }
+    : { fill: color, ink: readableTextColor(color) };
+}
+
+/** What a screen reader says for an event: its title, that it was called
+ *  off when it was, and in discover mode that you are going (the two looks
+ *  are told apart by eye only). */
+function label(event: CalEvent, look: EventLook): string {
+  return [
+    event.summary,
+    event.cancelled && 'cancelled',
+    look === 'going' && 'going',
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
+/**
+ * An all-day/multi-day event: a filled bar with its title. The month grid
+ * draws one inside every day it covers (see week-row), so the lines between
+ * days always show.
+ */
 export function EventBanner({
   placement,
+  look = 'normal',
   titleLines,
+  fade: trail,
   style,
   ...press
 }: BannerProps) {
-  const { event, continuesRight } = placement;
+  const { event } = placement;
   // Fill by source calendar; title contrasts against whatever that fill is.
-  const fill = event.color ?? AccentColor;
+  const fill = calendarTint(event.color);
   const ink = readableTextColor(fill);
   const pressed = pressedOccurrence.useIs(event.id);
   const dimmed = hoveredOccurrence.useDimmed(event.id);
@@ -217,10 +289,14 @@ export function EventBanner({
   // ground rather than turning see-through: it crosses the grid's rules (the
   // weekend line among them), which showed through a translucent fill. A
   // press washes it further than a hover: it has to read under a thumb.
-  const ground = useTheme().background;
+  const theme = useTheme();
+  const ground = theme.background;
   const wash = pressed ? 1 - BANNER_PRESSED : dimmed ? 1 - UNFOCUSED : 0;
   const fade = (color: string) => (wash ? mixHex(color, ground, wash) : color);
   const { onPressIn, onPressOut } = press;
+  // Discover mode's going is inverted; not going is filled as usual.
+  const face =
+    look === 'going' ? discoverFace('going', fill, theme) : { fill, ink };
   return (
     <Pressable
       {...press}
@@ -237,25 +313,45 @@ export function EventBanner({
         if (hoveredOccurrence.get() === event.id) hoveredOccurrence.set(null);
       }}
       accessibilityRole="button"
-      accessibilityLabel={event.summary}
+      accessibilityLabel={label(event, look)}
       style={[
         styles.banner,
-        { backgroundColor: fade(fill) },
-        continuesRight && styles.bannerContinuesRight,
+        { backgroundColor: fade(face.fill) },
+        trail &&
+          trailFill(
+            fade(mixHex(face.fill, ground, trail.from)),
+            fade(mixHex(face.fill, ground, trail.to))
+          ),
         style,
         BANNER_FOCUS_MOTION,
       ]}
     >
-      <ThemedText
-        type="small"
-        numberOfLines={titleLines}
-        textBreakStrategy="simple"
-        style={[styles.bannerTitle, TITLE_FOCUS_MOTION, { color: fade(ink) }]}
-      >
-        {event.summary || '(untitled)'}
-      </ThemedText>
+      {!trail && (
+        <ThemedText
+          type="small"
+          numberOfLines={titleLines}
+          textBreakStrategy="simple"
+          style={[
+            styles.bannerTitle,
+            TITLE_FOCUS_MOTION,
+            { color: fade(face.ink) },
+            event.cancelled && styles.cancelled,
+          ]}
+        >
+          {event.summary || '(untitled)'}
+        </ThemedText>
+      )}
     </Pressable>
   );
+}
+
+/** A left-to-right fade between two colours: the CSS property on the web,
+ *  React Native's own gradient on a phone. */
+function trailFill(from: string, to: string): ViewStyle {
+  const gradient = `linear-gradient(to right, ${from}, ${to})`;
+  return Platform.OS === 'web'
+    ? ({ backgroundImage: gradient } as ViewStyle)
+    : { experimental_backgroundImage: gradient };
 }
 
 /** Every event's text — chip title, wrapped title, start time, banner title.
@@ -299,6 +395,9 @@ const BANNER_FOCUS_MOTION = focusMotion('background-color');
 const TITLE_FOCUS_MOTION = focusMotion('color');
 
 const styles = StyleSheet.create({
+  cancelled: {
+    textDecorationLine: 'line-through',
+  },
   // A press on a timed event: a lighter dim than a banner's, as before.
   chipPressed: {
     opacity: 0.8,
@@ -330,11 +429,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   // One size and line box for every kind of event text, so a timed chip, a
-  // wrapped chip and an all-day banner all sit on the same baseline.
+  // wrapped chip and an all-day banner all sit on the same baseline; titles
+  // in Satoshi Medium, a step thicker than the app's regular text.
   chipTitle: {
     flex: 1,
     fontSize: EVENT_FONT_SIZE,
     lineHeight: EVENT_LINE_HEIGHT,
+    fontFamily: FontFamilyMedium,
   },
   chipTime: {
     fontSize: EVENT_FONT_SIZE,
@@ -344,6 +445,7 @@ const styles = StyleSheet.create({
   chipTitleWrapped: {
     fontSize: EVENT_FONT_SIZE,
     lineHeight: EVENT_LINE_HEIGHT,
+    fontFamily: FontFamilyMedium,
   },
   banner: {
     justifyContent: 'center',
@@ -351,13 +453,10 @@ const styles = StyleSheet.create({
     // The optical nudge, mirrored: a banner centres its title, so shrinking
     // the box from the bottom is what lifts the ink.
     paddingBottom: EVENT_INK_NUDGE * 2,
-    marginRight: StyleSheet.hairlineWidth,
-  },
-  bannerContinuesRight: {
-    marginRight: 0,
   },
   bannerTitle: {
     fontSize: EVENT_FONT_SIZE,
     lineHeight: EVENT_LINE_HEIGHT,
+    fontFamily: FontFamilyMedium,
   },
 });

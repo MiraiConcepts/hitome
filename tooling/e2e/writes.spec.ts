@@ -390,7 +390,7 @@ test("the day list's trash updates the month on screen, not the one the page ope
       .getByRole("button", { name: "Delete 🧪 Trash 3", exact: true })
       .click();
 
-    await expect(page.getByText("Event deleted")).toBeVisible();
+    await expect(page.getByText(/^Deleted from /)).toBeVisible();
     // Well inside the poll interval: the refresh itself did it.
     await expect(more).toHaveText(`+${before - 1}`, { timeout: 8_000 });
   } finally {

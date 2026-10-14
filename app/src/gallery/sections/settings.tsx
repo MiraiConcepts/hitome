@@ -2,7 +2,7 @@
 // everything built from it: the Settings screen's sections, the login and
 // the connection screens.
 import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { ConnectionProblem } from '@/components/calendar/connection-problem';
 import { CalendarMark } from '@/components/calendar/calendar-mark';
@@ -15,7 +15,9 @@ import {
   EyeIcon,
   EyeOffIcon,
   GiftIcon,
+  TelescopeIcon,
 } from '@/components/icons';
+import { CalendarRoleSwitch } from '@/components/settings/calendar-role-switch';
 import { AboutSection } from '@/components/settings/about-section';
 import { ConnectionSection } from '@/components/settings/connection-section';
 import {
@@ -39,11 +41,14 @@ import {
 } from '@/components/settings/settings-parts';
 import { SetupScreen } from '@/components/settings/setup-screen';
 import { ThemedText } from '@/components/themed-text';
+import type { CalendarRole } from '@/config/calendar-visibility';
 import { webConnectionProblem } from '@/config/dav-config';
 import { AccentColor, Colors, Spacing } from '@/constants/theme';
 
 import { Note, Row, Section, Specimen, Tag, ViewOnly } from '../parts';
-import { SAMPLE_CALENDARS } from '../sample-data';
+import { SAMPLE_CALENDARS, SAMPLE_TRAY_CALENDAR } from '../sample-data';
+
+const SETTINGS_CALENDARS = [...SAMPLE_CALENDARS, SAMPLE_TRAY_CALENDAR];
 
 const noop = () => {};
 const PARTS = 'components/settings/settings-parts.tsx';
@@ -121,17 +126,20 @@ function LoginSpecimens() {
  */
 function SampleCalendarsCard() {
   const [selected, setSelected] = useState(SAMPLE_CALENDARS[0].url);
-  const [hidden, setHidden] = useState<string[]>([SAMPLE_CALENDARS[2].url]);
+  const [roles, setRoles] = useState<Record<string, CalendarRole>>({
+    [SAMPLE_CALENDARS[2].url]: 'hidden',
+    [SAMPLE_TRAY_CALENDAR.url]: 'tray',
+  });
   const [week, setWeek] = useState('monday');
   const onWeb = Platform.OS === 'web';
   return (
     <SettingsSection title="Calendars">
-      {SAMPLE_CALENDARS.map((c) => {
-        const isHidden = hidden.includes(c.url);
+      {SETTINGS_CALENDARS.map((c) => {
+        const role = roles[c.url] ?? 'shown';
         return (
           <SettingsBlock
             key={c.url}
-            onPress={() => setSelected(c.url)}
+            onPress={role === 'tray' ? undefined : () => setSelected(c.url)}
             selected={c.url === selected}
           >
             <View style={styles.calRow}>
@@ -142,7 +150,7 @@ function SampleCalendarsCard() {
               />
               <ThemedText
                 type="small"
-                themeColor={isHidden ? 'placeholder' : undefined}
+                themeColor={role === 'hidden' ? 'placeholder' : undefined}
                 style={styles.flex}
               >
                 {c.name}
@@ -150,45 +158,33 @@ function SampleCalendarsCard() {
               {c.url === selected && (
                 <CheckIcon size={20} color={AccentColor} />
               )}
-              <Pressable
-                onPress={() =>
-                  setHidden((h) =>
-                    isHidden ? h.filter((u) => u !== c.url) : [...h, c.url]
-                  )
-                }
-                hitSlop={10}
-                style={styles.eye}
-              >
-                {isHidden ? (
-                  <EyeOffIcon size={20} color={Colors.dark.placeholder} />
-                ) : (
-                  <EyeIcon size={20} color={Colors.dark.textSecondary} />
-                )}
-              </Pressable>
+              <CalendarRoleSwitch
+                name={c.name}
+                role={role}
+                onChange={(next) => {
+                  setRoles((r) => ({ ...r, [c.url]: next }));
+                  // As the real section: the default never stays on a tray
+                  // calendar.
+                  if (next === 'tray' && c.url === selected)
+                    setSelected(
+                      SAMPLE_CALENDARS.find((o) => o.url !== c.url)!.url
+                    );
+                }}
+              />
             </View>
           </SettingsBlock>
         );
       })}
       <SettingsBlock>
-        {onWeb ? (
-          <View style={styles.legend}>
-            <SettingsMessage icon={CheckIcon}>
-              New events go here
-            </SettingsMessage>
-            <SettingsMessage icon={EyeIcon}>
-              Shown on the calendar
-            </SettingsMessage>
-          </View>
-        ) : (
-          <>
-            <SettingsMessage icon={CheckIcon}>
-              Where new events go. Tap a calendar to change.
-            </SettingsMessage>
-            <SettingsMessage icon={EyeIcon}>
-              Shown on the calendar and widget. Tap the eye to hide one.
-            </SettingsMessage>
-          </>
-        )}
+        {/* One line on every screen: a legend for the marks, side by side.
+            The rows show they can be tapped; what each mark means is the
+            part worth saying. */}
+        <View style={styles.legend}>
+          <SettingsMessage icon={CheckIcon}>New events</SettingsMessage>
+          <SettingsMessage icon={EyeIcon}>Shown</SettingsMessage>
+          <SettingsMessage icon={TelescopeIcon}>Discover</SettingsMessage>
+          <SettingsMessage icon={EyeOffIcon}>Hidden</SettingsMessage>
+        </View>
       </SettingsBlock>
       <SettingsBlock>
         <FieldStack label="Week starts on" icon={CalendarIcon}>
@@ -413,7 +409,7 @@ export function SettingsPartsSection() {
       <Specimen
         name="Calendars (assembled)"
         file="components/settings/calendars-section.tsx"
-        shows="Built here from its real parts with sample calendars (Family hidden): the real section reads the account's calendar list from the server and writes the choices to settings. Presses work on the sample."
+        shows="Built here from its real parts with sample calendars (Family hidden, Things to do in discover mode): the real section reads the account's calendar list from the server and writes the choices to settings. Presses work on the sample."
       >
         <View style={styles.cardBox}>
           <SampleCalendarsCard />
@@ -578,10 +574,6 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
-  },
-  eye: {
-    padding: Spacing.one,
-    margin: -Spacing.one,
   },
   legend: {
     flexDirection: 'row',

@@ -8,7 +8,8 @@ import {
   FieldChrome,
   LabelColumnWidth,
 } from '@/components/fields/field-chrome';
-import { GRID_RULE, TODAY_FILL } from '@/components/calendar/week-row';
+import { TODAY_COLOR } from '@/components/calendar/today-mark';
+import { GRID_RULE } from '@/components/calendar/week-row';
 import { EVENT_FONT_SIZE } from '@/components/calendar/event-chip';
 import { GRID_SCALE } from '@/components/calendar/grid-scale';
 import { ThemedText } from '@/components/themed-text';
@@ -211,7 +212,11 @@ export function Foundations() {
             value={LOCATION_FILL}
             source="constants/tags.ts"
           />
-          <Swatch name="TODAY_FILL" value={TODAY_FILL} source="week-row.tsx" />
+          <Swatch
+            name="TODAY_COLOR"
+            value={TODAY_COLOR}
+            source="today-mark.tsx"
+          />
           <Swatch name="GRID_RULE" value={GRID_RULE} source="week-row.tsx" />
           <Swatch
             name="HEADER_GROUND"

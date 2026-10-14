@@ -28,13 +28,14 @@ import {
   FlagOutlineBody,
   EyeOutlineBody,
   EyeOffOutlineBody,
+  TelescopeOutlineBody,
+  PhotoShareOutlineBody,
   GithubOutlineBody,
   FileTextOutlineBody,
   BugOutlineBody,
   GiftOutlineBody,
   ConfettiOutlineBody,
   CalendarPlusOutlineBody,
-  CalendarShareOutlineBody,
   ShareOutlineBody,
   TrashOutlineBody,
   WifiOffOutlineBody,
@@ -140,6 +141,14 @@ export function EyeOffIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(EyeOffOutlineBody, size, color)} />;
 }
 
+export function TelescopeIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(TelescopeOutlineBody, size, color)} />;
+}
+
+export function PhotoShareIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(PhotoShareOutlineBody, size, color)} />;
+}
+
 export function GithubIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(GithubOutlineBody, size, color)} />;
 }
@@ -154,10 +163,6 @@ export function BugIcon({ size = 24, color }: IconProps) {
 
 export function ConfettiIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(ConfettiOutlineBody, size, color)} />;
-}
-
-export function CalendarShareIcon({ size = 24, color }: IconProps) {
-  return <SvgXml xml={svg(CalendarShareOutlineBody, size, color)} />;
 }
 
 export function GiftIcon({ size = 24, color }: IconProps) {

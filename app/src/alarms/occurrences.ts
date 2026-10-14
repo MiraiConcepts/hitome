@@ -46,7 +46,9 @@ export function desiredAlarms(
   const out: DesiredAlarm[] = [];
   const seen = new Set<string>();
   for (const event of events) {
-    if (!event.alarm) continue;
+    // A cancelled event is still read (a tray event you were going to shows
+    // crossed out) but never rings.
+    if (!event.alarm || event.cancelled) continue;
     if (event.start.getTime() > horizonEnd) continue;
     const fireDate = alarmTimeFor(
       event.raw,

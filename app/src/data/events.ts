@@ -12,6 +12,7 @@ export {
   isAuthFailure,
   listCalendars,
   moveEvent,
+  setGoing,
   undoDelete,
   updateEvent,
   type CalendarChoice,

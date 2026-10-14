@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { listCalendars, type CalendarChoice } from '@/data/events';
 import { CalendarMark } from '@/components/calendar/calendar-mark';
 import { ChipRow } from '@/components/fields/chip-row';
 import { FieldStack } from '@/components/fields/field-stack';
+import { CalendarIcon, CheckIcon } from '@/components/icons';
 import {
-  CalendarIcon,
-  CheckIcon,
-  EyeIcon,
-  EyeOffIcon,
-} from '@/components/icons';
+  CALENDAR_ROLES,
+  CalendarRoleSwitch,
+} from '@/components/settings/calendar-role-switch';
 import {
   Card,
   CONTROL_HEIGHT,
@@ -27,8 +26,10 @@ import {
   connectFailureMessage,
 } from '@/config/dav-config';
 import {
-  setCalendarHidden,
-  useHiddenCalendars,
+  roleOf,
+  setCalendarRole,
+  useCalendarRoles,
+  type CalendarRole,
 } from '@/config/calendar-visibility';
 import {
   getPhoneFirstDay,
@@ -50,7 +51,7 @@ const ON_WEB = Platform.OS === 'web';
 export function CalendarsSection() {
   const theme = useTheme();
   const preferred = useDefaultCalendar();
-  const hidden = useHiddenCalendars();
+  const roles = useCalendarRoles();
   const weekStart = useWeekStart();
   const [calendars, setCalendars] = useState<CalendarChoice[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -75,8 +76,23 @@ export function CalendarsSection() {
     };
   }, []);
 
-  // Nothing chosen yet means discovery order, which is what the first row is.
-  const selectedUrl = preferred ?? calendars?.[0]?.url;
+  // Nothing chosen yet means discovery order: the first row that is not a
+  // tray calendar (those are filled from elsewhere, never written into).
+  const writable = calendars?.filter((c) => roleOf(c.url, roles) !== 'tray');
+  const selectedUrl =
+    (preferred && writable?.find((c) => c.url === preferred)?.url) ??
+    writable?.[0]?.url;
+
+  function changeRole(url: string, role: CalendarRole) {
+    setCalendarRole(url, role);
+    // New events cannot go into the tray: move the default off it.
+    if (role === 'tray' && url === selectedUrl) {
+      const next = writable?.find((c) => c.url !== url);
+      if (next) setDefaultCalendar(next.url);
+    }
+    // The widget redraws from its own fetch; tell it now.
+    refreshAgendaWidget();
+  }
 
   return (
     <SettingsSection title="Calendars" testID="settings-calendars">
@@ -94,11 +110,15 @@ export function CalendarsSection() {
       )}
       {calendars?.map((calendar) => {
         const selected = calendar.url === selectedUrl;
-        const isHidden = hidden.includes(calendar.url);
+        const role = roleOf(calendar.url, roles);
         return (
           <SettingsBlock
             key={calendar.url}
-            onPress={() => setDefaultCalendar(calendar.url)}
+            onPress={
+              role === 'tray'
+                ? undefined
+                : () => setDefaultCalendar(calendar.url)
+            }
             selected={selected}
             testID={`settings-calendar-${calendar.name}`}
           >
@@ -110,33 +130,18 @@ export function CalendarsSection() {
               />
               <ThemedText
                 type="small"
-                themeColor={isHidden ? 'placeholder' : undefined}
+                themeColor={role === 'hidden' ? 'placeholder' : undefined}
                 style={styles.name}
               >
                 {calendar.name}
               </ThemedText>
               {selected && <CheckIcon size={CHECK_SIZE} color={AccentColor} />}
-              <Pressable
-                onPress={() => {
-                  setCalendarHidden(calendar.url, !isHidden);
-                  // The widget redraws from its own fetch; tell it now.
-                  refreshAgendaWidget();
-                }}
-                hitSlop={10}
-                // Padded to a 28pt target (web ignores hitSlop), pulled
-                // back by the same so the row's layout does not move.
-                style={styles.eye}
-                accessibilityRole="switch"
-                aria-checked={!isHidden}
-                accessibilityLabel={`Show ${calendar.name} on the calendar`}
-                testID={`settings-calendar-visible-${calendar.name}`}
-              >
-                {isHidden ? (
-                  <EyeOffIcon size={CHECK_SIZE} color={theme.placeholder} />
-                ) : (
-                  <EyeIcon size={CHECK_SIZE} color={theme.textSecondary} />
-                )}
-              </Pressable>
+              <CalendarRoleSwitch
+                name={calendar.name}
+                role={role}
+                onChange={(next) => changeRole(calendar.url, next)}
+                testID={`settings-calendar-role-${calendar.name}`}
+              />
             </View>
           </SettingsBlock>
         );
@@ -145,28 +150,17 @@ export function CalendarsSection() {
         // What the tick means, once, at the foot of the card — the list
         // itself stays just the calendars.
         <SettingsBlock>
-          {ON_WEB ? (
-            // One line on the web: a legend for the two marks, side by side.
-            // Rows show they can be clicked; what each mark means is the
-            // part worth saying.
-            <View style={styles.legend}>
-              <SettingsMessage icon={CheckIcon}>
-                New events go here
+          {/* One line on every screen: a legend for the marks, side by side.
+              The rows show they can be tapped; what each mark means is the
+              part worth saying. */}
+          <View style={styles.legend}>
+            <SettingsMessage icon={CheckIcon}>New events</SettingsMessage>
+            {CALENDAR_ROLES.map(({ role, Icon, name }) => (
+              <SettingsMessage key={role} icon={Icon}>
+                {name}
               </SettingsMessage>
-              <SettingsMessage icon={EyeIcon}>
-                Shown on the calendar
-              </SettingsMessage>
-            </View>
-          ) : (
-            <>
-              <SettingsMessage icon={CheckIcon}>
-                Where new events go. Tap a calendar to change.
-              </SettingsMessage>
-              <SettingsMessage icon={EyeIcon}>
-                Shown on the calendar and widget. Tap the eye to hide one.
-              </SettingsMessage>
-            </>
-          )}
+            ))}
+          </View>
         </SettingsBlock>
       )}
       <SettingsBlock>
@@ -210,10 +204,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     columnGap: Spacing.four,
     rowGap: Spacing.two,
-  },
-  eye: {
-    padding: Spacing.one,
-    margin: -Spacing.one,
   },
   // A control-height row once SettingsBlock's own padding is added.
   row: {

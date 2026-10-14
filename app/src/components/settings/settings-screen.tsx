@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -10,12 +11,14 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 
+import { SNACK_MS, SNACK_SPOT, SnackBar } from '@/components/snack-bar';
 import { AboutSection } from '@/components/settings/about-section';
 import { CalendarsSection } from '@/components/settings/calendars-section';
 import { ConnectionSection } from '@/components/settings/connection-section';
 import { NotificationsSection } from '@/components/settings/notifications-section';
 import { SettingsHeader } from '@/components/settings/settings-parts';
 import { ThemedView } from '@/components/themed-view';
+import { MESSAGE_SAMPLES } from '@/constants/messages';
 import { Spacing } from '@/constants/theme';
 import { useEscapeKey } from '@/hooks/use-escape-key';
 
@@ -35,6 +38,26 @@ export function SettingsScreen() {
   const goBack = () =>
     router.canGoBack() ? router.back() : router.replace('/');
   useEscapeKey(goBack);
+  // "Show a test message": each press shows the next of the app's messages
+  // (constants/messages) in the month screen's bar, so the set can be read
+  // through. Gone after a while, as the month screen's.
+  const [sample, setSample] = useState<{ index: number; key: number } | null>(
+    null
+  );
+  const showTestMessage = () =>
+    setSample((prev) => ({
+      index: prev ? (prev.index + 1) % MESSAGE_SAMPLES.length : 0,
+      key: Date.now(),
+    }));
+  useEffect(() => {
+    if (!sample) return;
+    const timer = setTimeout(() => setSample(null), SNACK_MS);
+    return () => clearTimeout(timer);
+  }, [sample]);
+  const notifications = (
+    <NotificationsSection onTestMessage={showTestMessage} />
+  );
+  const shown = sample ? MESSAGE_SAMPLES[sample.index] : null;
   return (
     <ThemedView style={styles.container}>
       {/* Top and sides only, as in the month view; the scroll view applies the
@@ -57,7 +80,7 @@ export function SettingsScreen() {
                 <CalendarsSection />
               </View>
               <View style={styles.column}>
-                <NotificationsSection />
+                {notifications}
                 <AboutSection />
               </View>
             </>
@@ -65,12 +88,27 @@ export function SettingsScreen() {
             <>
               <ConnectionSection />
               <CalendarsSection />
-              <NotificationsSection />
+              {notifications}
               <AboutSection />
             </>
           )}
         </ScrollView>
       </SafeAreaView>
+      <View
+        pointerEvents="box-none"
+        style={[SNACK_SPOT, { bottom: insets.bottom + Spacing.three }]}
+      >
+        {shown && (
+          <SnackBar
+            key={sample!.key}
+            icon={shown.icon}
+            message={`${shown.message}  (${sample!.index + 1} of ${MESSAGE_SAMPLES.length})`}
+            action={
+              shown.undo ? { label: 'Undo', onPress: () => {} } : undefined
+            }
+          />
+        )}
+      </View>
     </ThemedView>
   );
 }
@@ -102,6 +140,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     maxWidth: TWO_COLUMN_MIN_WIDTH,
   },
+  // As the month screen's: bottom right, clear of the content's reach.
   column: {
     flex: 1,
     minWidth: 0,

@@ -150,7 +150,12 @@ export function fakeStore({ synced = true }: { synced?: boolean } = {}) {
       return instances(Number(when[1]), Number(when[2])).filter(
         (r) =>
           ids.includes(num(r.calendar_id)) &&
-          (r.eventStatus == null || num(r.eventStatus) !== 2)
+          // As fetchMonth's selection: a cancelled single event is kept.
+          (r.eventStatus == null ||
+            num(r.eventStatus) !== 2 ||
+            (r.rrule == null &&
+              r.original_id == null &&
+              r.original_sync_id == null))
       );
     }
     if (path === '/calendars') return calendars.filter((c) => c.visible === 1);

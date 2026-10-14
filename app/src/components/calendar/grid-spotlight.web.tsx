@@ -1,11 +1,12 @@
 // The month grid's hover on the web: a crosshair. The day under the mouse
-// takes a wash of today's blue, and its week row and weekday column a faint one, so
+// takes a wash of today's colour (blue, orange in discover mode), and its week row and weekday column a faint one, so
 // the pointer reads which week and which weekday it is on at a glance. Each
 // cell is marked with a data attribute and a stylesheet draws the wash on an
 // overlay, which fades in and out; React never re-renders for a mouse move.
 import { useEffect } from 'react';
 
-import { TODAY_FILL } from '@/components/calendar/week-row';
+import { TODAY_COLOR } from '@/components/calendar/today-mark';
+import { AccentColor } from '@/constants/theme';
 import { rgbHex } from '@/utils/color';
 
 /** The hovered day's wash (alpha of today's blue): a lighter shade of the
@@ -16,9 +17,13 @@ const LINE = 0.045;
 const FADE_MS = 90;
 
 const CELLS = '[data-testid^="day-cell-"]';
-const [R, G, B] = [1, 3, 5].map((i) =>
-  parseInt(rgbHex(TODAY_FILL).slice(i, i + 2), 16)
-);
+const channels = (hex: string) =>
+  [1, 3, 5].map((i) => parseInt(rgbHex(hex).slice(i, i + 2), 16)).join(', ');
+const BLUE = channels(TODAY_COLOR);
+const ORANGE = channels(AccentColor);
+/** Set on the page's root while discover mode is on: the wash follows
+ *  today's fill to orange. */
+const DISCOVER_ATTR = 'data-hitome-discover';
 
 let installed = false;
 
@@ -45,13 +50,22 @@ ${CELLS}[data-cross='line']::after {
   background-color: rgba(255, 255, 255, ${LINE});
 }
 ${CELLS}[data-cross='cell']::after {
-  background-color: rgba(${R}, ${G}, ${B}, ${CELL});
+  background-color: rgba(${BLUE}, ${CELL});
+}
+:root[${DISCOVER_ATTR}] ${CELLS}[data-cross='cell']::after {
+  background-color: rgba(${ORANGE}, ${CELL});
 }
 `;
   document.head.appendChild(style);
 }
 
-export function GridSpotlight() {
+export function GridSpotlight({ discover = false }: { discover?: boolean }) {
+  useEffect(() => {
+    const root = document.documentElement;
+    if (discover) root.setAttribute(DISCOVER_ATTR, '');
+    else root.removeAttribute(DISCOVER_ATTR);
+    return () => root.removeAttribute(DISCOVER_ATTR);
+  }, [discover]);
   useEffect(() => {
     install();
     let hovered: HTMLElement | null = null;

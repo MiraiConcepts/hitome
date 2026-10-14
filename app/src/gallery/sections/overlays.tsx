@@ -25,6 +25,7 @@ import {
   BUSY_EVENTS,
   DAY,
   SAMPLE,
+  SAMPLE_TRAY_EVENTS,
   TODAY,
   TODAY_EVENTS,
 } from '../sample-data';
@@ -111,7 +112,7 @@ export function OverlaysSection() {
       <Specimen
         name="DayPopover (real)"
         file="components/calendar/day-popover.tsx"
-        shows="Today's 4 events; a 12-event day (scrolls); Add event shows on the web only. Rows open the editor, the bin deletes (a repeating one asks first)."
+        shows="Today's 4 events; a 12-event day (scrolls); discover mode (a going box per row, the row opens the page, no Add event); Add event shows on the web only. Rows open the editor, the bin deletes (a repeating one asks first)."
       >
         <Row gap={Spacing.two}>
           <Open
@@ -131,6 +132,10 @@ export function OverlaysSection() {
                 SAMPLE.birthday,
               ])
             }
+          />
+          <Open
+            label="Day list: discover mode"
+            onPress={() => openDay(TODAY, SAMPLE_TRAY_EVENTS, true)}
           />
         </Row>
       </Specimen>

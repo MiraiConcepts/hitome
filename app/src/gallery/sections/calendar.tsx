@@ -11,7 +11,15 @@ import {
 } from 'react-native';
 
 import type { CalEvent } from '@/caldav/types';
-import { EventBanner, EventChip } from '@/components/calendar/event-chip';
+import {
+  EventBanner,
+  EventChip,
+  type EventLook,
+} from '@/components/calendar/event-chip';
+import {
+  CASCADE_DONE_MS,
+  CascadeCover,
+} from '@/components/calendar/cascade-cover';
 import { EventTags } from '@/components/calendar/event-tags';
 import { GridSpotlight } from '@/components/calendar/grid-spotlight';
 import { MonthGrid } from '@/components/calendar/month-grid';
@@ -36,7 +44,7 @@ import { eventDays, toDateString } from '@/utils/date';
 
 import { useOverlays } from '../overlays';
 import { Note, Row, Section, Specimen, Tag } from '../parts';
-import { GRID_EVENTS, SAMPLE, TODAY } from '../sample-data';
+import { GRID_EVENTS, SAMPLE, SAMPLE_TRAY_EVENTS, TODAY } from '../sample-data';
 
 const noop = () => {};
 
@@ -81,6 +89,7 @@ function Header(
     offline: boolean;
     authFailed: boolean;
     fetchedAt: Date | null;
+    discover: { open: boolean };
   }>
 ) {
   const { openEditor } = useOverlays();
@@ -104,9 +113,65 @@ function Header(
       onAdd={() => openEditor({ event: null, defaultDay: TODAY })}
       onShareMonth={noop}
       onSettings={noop}
+      discover={
+        props.discover ? { ...props.discover, onPress: noop } : undefined
+      }
     />
   );
 }
+
+/** Discover events as the grid draws them in discover mode: one not yet
+ *  answered, one going, and the going one called off. */
+const OPEN_GIG = SAMPLE_TRAY_EVENTS.find((e) => e.free)!;
+const GOING_GIG = SAMPLE_TRAY_EVENTS.find((e) => !e.free)!;
+const CANCELLED_GIG: CalEvent = { ...GOING_GIG, cancelled: true };
+
+/** Discover mode's change of calendar, on a grid-sized box: the days turn
+ *  over from the top right, and the box changes side under them. */
+function SampleCascade() {
+  const [side, setSide] = useState<'mine' | 'discover'>('mine');
+  const [run, setRun] = useState<{ n: number; to: 'mine' | 'discover' } | null>(
+    null
+  );
+  const turn = () => {
+    if (run) return;
+    const to = side === 'mine' ? 'discover' : 'mine';
+    const n = Date.now();
+    setRun({ n, to });
+    setSide(to);
+    setTimeout(() => setRun(null), CASCADE_DONE_MS);
+  };
+  return (
+    <View style={{ gap: Spacing.two }}>
+      <View
+        style={[
+          styles.cascadeBox,
+          side === 'discover' && { backgroundColor: AccentColor },
+        ]}
+      >
+        <ThemedText
+          type="subtitle"
+          style={side === 'discover' && { color: Colors.light.text }}
+        >
+          {side === 'mine' ? 'Your month' : 'Discover'}
+        </ThemedText>
+        {run && (
+          <CascadeCover
+            key={run.n}
+            width={CASCADE_BOX.width}
+            height={CASCADE_BOX.height}
+            color={Colors.dark.background}
+          />
+        )}
+      </View>
+      <Row gap={Spacing.two}>
+        <SettingsButton label="Turn over" onPress={turn} />
+      </Row>
+    </View>
+  );
+}
+
+const CASCADE_BOX = { width: 360, height: 300 };
 
 /** A grid cell's worth of room for one strip. */
 function Strip({
@@ -146,22 +211,36 @@ export function CalendarSection() {
     delayLongPress: 350,
     unstable_pressDelay: 90,
   });
-  const chips: [string, CalEvent, number][] = [
+  const chips: [string, CalEvent, number, EventLook?][] = [
     ['timed, 1 line', SAMPLE.dentist, 1],
     ['emoji', SAMPLE.lunch, 1],
     ['long title, 1 line (cut)', SAMPLE.planning, 1],
     ['long title, 2 lines', SAMPLE.planning, 2],
     ['calendar colour (Work)', SAMPLE.standup, 1],
     ['untitled', SAMPLE.untitled, 1],
+    ['cancelled (a discover event you were going to)', CANCELLED_GIG, 1],
+    ['discover mode: not going (filled)', OPEN_GIG, 1, 'open'],
+    ['discover mode: going (inverted)', GOING_GIG, 1, 'going'],
   ];
-  const banners: [string, CalEvent, number, number, boolean][] = [
-    ['all-day, 1 day', SAMPLE.allDayToday, 1, 1, false],
-    ['birthday colour', SAMPLE.birthday, 1, 1, false],
-    ['multi-day, 3 days', SAMPLE.trip, 3, 1, false],
-    ['continues past the week edge', SAMPLE.trip, 2, 1, true],
-    ['timed multi-day (a banner too)', SAMPLE.hackathon, 3, 1, false],
-    ['long title, 2 lines', SAMPLE.planning, 2, 2, false],
-    ['accent (no calendar colour)', SAMPLE.dentist, 2, 1, false],
+  // One day's piece each: the grid draws a multi-day event as a piece per
+  // day it covers (week-row), so no specimen spans several.
+  const banners: [
+    string,
+    CalEvent,
+    number,
+    { from: number; to: number }?,
+    EventLook?,
+  ][] = [
+    ['all-day', SAMPLE.allDayToday, 1],
+    ['birthday colour', SAMPLE.birthday, 1],
+    ['multi-day: its first day', SAMPLE.trip, 1],
+    ['multi-day: a later day, fading', SAMPLE.trip, 1, { from: 0, to: 0.8 }],
+    ['timed multi-day (a banner too)', SAMPLE.hackathon, 1],
+    ['long title, 2 lines', SAMPLE.planning, 2],
+    ['accent (no calendar colour)', SAMPLE.dentist, 1],
+    ['cancelled (crossed out)', { ...SAMPLE.trip, cancelled: true }, 1],
+    ['discover mode: not going (filled)', OPEN_GIG, 1, undefined, 'open'],
+    ['discover mode: going (inverted)', GOING_GIG, 1, undefined, 'going'],
   ];
 
   // One week (today's), as the grid lays it out at a six-row height.
@@ -197,6 +276,18 @@ export function CalendarSection() {
         <Header offline fetchedAt={null} />
         <Tag>login rejected</Tag>
         <Header offline authFailed />
+        <Tag>a discover calendar (the telescope)</Tag>
+        <Header discover={{ open: false }} />
+        <Tag>discover mode (the bar turns orange)</Tag>
+        <Header discover={{ open: true }} />
+      </Specimen>
+
+      <Specimen
+        name="CascadeCover"
+        file="components/calendar/cascade-cover.tsx"
+        shows="Discover mode's change of calendar: the grid changes at once under tiles in its own ground, which clear day by day from the telescope's corner (top right) to the bottom left. Turn over runs it on a grid-sized box."
+      >
+        <SampleCascade />
       </Specimen>
 
       <Specimen
@@ -214,13 +305,14 @@ export function CalendarSection() {
         shows={`In a ${cell} px cell (this window's grid cell). The grid grants at most 2 lines. The grid draws no repeat or alert markers (only the widget had them, and it no longer does).`}
       >
         <Row gap={Spacing.two}>
-          {chips.map(([label, event, lines]) => (
+          {chips.map(([label, event, lines, look]) => (
             <View key={label} style={styles.stripCell}>
               <Tag>{label}</Tag>
               <Strip width={cell} lines={lines}>
                 {(style) => (
                   <EventChip
                     event={event}
+                    look={look}
                     titleLines={lines}
                     style={style}
                     {...press(event)}
@@ -235,25 +327,27 @@ export function CalendarSection() {
       <Specimen
         name="EventBanner (all-day and multi-day)"
         file="components/calendar/event-chip.tsx"
-        shows="Filled in the calendar's colour, ink picked for contrast; flush right when it continues into the next week"
+        shows="Filled in the calendar's colour, ink picked for contrast; on the grid each day draws its own piece, the later ones untitled and fading"
       >
         <Row gap={Spacing.two}>
-          {banners.map(([label, event, span, lines, continues]) => (
+          {banners.map(([label, event, lines, fade, look]) => (
             <View key={label} style={styles.stripCell}>
               <Tag>{label}</Tag>
-              <Strip width={cell * span} lines={lines}>
+              <Strip width={cell} lines={lines}>
                 {(style) => (
                   <EventBanner
                     placement={{
                       event,
                       startCol: 0,
-                      span,
+                      span: 1,
                       slot: 0,
                       rows: lines,
                       continuesLeft: false,
-                      continuesRight: continues,
+                      continuesRight: false,
                     }}
                     titleLines={lines}
+                    fade={fade}
+                    look={look}
                     style={style}
                     {...press(event)}
                   />
@@ -451,6 +545,15 @@ function SampleMonthGrid({
 }
 
 const styles = StyleSheet.create({
+  cascadeBox: {
+    width: CASCADE_BOX.width,
+    height: CASCADE_BOX.height,
+    maxWidth: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.dark.background,
+    overflow: 'hidden',
+  },
   fill: {
     flex: 1,
   },

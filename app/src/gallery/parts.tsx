@@ -14,7 +14,7 @@ import {
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 
 import type { IconProps } from '@/components/icons';
-import { SnackBar } from '@/components/calendar/month-screen';
+import { SnackBar } from '@/components/snack-bar';
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, Colors, DangerColor, Spacing } from '@/constants/theme';
 

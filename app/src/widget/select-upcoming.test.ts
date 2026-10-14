@@ -106,6 +106,16 @@ describe('toWidgetEvent', () => {
     expect('location' in toWidgetEvent(event)).toBe(false);
   });
 
+  it('carries a cancelled event as cancelled', () => {
+    const event = mkEvent(
+      'gig',
+      new Date(Date.UTC(2026, 6, 8, 12, 0)),
+      new Date(Date.UTC(2026, 6, 8, 14, 0))
+    );
+    expect(toWidgetEvent({ ...event, cancelled: true }).cancelled).toBe(true);
+    expect('cancelled' in toWidgetEvent(event)).toBe(false);
+  });
+
   it('joins multi-line locations onto one line (Apple venue\\naddress)', () => {
     const event = mkEvent(
       'talk',

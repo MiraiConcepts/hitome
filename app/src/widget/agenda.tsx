@@ -28,13 +28,12 @@ import {
 import {
   AccentColor,
   Colors,
-  FontFamily,
+  FontFamilyMedium,
   FontFamilyBold,
   OnAccentColor,
   type ThemeColor,
 } from '@/constants/theme';
 import { LOCATION_FILL, TAG } from '@/constants/tags';
-import { rgbHex } from '@/utils/color';
 import { formatTime } from '@/utils/date';
 
 import {
@@ -46,6 +45,7 @@ import {
 } from './format';
 import { eventLink, newEventLink } from './links';
 import type { WidgetCache } from './types';
+import { calendarTint } from '@/utils/calendar-tint';
 
 type Palette = Record<ThemeColor, string>;
 
@@ -69,7 +69,7 @@ const ARROW_ICON = iconSvg(OnAccentColor, ArrowRightOutlineBody);
 
 /** An event's source-calendar color, alpha stripped for SVG fills / ColorProp;
  *  uncolored / default-calendar events keep the theme accent. */
-const markerColor = (color: string | undefined) => rgbHex(color ?? AccentColor);
+const markerColor = calendarTint;
 
 /** A per-event marker glyph (sun / sunrise / sunset / gift), tinted by the
  *  event's source-calendar color. */
@@ -88,7 +88,7 @@ const MARKER_ICON = { width: 14, height: 14, marginTop: 0.5 } as const;
 /** An event row's primary line — time, dot, title. */
 const rowText = (palette: Palette) => ({
   fontSize: 13,
-  fontFamily: FontFamily,
+  fontFamily: FontFamilyMedium,
   color: hex(palette.text),
 });
 
@@ -155,7 +155,7 @@ function Chip({
         truncate="END"
         style={{
           fontSize: TAG.fontSize,
-          fontFamily: FontFamily,
+          fontFamily: FontFamilyMedium,
           color: hex(color),
         }}
       />
@@ -253,7 +253,11 @@ function EventRow({
         )}
         <FlexWidget style={{ flex: 1 }}>
           <TextWidget
-            text={event.summary || '(untitled)'}
+            text={
+              event.cancelled
+                ? `Cancelled: ${event.summary || '(untitled)'}`
+                : event.summary || '(untitled)'
+            }
             maxLines={1}
             truncate="END"
             style={rowText(palette)}
@@ -264,7 +268,7 @@ function EventRow({
             text={`(${dayIndex}/${spanDays})`}
             style={{
               fontSize: 12,
-              fontFamily: FontFamily,
+              fontFamily: FontFamilyMedium,
               color: hex(palette.textSecondary),
               marginLeft: 6,
             }}
@@ -349,7 +353,7 @@ function Body({
         text={message}
         style={{
           fontSize: 12,
-          fontFamily: FontFamily,
+          fontFamily: FontFamilyMedium,
           color: hex(palette.textSecondary),
         }}
       />
@@ -420,7 +424,7 @@ function SignedOut() {
         />
         <TextWidget
           text="Tap to allow calendar access"
-          style={{ fontSize: 13, fontFamily: FontFamily, color: ink }}
+          style={{ fontSize: 13, fontFamily: FontFamilyMedium, color: ink }}
         />
       </FlexWidget>
       <SvgWidget svg={ARROW_ICON} style={{ width: 24, height: 24 }} />
@@ -478,7 +482,7 @@ function Agenda({
               text={`Last Updated: ${formatTime(new Date(cache.fetchedAt))}`}
               style={{
                 fontSize: 10,
-                fontFamily: FontFamily,
+                fontFamily: FontFamilyMedium,
                 color: onAccent,
               }}
             />

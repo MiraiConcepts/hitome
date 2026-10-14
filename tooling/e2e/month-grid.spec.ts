@@ -55,9 +55,8 @@ async function todayLabelFor(page: Page, day: string) {
   return page.evaluate(
     (d: string) =>
       new Date(`${d}T00:00:00`).toLocaleDateString(undefined, {
-        weekday: "short",
+        weekday: "long",
         day: "numeric",
-        month: "long",
       }),
     day,
   );
@@ -487,7 +486,7 @@ test("share from the day list copies the event as text, and the list has Add eve
   await popover
     .getByRole("button", { name: "Share 🧪 Busy 5", exact: true })
     .click();
-  await expect(page.getByText("Copied to clipboard")).toBeVisible();
+  await expect(page.getByText("Event copied")).toBeVisible();
   const copied = await page.evaluate(
     () => (window as unknown as { __copied: string }).__copied,
   );
@@ -608,7 +607,7 @@ test("a11y: toasts and the connection banner are live regions", async ({
     .getByRole("button", { name: "Share 🧪 Busy 5", exact: true })
     .click();
   const toast = page.getByRole("status").filter({
-    hasText: "Copied to clipboard",
+    hasText: "Event copied",
   });
   await expect(toast).toBeVisible();
   await expect(toast).toHaveAttribute("aria-live", "polite");
@@ -698,7 +697,7 @@ test("the header copies the month as a picture, every event in it", async ({
     });
   });
   await page.getByTestId("calendar-share-month").click();
-  await expect(page.getByText("Month copied as a picture")).toBeVisible({
+  await expect(page.getByText("Agenda copied")).toBeVisible({
     timeout: 20_000,
   });
   const png = Buffer.from(

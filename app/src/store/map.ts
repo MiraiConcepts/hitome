@@ -12,6 +12,8 @@ import type {
 
 import type { StoreRow, StoreValues } from '../../modules/calendar-store';
 
+import { AVAILABILITY_FREE, STATUS_CANCELED } from './contract';
+
 const BIRTHDAY_NAME = /birthday/i;
 const HOLIDAY_NAME = /holiday/i;
 
@@ -295,6 +297,8 @@ export function instanceToEvent(row: StoreRow, ctx: InstanceContext): CalEvent {
     ...(str(row.description) ? { description: str(row.description) } : {}),
     ...(recurring ? { recurring: true, recurrenceStart } : {}),
     ...(alarmMinutes !== undefined ? { alarm: true } : {}),
+    ...(num(row.availability) === AVAILABILITY_FREE ? { free: true } : {}),
+    ...(num(row.eventStatus) === STATUS_CANCELED ? { cancelled: true } : {}),
     ...(color ? { color } : {}),
     ...(icon ? { icon } : {}),
     raw: synthesizeIcs({

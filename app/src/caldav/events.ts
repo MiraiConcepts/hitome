@@ -17,6 +17,7 @@ import {
   editPreserving,
   excludeOccurrence,
   isFirstOccurrence,
+  markGoing,
   splitSeries,
   truncateSeries,
   type EditScope,
@@ -214,6 +215,21 @@ export async function updateEvent(
     await revertEvent(event).catch(() => {});
     throw err;
   }
+}
+
+/**
+ * Mark a tray event going (busy, with `alertMinutes` as its reminder when it
+ * has none) or not (free, its reminder removed). The whole event, a series
+ * included: tray calendars hold one-off showings. If-Match as every write:
+ * a feed run that changed it since the fetch is a ConflictError.
+ */
+export async function setGoing(
+  event: CalEvent,
+  going: boolean,
+  alertMinutes: number | null
+): Promise<void> {
+  const alert = alertMinutes === null ? null : { offsetMinutes: alertMinutes };
+  await putObject(event, markGoing(event.raw, going, alert), 'update');
 }
 
 /** The calendar an event's object lives in (its URL is the calendar's plus

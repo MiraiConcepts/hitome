@@ -34,6 +34,9 @@ export type WidgetEvent = {
   color?: string;
   /** Calendar-specific marker glyph — e.g. 'gift' or 'confetti' swaps the all-day sun. */
   icon?: EventIcon;
+  /** A tray event you were going to that was called off: its title reads
+   *  "Cancelled: …" (the widget's text cannot be crossed out). */
+  cancelled?: boolean;
 };
 
 /** Last successful fetch, persisted between headless widget runs. */

@@ -107,6 +107,29 @@ helper scripts.
   confetti for one named holiday, else a calendar), not a dot. Only the month grid's tap ripple stays round. This breaks
   byte-identity with the notes app's `theme.ts`/`src/components/` until it
   makes the same change.
+- **Discover mode** (plan: `.claude/plans/discover-tray-plan.md`): each
+  calendar is shown, discover ("tray" in code), or hidden (Settings ›
+  Calendars, per device, `src/config/calendar-visibility.ts`). Discover
+  calendars are filled by the feeds sink in the Radicale repo
+  (`radicale/feeds/feeds_sink.py`), which owns SUMMARY, DTSTART, DTEND,
+  DURATION, URL, DESCRIPTION, STATUS and DTSTAMP and keeps everything else.
+  "Going" is the event's own busy/free: TRANSP OPAQUE or missing (Android:
+  AVAILABILITY busy) = going, TRANSPARENT = not. The header's telescope button switches
+  the grid to discover mode (`CascadeCover` fades tiles away day by day; the
+  bar crossfades to orange): only discover events, filled in their calendar's
+  colour (not going) or inverted, a light fill with the title in that colour
+  (going), going ones first in each day. A tap opens the day list, whose box answers going / not
+  (`setGoing`, which writes only TRANSP, always explicitly, and hitome's own
+  VALARM); a row or a hold opens its page. hitome never edits, moves or
+  deletes a discover event, nor creates into a discover calendar; on the
+  calendar a going one opens its page. Going events show on the grid and
+  widget; a cancelled one shows crossed out until its day has passed.
+- **Messages** (the month screen's bar) all come from
+  `src/constants/messages.ts`, with one vocabulary: a change names the
+  calendar ("Added to Personal", "Saved to", "Deleted from"; dates taken out
+  of a series are "Removed from"); failures read "<thing> <action> failed";
+  the month picture is "Agenda". Settings › Notifications can step through
+  them all ("Show a test message"). Add new ones there, in the same style.
 - Ports on this Mac: 4000 is this repo's dev server (`server:dev`) and 4100
   is mitsume's dev proxy (fixed so both apps run side by side), 8881 is this
   repo's e2e stack, 8080 belongs to an unrelated dev server, and 5000 is

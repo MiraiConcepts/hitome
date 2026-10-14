@@ -7,9 +7,9 @@ import {
   HEADER_TITLE_TYPE,
 } from '@/components/calendar/month-header';
 import {
-  bannerTitleLines,
-  chipSlots,
+  COUNTER_FOOTPRINT,
   DAY_NUMBER_HEIGHT,
+  EVENT_GAP,
   SLOT_HEIGHT,
   WeekRow,
 } from '@/components/calendar/week-row';
@@ -19,27 +19,24 @@ import { useTheme } from '@/hooks/use-theme';
 import {
   addDays,
   getFirstDayOfWeek,
-  layoutWeek,
   weekStartOf,
   type MonthAnchor,
 } from '@/utils/calendar-grid';
 import { toDateString } from '@/utils/date';
 
-/** The picture's size, whatever the screen: 4:3, landscape, so titles have
- *  room and it reads the same pasted anywhere, from the phone too. A month
- *  whose busiest week needs more room makes it taller instead of hiding
- *  events. */
-export const PICTURE_WIDTH = 1024;
-export const PICTURE_HEIGHT = 768;
-const CELL_WIDTH = PICTURE_WIDTH / 7;
+/** The picture is a square of this side, on every platform: it reads the
+ *  same wherever it is pasted or posted, and a busy month stays the same
+ *  size (a busy day shows "+N", as on the grid). Drawn at the phone's own
+ *  width, every day was a thumbnail of cut titles and "+2"s; at a desktop's
+ *  1024, the text was small in the picture. 700 is between (picked
+ *  2026-10-15). Captured at 2x (see share-month): a 1400px image. */
+const SIDE = 700;
 
 /** The month name's bar and the weekday row, at fixed heights so the weeks
  *  can be given the rest. */
 const TITLE_BAR_HEIGHT = 82;
 const WEEKDAY_ROW_HEIGHT = 28;
 
-/** A week with nothing in it still gets a cell of about the grid's shape. */
-const MIN_SLOTS = 3;
 /** Room beneath the last event, so it does not sit on the next row's rule. */
 const ROW_FOOT = Spacing.one;
 
@@ -55,26 +52,9 @@ function inWeek(events: CalEvent[], weekStart: Date): CalEvent[] {
   });
 }
 
-/** The slots a week needs to show every event in it, none behind "+N". */
-function slotsNeeded(weekStart: Date, events: CalEvent[]): number {
-  const layout = layoutWeek(
-    weekStart,
-    events,
-    // More than any day could fill, so nothing overflows.
-    events.length * 2 + 1,
-    (event) => chipSlots(event.summary, CELL_WIDTH),
-    (event, span) => bannerTitleLines(event.summary, span * CELL_WIDTH),
-    false
-  );
-  let need = 0;
-  for (const b of layout.banners) need = Math.max(need, b.slot + b.rows);
-  for (const c of layout.chips) need = Math.max(need, c.slot + c.span);
-  return Math.max(MIN_SLOTS, need);
-}
-
 type Props = {
   month: MonthAnchor;
-  /** The events on screen (hidden calendars already left out). */
+  /** The calendar's events, as onCalendar draws them (never discover mode's). */
   events: CalEvent[];
   todayStr: string;
   ref?: Ref<View>;
@@ -82,12 +62,14 @@ type Props = {
 
 /**
  * One month as a picture: its name, the weekday row and its weeks, drawn by
- * the grid's own rows at a desktop's width, each week as tall as its busiest
- * day needs. Mounted off screen only while a picture is being taken (see
+ * the grid's own rows, in a square (see SIDE), the weeks sharing its
+ * height evenly. Mounted off screen only while a picture is being taken (see
  * share-month); nothing in it responds to touch.
  */
 export function MonthPicture({ month, events, todayStr, ref }: Props) {
   const theme = useTheme();
+  const side = SIDE;
+  const cellWidth = side / 7;
   const first = new Date(month.year, month.month0, 1);
   const last = new Date(month.year, month.month0 + 1, 0);
   const weeks: Date[] = [];
@@ -106,7 +88,7 @@ export function MonthPicture({ month, events, todayStr, ref }: Props) {
     )
   );
 
-  const weeksRoom = PICTURE_HEIGHT - TITLE_BAR_HEIGHT - WEEKDAY_ROW_HEIGHT;
+  const weeksRoom = side - TITLE_BAR_HEIGHT - WEEKDAY_ROW_HEIGHT;
 
   return (
     <View
@@ -115,7 +97,15 @@ export function MonthPicture({ month, events, todayStr, ref }: Props) {
       pointerEvents="none"
       aria-hidden
       importantForAccessibility="no-hide-descendants"
-      style={[styles.picture, { backgroundColor: theme.background }]}
+      style={[
+        styles.picture,
+        {
+          left: -side * 4,
+          width: side,
+          height: side,
+          backgroundColor: theme.background,
+        },
+      ]}
     >
       <View style={styles.header}>
         <ThemedText style={styles.title}>{title}</ThemedText>
@@ -131,29 +121,27 @@ export function MonthPicture({ month, events, todayStr, ref }: Props) {
       </View>
       {weeks.map((week, index) => {
         const weekEvents = inWeek(events, week);
-        const needed =
-          DAY_NUMBER_HEIGHT +
-          slotsNeeded(week, weekEvents) * SLOT_HEIGHT +
-          ROW_FOOT;
-        // The weeks share what the bars leave of 4:3; the last takes the
-        // odd pixels.
+        // The weeks share what the bars leave of the picture; the last takes
+        // the odd pixels.
         const share = Math.floor(weeksRoom / weeks.length);
-        const fair =
+        const rowHeight =
           index === weeks.length - 1
             ? weeksRoom - share * (weeks.length - 1)
             : share;
-        const rowHeight = Math.max(needed, fair);
-        const slots = Math.floor(
-          (rowHeight - DAY_NUMBER_HEIGHT - ROW_FOOT) / SLOT_HEIGHT
-        );
+        // As the grid works it out (month-grid): the slots that fit, and
+        // whether the "+N" counter fits in what they leave.
+        const eventsHeight = rowHeight - DAY_NUMBER_HEIGHT - ROW_FOOT;
+        const slots = Math.max(0, Math.floor(eventsHeight / SLOT_HEIGHT));
+        const counterNeedsSlot =
+          eventsHeight - slots * SLOT_HEIGHT + EVENT_GAP < COUNTER_FOOTPRINT;
         return (
           <WeekRow
             key={toDateString(week)}
             weekStart={toDateString(week)}
             rowHeight={rowHeight}
-            cellWidth={CELL_WIDTH}
+            cellWidth={cellWidth}
             slotCount={slots}
-            counterNeedsSlot={false}
+            counterNeedsSlot={counterNeedsSlot}
             events={weekEvents}
             todayStr={todayStr}
             focusedYear={month.year}
@@ -173,9 +161,7 @@ const styles = StyleSheet.create({
   // Off screen: laid out and drawn, so it can be captured, but never seen.
   picture: {
     position: 'absolute',
-    left: -PICTURE_WIDTH * 4,
     top: 0,
-    width: PICTURE_WIDTH,
   },
   header: {
     height: TITLE_BAR_HEIGHT,

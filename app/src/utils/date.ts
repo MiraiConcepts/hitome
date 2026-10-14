@@ -117,14 +117,14 @@ export function dayLabel(day: string): string {
   });
 }
 
-/** e.g. 'Tue 1 September' — dayLabel with the month spelled out, for the
- *  header, which has the room. Locale-formatted like every other label here,
- *  so the ordering follows the device rather than this file. */
+/** e.g. 'Thursday 15' — today in the header, under the month's name: the
+ *  weekday spelled out, and no month (the title above names one; picked
+ *  2026-10-15). Locale-formatted like every other label here, so the
+ *  ordering follows the device rather than this file. */
 export function longDayLabel(day: string): string {
   return (parseDay(day) ?? new Date()).toLocaleDateString(undefined, {
-    weekday: 'short',
+    weekday: 'long',
     day: 'numeric',
-    month: 'long',
   });
 }
 

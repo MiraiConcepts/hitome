@@ -1,9 +1,6 @@
 // Fetches the widget's event window and reduces it to the next-10 snapshot.
 import { fetchMonth } from '@/data/events';
-import {
-  ensureHiddenCalendars,
-  inHiddenCalendar,
-} from '@/config/calendar-visibility';
+import { ensureCalendarRoles, onCalendar } from '@/config/calendar-visibility';
 
 import { selectUpcoming, toWidgetEvent } from './select-upcoming';
 import type { WidgetEvent } from './types';
@@ -15,10 +12,10 @@ export const HORIZON_DAYS = 60;
 export async function fetchUpcoming(now: Date): Promise<WidgetEvent[]> {
   const horizon = new Date(now);
   horizon.setDate(horizon.getDate() + HORIZON_DAYS);
-  const [events, hidden] = await Promise.all([
+  const [events, roles] = await Promise.all([
     fetchMonth(now, horizon),
-    ensureHiddenCalendars(),
+    ensureCalendarRoles(),
   ]);
-  const shown = events.filter((e) => !inHiddenCalendar(e.url, hidden));
+  const shown = events.filter((e) => onCalendar(e, roles, now));
   return selectUpcoming(shown, now).map(toWidgetEvent);
 }

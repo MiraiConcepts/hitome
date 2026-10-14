@@ -69,7 +69,13 @@ const TEST_SENT =
  * action that state allows, and fires a real notification through the real
  * channel so a working setup is provable rather than assumed.
  */
-export function NotificationsSection() {
+export function NotificationsSection({
+  onTestMessage,
+}: {
+  /** Show the next of the app's messages in a message bar (see the
+   *  settings screen). */
+  onTestMessage?: () => void;
+} = {}) {
   const defaultAlert = useDefaultAlert();
   const [snapshot, setSnapshot] = useState<PermissionSnapshot | null>(null);
   const [scheduled, setScheduled] = useState<number | null>(null);
@@ -285,6 +291,13 @@ export function NotificationsSection() {
             onPress={sendTest}
             testID="settings-test-notification"
           />
+          {onTestMessage && (
+            <SettingsButton
+              label="Show a test message"
+              onPress={onTestMessage}
+              testID="settings-test-message"
+            />
+          )}
         </SettingsButtonRow>
 
         {/* Under the button, not over it: arriving above, the line pushed

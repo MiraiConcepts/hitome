@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 
 import type { CalEvent } from '@/caldav/types';
+import type { EventLook } from '@/components/calendar/event-chip';
 import {
   COUNTER_FOOTPRINT,
   DAY_NUMBER_HEIGHT,
@@ -75,6 +76,11 @@ type Props = {
   onOpenDay: (day: string) => void;
   onPressEvent: (event: CalEvent) => void;
   onCreateOnDay: (day: string) => void;
+  /** Discover mode's drawing and hold (see WeekRow). */
+  eventLook?: (event: CalEvent) => EventLook;
+  onHoldEvent?: (event: CalEvent) => boolean;
+  /** Discover mode is on (today's fill turns orange). */
+  discover?: boolean;
 };
 
 /**
@@ -207,6 +213,9 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     onOpenDay,
     onPressEvent,
     onCreateOnDay,
+    eventLook,
+    onHoldEvent,
+    discover,
   },
   ref
 ) {
@@ -469,8 +478,8 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   // focus and the chips it first rendered with. Pressing Today four months
   // back landed on the right month with every day dimmed and no events on it.
   const extraData = useMemo(
-    () => ({ focusedMonth, weekEvents, pulse }),
-    [focusedMonth, weekEvents, pulse]
+    () => ({ focusedMonth, weekEvents, pulse, eventLook, discover }),
+    [focusedMonth, weekEvents, pulse, eventLook, discover]
   );
 
   const renderItem = ({ item, index }: ListRenderItemInfo<string>) => (
@@ -489,6 +498,9 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
       onOpenDay={onOpenDay}
       onPressEvent={onPressEvent}
       onCreateOnDay={onCreateOnDay}
+      eventLook={eventLook}
+      onHoldEvent={onHoldEvent}
+      discover={discover}
     />
   );
 

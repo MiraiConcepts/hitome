@@ -24,3 +24,12 @@ export const GRID_SCALE =
 export function scaled(px: number): number {
   return Math.round(px * GRID_SCALE);
 }
+
+/** Rule thickness: every line in the month grid. A border only covers a
+ *  whole pixel once it spans two of them; anything thinner straddles a
+ *  boundary, is antialiased into the cell behind it, and the lines stop
+ *  matching. Two pixels needs 0.77dp at 2.625x and 0.58dp at 3.5x, so a
+ *  whole dp clears it on any screen at 2x or denser (1.5dp was tried
+ *  2026-10-15 and put back). Here rather than in week-row so the header's
+ *  seam, which covers the grid's top rule, can share it. */
+export const RULE_WIDTH = 1;

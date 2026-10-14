@@ -5,8 +5,14 @@ import { tzlib_get_ical_block } from 'timezones-ical-library';
 
 import { expandBetween } from './expand';
 import { applyRecurrence, masterVevent } from './rrule';
-import type { CalEvent, EventChanges, EventInput, EventSource } from './types';
-import { applyAlarm } from './valarm';
+import type {
+  AlarmInput,
+  CalEvent,
+  EventChanges,
+  EventInput,
+  EventSource,
+} from './types';
+import { applyAlarm, findOurAlarm } from './valarm';
 
 /**
  * Expand one calendar object's ICS into concrete CalEvents overlapping [start, end).
@@ -68,6 +74,16 @@ export function expandEvents(
           }
         : {}),
       ...(vevent.getFirstSubcomponent('valarm') ? { alarm: true } : {}),
+      // TRANSP absent means OPAQUE (busy), as RFC 5545 and the feeds that
+      // fill tray calendars both read it.
+      ...(String(vevent.getFirstPropertyValue('transp') ?? '').toUpperCase() ===
+      'TRANSPARENT'
+        ? { free: true }
+        : {}),
+      ...(String(vevent.getFirstPropertyValue('status') ?? '').toUpperCase() ===
+      'CANCELLED'
+        ? { cancelled: true }
+        : {}),
       ...(source.color ? { color: source.color } : {}),
       ...(source.icon ? { icon: source.icon } : {}),
       raw: ics,
@@ -406,6 +422,29 @@ export function editPreserving(
   // prefills never produce a change), so foreign data is never rewritten.
   if (changes.recurrence !== undefined)
     applyRecurrence(vevent, changes.recurrence);
+  touch(vevent);
+  return vcalendar.toString();
+}
+
+/**
+ * Mark a tray event going or not (see config/calendar-visibility): TRANSP
+ * OPAQUE (busy) or TRANSPARENT (free), always written out rather than
+ * removed, since a missing TRANSP reads as busy. Going adds `alert` as the
+ * event's reminder unless it already has one of ours; not going removes
+ * ours. Everything else, the fields the feed owns included, is left as it
+ * is, as editPreserving does.
+ */
+export function markGoing(
+  ics: string,
+  going: boolean,
+  alert: AlarmInput | null
+): string {
+  const vcalendar = new ICAL.Component(ICAL.parse(ics));
+  const vevent = masterVevent(vcalendar);
+  if (!vevent) return ics;
+  vevent.updatePropertyWithValue('transp', going ? 'OPAQUE' : 'TRANSPARENT');
+  if (!going) applyAlarm(vevent, null);
+  else if (alert && !findOurAlarm(vevent)) applyAlarm(vevent, alert);
   touch(vevent);
   return vcalendar.toString();
 }

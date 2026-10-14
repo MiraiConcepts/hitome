@@ -28,8 +28,9 @@ for (const [tzid, body] of Object.entries(zones as Record<string, string>)) {
     ICAL.TimezoneService.register(new ICAL.Timezone(vtimezone), tzid);
 }
 
-/** STATUS:CANCELLED: the organiser called it off. Not shown, as on
- *  Android, whose calendar store hides cancelled rows. */
+/** STATUS:CANCELLED: the organiser called it off. A cancelled occurrence
+ *  or series is left out; a cancelled single event is kept, for the caller
+ *  to flag (a tray event you were going to shows crossed out). */
 function cancelled(event: ICAL.Event): boolean {
   const status = event.component.getFirstPropertyValue('status');
   return String(status ?? '').toUpperCase() === 'CANCELLED';
@@ -98,7 +99,8 @@ function startNear(event: ICAL.Event, from: number): ICAL.Time | undefined {
  * The events and occurrences of `ics` overlapping [after, before]: a
  * moved or edited occurrence (a RECURRENCE-ID exception) stands in for the
  * one it replaces, wherever it was moved to, and EXDATEs are left out, as
- * are cancelled events and occurrences (STATUS:CANCELLED). Each
+ * are cancelled series and occurrences (STATUS:CANCELLED); a cancelled
+ * single event is kept, and flagged by the caller. Each
  * repeating event gives at most `maxOccurrences` in the range, and its rule
  * is walked at most `maxSteps` times: a series that cannot start near the
  * range (see startNear) is walked from its DTSTART, which once cut off a
@@ -125,12 +127,13 @@ export function expandBetween(
     standalone: new Set(),
   };
   for (const event of all) {
-    if (event.isRecurrenceException() || cancelled(event)) continue;
+    if (event.isRecurrenceException()) continue;
     if (!event.isRecurring()) {
       const { start, end } = times(event);
       if (inRange(start, end)) result.events.push(event);
       continue;
     }
+    if (cancelled(event)) continue;
     // This series' exceptions, by the occurrence each replaces; only those
     // that now sit in the range are shown, and the walk reaches as far as
     // their occurrences (an occurrence moved out of the range, or into it

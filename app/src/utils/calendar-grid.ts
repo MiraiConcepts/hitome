@@ -312,8 +312,13 @@ export function layoutWeek<T extends GridEventLike>(
    *  anchored to the cell's bottom edge, not laid into a slot, so when the
    *  space left under the last strip is deep enough to hold it the slot stays
    *  available for an event — see counterNeedsSlot in month-grid. */
-  reserveCounterSlot = true
+  reserveCounterSlot = true,
+  /** Placed before the rest, in each day and among the bars (discover
+   *  mode: the events you are going to, so a busy day never hides them
+   *  behind "+N"). Order within each group is unchanged. */
+  first?: (event: T) => boolean
 ): WeekLayout<T> {
+  const rank = (event: T) => (first?.(event) ? 0 : 1);
   const weekStartMs = weekStart.getTime();
   const weekEndMs = addDays(weekStart, 7).getTime();
 
@@ -345,6 +350,7 @@ export function layoutWeek<T extends GridEventLike>(
 
   banners.sort(
     (a, b) =>
+      rank(a.event) - rank(b.event) ||
       a.startCol - b.startCol ||
       b.span - a.span ||
       a.event.start.getTime() - b.event.start.getTime() ||
@@ -404,7 +410,9 @@ export function layoutWeek<T extends GridEventLike>(
   chipsByCol.forEach((list, col) => {
     list.sort(
       (a, b) =>
-        a.start.getTime() - b.start.getTime() || a.id.localeCompare(b.id)
+        rank(a) - rank(b) ||
+        a.start.getTime() - b.start.getTime() ||
+        a.id.localeCompare(b.id)
     );
     for (const event of list) {
       const span = Math.max(1, chipSpan ? chipSpan(event) : 1);
