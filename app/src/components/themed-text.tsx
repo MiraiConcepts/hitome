@@ -1,6 +1,6 @@
 import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
 
-import { Fonts, ThemeColor } from '@/constants/theme';
+import { FontFamilyMedium, Fonts, ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ThemedTextProps = TextProps & {
@@ -15,17 +15,29 @@ export function ThemedText({
   ...rest
 }: ThemedTextProps) {
   const theme = useTheme();
+  const own = [
+    type === 'default' && styles.default,
+    type === 'title' && styles.title,
+    type === 'small' && styles.small,
+    type === 'smallBold' && styles.smallBold,
+    type === 'subtitle' && styles.subtitle,
+    type === 'code' && styles.code,
+  ];
+  // Regular-weight text is set in Satoshi Medium (2026-10-15: the regular
+  // face read thin); text at 600 or more keeps Satoshi, which picks the
+  // bold face from its weight as before. A style naming its own family
+  // keeps it.
+  const declared = StyleSheet.flatten([own, style])?.fontWeight;
+  const weight = declared === 'bold' ? 700 : Number(declared) || 400;
 
   return (
     <Text
       style={[
-        { color: theme[themeColor ?? 'text'], fontFamily: Fonts.sans },
-        type === 'default' && styles.default,
-        type === 'title' && styles.title,
-        type === 'small' && styles.small,
-        type === 'smallBold' && styles.smallBold,
-        type === 'subtitle' && styles.subtitle,
-        type === 'code' && styles.code,
+        {
+          color: theme[themeColor ?? 'text'],
+          fontFamily: weight >= 600 ? Fonts.sans : FontFamilyMedium,
+        },
+        own,
         style,
       ]}
       {...rest}

@@ -4,7 +4,7 @@ import { Host, TimePickerDialog } from '@expo/ui/jetpack-compose';
 import { useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text } from 'react-native';
 
-import { Fonts } from '@/constants/theme';
+import { FontFamilyMedium } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   clock24Hour,
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: FieldChrome.fontSize,
-    fontFamily: Fonts.sans,
+    fontFamily: FontFamilyMedium,
   },
   dialogHost: {
     position: 'absolute',

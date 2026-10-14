@@ -23,7 +23,7 @@ async function dataUrl(uri: string): Promise<string> {
 let fontCss: Promise<string> | null = null;
 
 /**
- * Satoshi for the picture, both its faces, written out here. A picture is
+ * Satoshi for the picture, all three of its faces, written out here. A picture is
  * drawn apart from the page and sees only the fonts handed to it; left to
  * find them itself, the library found only the bold face (font-faces.web.ts
  * declares it in a stylesheet, while expo-font registers the regular one
@@ -36,13 +36,17 @@ function satoshiCss(): Promise<string> {
     dataUrl(
       Asset.fromModule(require('../../assets/fonts/Satoshi_bold.otf')).uri
     ),
-  ]).then(([regular, bold]) => {
+    dataUrl(
+      Asset.fromModule(require('../../assets/fonts/Satoshi_medium.otf')).uri
+    ),
+  ]).then(([regular, bold, medium]) => {
     const face = (family: string, src: string, weight: number) =>
       `@font-face{font-family:${JSON.stringify(family)};src:url(${src});font-weight:${weight}}`;
     return (
       face('Satoshi', regular, 400) +
       face('Satoshi', bold, 700) +
-      face('Satoshi_bold', bold, 700)
+      face('Satoshi_bold', bold, 700) +
+      face('Satoshi_medium', medium, 500)
     );
   });
   fontCss.catch(() => {

@@ -13,12 +13,19 @@ let declared = false;
 export function declareBoldFace(): void {
   if (declared || typeof document === 'undefined') return;
   declared = true;
-  const uri = Asset.fromModule(
+  const bold = Asset.fromModule(
     require('../../assets/fonts/Satoshi_bold.otf')
   ).uri;
-  const face = (family: string) =>
-    `@font-face{font-family:${JSON.stringify(family)};src:url(${JSON.stringify(uri)});font-weight:700;font-display:swap}`;
+  const medium = Asset.fromModule(
+    require('../../assets/fonts/Satoshi_medium.otf')
+  ).uri;
+  const face = (family: string, uri: string, weight: number) =>
+    `@font-face{font-family:${JSON.stringify(family)};src:url(${JSON.stringify(uri)});font-weight:${weight};font-display:swap}`;
   const style = document.createElement('style');
-  style.textContent = face('Satoshi') + face('Satoshi_bold');
+  // Satoshi_medium the same way, at 500 (the grid's event text).
+  style.textContent =
+    face('Satoshi', bold, 700) +
+    face('Satoshi_bold', bold, 700) +
+    face('Satoshi_medium', medium, 500);
   document.head.appendChild(style);
 }

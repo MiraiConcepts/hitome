@@ -4,7 +4,7 @@ import { DatePickerDialog, Host } from '@expo/ui/jetpack-compose';
 import { useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text } from 'react-native';
 
-import { Fonts } from '@/constants/theme';
+import { FontFamilyMedium } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { parseDay } from '@/utils/date';
 
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: FieldChrome.fontSize,
-    fontFamily: Fonts.sans,
+    fontFamily: FontFamilyMedium,
   },
   // The dialog lives in its own window; its Host needs no footprint.
   dialogHost: {

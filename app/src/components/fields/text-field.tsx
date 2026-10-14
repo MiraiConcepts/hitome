@@ -1,7 +1,7 @@
 import { useState, type ComponentType, type Ref } from 'react';
 import { StyleSheet, TextInput, type TextInputProps } from 'react-native';
 
-import { AccentColor, Fonts } from '@/constants/theme';
+import { AccentColor, FontFamilyMedium } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 import { FieldChrome } from './field-chrome';
@@ -57,7 +57,7 @@ export function TextField({
 const styles = StyleSheet.create({
   input: {
     ...FieldChrome,
-    fontFamily: Fonts.sans,
+    fontFamily: FontFamilyMedium,
     backgroundColor: 'transparent',
     // The browser's own focus ring would double the accent border.
     outlineWidth: 0,

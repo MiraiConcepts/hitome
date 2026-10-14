@@ -1,7 +1,7 @@
 // Web time field: a themed native <input type="time"> — value is always 24h
 // 'HH:MM' regardless of locale display. Geometry/behavior twin:
 // time-field.tsx (Compose dialog).
-import { Fonts } from '@/constants/theme';
+import { FontFamilyMedium } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -36,7 +36,7 @@ export function TimeField({ value, onChange, label, testID }: TimeFieldProps) {
         fontSize: FieldChrome.fontSize,
         backgroundColor: 'transparent',
         color: theme.text,
-        fontFamily: Fonts.sans,
+        fontFamily: FontFamilyMedium,
         colorScheme: scheme,
         width: '100%',
         boxSizing: 'border-box',

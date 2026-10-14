@@ -1,7 +1,7 @@
 // Web date field: a themed native <input type="date"> — value is always
 // 'YYYY-MM-DD' regardless of locale display. Geometry/behavior twin:
 // date-field.tsx (Compose dialog).
-import { Fonts } from '@/constants/theme';
+import { FontFamilyMedium } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -47,7 +47,7 @@ export function DateField({
         fontSize: FieldChrome.fontSize,
         backgroundColor: 'transparent',
         color: theme.text,
-        fontFamily: Fonts.sans,
+        fontFamily: FontFamilyMedium,
         // Flips the browser picker popup + glyphs to the app's scheme.
         colorScheme: scheme,
         width: '100%',

@@ -71,6 +71,7 @@
         {
           "fonts": [
             "./assets/fonts/Satoshi.otf",
+            "./assets/fonts/Satoshi_medium.otf",
             "./assets/fonts/Satoshi_bold.otf"
           ]
         }

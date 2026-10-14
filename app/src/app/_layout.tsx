@@ -38,6 +38,7 @@ export default function RootLayout() {
   // it via the expo-font config plugin (and the widget reads assets/fonts).
   const [fontsLoaded, fontError] = useFonts({
     Satoshi: require('../../assets/fonts/Satoshi.otf'),
+    Satoshi_medium: require('../../assets/fonts/Satoshi_medium.otf'),
     Satoshi_bold: require('../../assets/fonts/Satoshi_bold.otf'),
   });
   const hydrated = useHydrated();

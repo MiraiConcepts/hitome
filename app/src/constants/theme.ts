@@ -86,6 +86,10 @@ export const WideLayoutMinWidth = 768;
  */
 export const FontFamily = 'Satoshi';
 export const FontFamilyBold = 'Satoshi_bold';
+/** Regular-weight text everywhere (ThemedText, the fields, the widget): a
+ *  step thicker than Satoshi Regular, which read thin (added 2026-10-15;
+ *  the same Fontshare release as the other two). */
+export const FontFamilyMedium = 'Satoshi_medium';
 
 /**
  * Brand accent (matches the app icon). Duplicated in static config that can't
