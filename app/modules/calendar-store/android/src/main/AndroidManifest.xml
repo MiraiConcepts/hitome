@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!-- The widget redrawn in a new time zone: see ZoneChangeReceiver. -->
+    <receiver
+      android:name="expo.modules.calendarstore.ZoneChangeReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+      </intent-filter>
+    </receiver>
+  </application>
+</manifest>

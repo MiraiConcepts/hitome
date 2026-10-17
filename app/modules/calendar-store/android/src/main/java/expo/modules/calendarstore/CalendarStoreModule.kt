@@ -34,6 +34,10 @@ class CalendarStoreModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("CalendarStore")
 
+    // For ZoneChangeReceiver: never end the process under a screen in use.
+    OnActivityEntersForeground { AppVisibility.inForeground = true }
+    OnActivityEntersBackground { AppVisibility.inForeground = false }
+
     Events(ON_CHANGE)
 
     AsyncFunction("query") { uri: String, projection: List<String>, selection: String?, args: List<String>?, sort: String? ->
