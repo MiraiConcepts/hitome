@@ -200,3 +200,21 @@ export function scopesFor(
   if (recurrence.kind === 'custom' && dayChanged) return ['this'];
   return ['this', 'following', 'all'];
 }
+
+/**
+ * Why an editor cannot save, or null: an event whose calendar is not among
+ * the writable ones (`calendars`; on Android only those are listed), or a new
+ * event with no calendar it may go into (`offered`: the writable ones less
+ * the discover calendars).
+ */
+export function editorLock(
+  eventUrl: string | null,
+  calendars: readonly { url: string }[],
+  offered: readonly { url: string }[]
+): 'readOnly' | 'noCalendar' | null {
+  if (eventUrl !== null)
+    return calendars.some((c) => eventUrl.startsWith(c.url))
+      ? null
+      : 'readOnly';
+  return offered.length === 0 ? 'noCalendar' : null;
+}

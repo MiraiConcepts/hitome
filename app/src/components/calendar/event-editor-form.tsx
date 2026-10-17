@@ -333,11 +333,17 @@ export function EventEditorFields({
     </View>
   );
 
+  // Nothing to change in an editor that cannot save: the fields stay to be
+  // read, but take no touches or typing.
+  const lock = editor.locked ? ('none' as const) : ('auto' as const);
   if (columns) {
     // The card's dashed rule runs between the columns, so each column carries
     // its own padding on either side of it.
     return (
-      <View style={[styles.fields, styles.columns, styles.columnsCard]}>
+      <View
+        pointerEvents={lock}
+        style={[styles.fields, styles.columns, styles.columnsCard]}
+      >
         <View style={[styles.column, styles.columnPadded]}>{what}</View>
         <View style={styles.columnRule}>
           <View style={StyleSheet.absoluteFill}>
@@ -349,12 +355,19 @@ export function EventEditorFields({
     );
   }
   return (
-    <View style={styles.fields}>
+    <View pointerEvents={lock} style={styles.fields}>
       {what}
       {details}
     </View>
   );
 }
+
+/** What an editor that cannot save says instead of offering Save. */
+const LOCKED_NOTE = {
+  readOnly: 'This calendar is read-only, so this event can’t be changed here.',
+  noCalendar:
+    'No calendar here can take new events. Add a writable one in your sync app (DAVx⁵).',
+} as const;
 
 /** A validation problem, under the field it is about. */
 function FieldProblem({ text }: { text: string | null }) {
@@ -408,7 +421,22 @@ export function EventEditorActions({
           {problem}
         </SettingsMessage>
       )}
-      {editor.discardAsk ? (
+      {editor.locked ? (
+        <>
+          <SettingsMessage testID="editor-locked">
+            {LOCKED_NOTE[editor.locked]}
+          </SettingsMessage>
+          <View style={styles.actionRow}>
+            <View style={styles.actionsRight}>
+              <SettingsButton
+                label="Close"
+                onPress={onClose}
+                testID="editor-cancel"
+              />
+            </View>
+          </View>
+        </>
+      ) : editor.discardAsk ? (
         <DiscardChoice onKeep={editor.keepEditing} onDiscard={onClose} />
       ) : scopeAsk ? (
         <ScopeChoice

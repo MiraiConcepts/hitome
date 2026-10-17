@@ -181,6 +181,7 @@ export function useSampleEditor({
 
   return {
     event,
+    locked: null as 'readOnly' | 'noCalendar' | null,
     summary,
     setSummary: (next: string) => {
       setSummaryState(next);

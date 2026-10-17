@@ -32,6 +32,7 @@ import type {
 import type { AlarmState } from '@/components/calendar/alarm-field';
 import {
   CUSTOM_DAY_NOTE,
+  editorLock,
   endDayForAllDay,
   alarmEqual,
   initialFormState,
@@ -129,6 +130,11 @@ export function useEventEditor({
   // The calendars to choose from and the selected one: where a new event is
   // created, or where an existing one lives (choosing another moves it).
   const [calendars, setCalendars] = useState<CalendarChoice[]>([]);
+  /** Why nothing can be saved, if so: the event's calendar is read-only (a
+   *  holiday or subscribed calendar), or, for a new event, no calendar here
+   *  takes new events. Read off the calendar list, which on Android names
+   *  only the writable ones (the web's server has no read-only calendars). */
+  const [locked, setLocked] = useState<'readOnly' | 'noCalendar' | null>(null);
   const [calendarUrl, setCalendarUrl] = useState<string | undefined>(undefined);
 
   // Where the event started out, to tell a move from a stay.
@@ -158,9 +164,11 @@ export function useEventEditor({
         if (!alive) return;
         // Tray calendars are filled from elsewhere, so they are not offered
         // to write into (an event already in one keeps its own).
-        setCalendars(
-          list.filter((c) => c.url === url || roleOf(c.url, roles) !== 'tray')
+        const offered = list.filter(
+          (c) => c.url === url || roleOf(c.url, roles) !== 'tray'
         );
+        setCalendars(offered);
+        setLocked(editorLock(event?.url ?? null, list, offered));
         setCalendarUrl(url);
         setLoadedCalendarUrl(url);
         if (event) setOriginalCalendarUrl(url);
@@ -297,6 +305,7 @@ export function useEventEditor({
   }
 
   async function save(scope?: EditScope) {
+    if (locked) return;
     const trimmed = summary.trim();
     if (!trimmed) {
       setProblem({ field: 'title', text: 'Add a title' });
@@ -498,6 +507,7 @@ export function useEventEditor({
 
   return {
     event,
+    locked,
     summary,
     setSummary,
     allDay,

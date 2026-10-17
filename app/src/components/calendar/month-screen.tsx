@@ -1149,7 +1149,13 @@ export function MonthScreen() {
           }}
           onPressEvent={onPressEvent}
           onDelete={onDeleteEvent}
-          canDelete={(event) => roleOf(event.url, calendarRoles) !== 'tray'}
+          // Neither a discover event nor one in a read-only calendar (absent
+          // from the list, which on Android names only the writable ones).
+          canDelete={(event) =>
+            roleOf(event.url, calendarRoles) !== 'tray' &&
+            (calendarList.length === 0 ||
+              calendarList.some((c) => event.url.startsWith(c.url)))
+          }
           toast={
             snackBar ? (
               <View

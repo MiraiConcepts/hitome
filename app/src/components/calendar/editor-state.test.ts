@@ -1,6 +1,7 @@
 import type { CalEvent } from '@/caldav/types';
 
 import {
+  editorLock,
   endDayForAllDay,
   initialFormState,
   isDirty,
@@ -292,5 +293,23 @@ describe('scopesFor', () => {
   it('keeps all three for a delete (no day moves) of a custom series', () => {
     // The editor's delete path asks with dayChanged false.
     expect(scopesFor(custom, false)).toEqual(ALL);
+  });
+});
+
+describe('editorLock', () => {
+  const personal = { url: 'store:1/' };
+  const holidays = 'store:9/123';
+
+  it('lets an event in a writable calendar be saved', () => {
+    expect(editorLock('store:1/42', [personal], [personal])).toBeNull();
+  });
+
+  it('locks an event whose calendar is not among the writable ones', () => {
+    expect(editorLock(holidays, [personal], [personal])).toBe('readOnly');
+  });
+
+  it('locks a new event when no calendar can take it', () => {
+    expect(editorLock(null, [], [])).toBe('noCalendar');
+    expect(editorLock(null, [personal], [personal])).toBeNull();
   });
 });
