@@ -604,45 +604,52 @@ export const WeekRow = memo(function WeekRow({
           const beforeSplit = splits.includes(col + 1);
           const own = byCol[col];
           return (
-            <Pressable
+            // The cell is a plain box; its tap target is a layer filling it,
+            // under the date and the events rather than around them: on the
+            // web a Pressable is a <button>, and a button inside a button is
+            // not allowed (React said so, and browsers hide what is inside a
+            // button from screen readers). Touches between the events fall
+            // through the box-none layers to it.
+            <View
               key={dateString}
-              testID={`day-cell-${dateString}`}
-              // No keyboard ring: focus returns here when a day list or editor
-              // closes, and a frame round the day read as a leftover.
-              {...DAY_CELL_DATA}
-              // A screen reader names the whole date, today and the day's
-              // count, and offers the hold (add an event) as an action of its
-              // own.
-              accessibilityRole="button"
-              accessibilityLabel={dayCellLabel(day, {
-                isToday,
-                count: daysWithEvents.get(dateString) ?? 0,
-                currentYear: Number(todayStr.slice(0, 4)),
-              })}
-              accessibilityActions={[
-                { name: 'longpress', label: 'Add an event' },
-              ]}
-              onAccessibilityAction={(e) => {
-                if (e.nativeEvent.actionName === 'longpress') createOn(col);
-              }}
-              onPress={() => openDay(col)}
-              onLongPress={() => holdOn(col)}
-              onPressIn={(e) =>
-                pressIn(col, e.nativeEvent.locationX, e.nativeEvent.locationY)
-              }
-              onPressOut={pressOut}
-              delayLongPress={LONG_PRESS_MS}
-              unstable_pressDelay={PRESS_DELAY_MS}
-              // A mouse over the grid lights it from grid-spotlight.web.ts,
-              // a glow that follows the pointer across the cells.
               style={[
                 styles.cell,
                 col < 6 && styles.cellRule,
                 beforeSplit && styles.cellSplit,
               ]}
             >
+              <Pressable
+                testID={`day-cell-${dateString}`}
+                // No keyboard ring: focus returns here when a day list or editor
+                // closes, and a frame round the day read as a leftover.
+                {...DAY_CELL_DATA}
+                // A screen reader names the whole date, today and the day's
+                // count, and offers the hold (add an event) as an action of its
+                // own.
+                accessibilityRole="button"
+                accessibilityLabel={dayCellLabel(day, {
+                  isToday,
+                  count: daysWithEvents.get(dateString) ?? 0,
+                  currentYear: Number(todayStr.slice(0, 4)),
+                })}
+                accessibilityActions={[
+                  { name: 'longpress', label: 'Add an event' },
+                ]}
+                onAccessibilityAction={(e) => {
+                  if (e.nativeEvent.actionName === 'longpress') createOn(col);
+                }}
+                onPress={() => openDay(col)}
+                onLongPress={() => holdOn(col)}
+                onPressIn={(e) =>
+                  pressIn(col, e.nativeEvent.locationX, e.nativeEvent.locationY)
+                }
+                onPressOut={pressOut}
+                delayLongPress={LONG_PRESS_MS}
+                unstable_pressDelay={PRESS_DELAY_MS}
+                style={StyleSheet.absoluteFill}
+              />
               {beforeSplit && <View style={styles.splitBridge} />}
-              <View style={styles.dayNumberWrap}>
+              <View pointerEvents="none" style={styles.dayNumberWrap}>
                 <ThemedText
                   type="small"
                   numberOfLines={1}
@@ -756,7 +763,7 @@ export const WeekRow = memo(function WeekRow({
                   </ThemedText>
                 </View>
               ) : null}
-            </Pressable>
+            </View>
           );
         })}
       </View>

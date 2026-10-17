@@ -169,9 +169,10 @@ test("month grid: chips, banners, navigation, editors", async ({ page }) => {
   });
 
   await test.step("banners: span days 8–10, stack above chips, break per week", async () => {
-    // Some segment of the multi-day banner horizontally overlaps each covered
-    // day cell (the span may break across a week edge on some run dates).
-    const segments = grid(page).getByText("🧪 E2E Multi-day");
+    // Some piece of the multi-day banner horizontally overlaps each covered
+    // day cell. A piece per day, only the first of a row titled, so they are
+    // found by their name for screen readers, which every piece carries.
+    const segments = grid(page).locator('[aria-label="🧪 E2E Multi-day"]');
     const segmentBoxes = [];
     for (let i = 0; i < (await segments.count()); i++) {
       segmentBoxes.push(await segments.nth(i).boundingBox());
@@ -662,7 +663,7 @@ test("a11y: the location input has a name", async ({ page }) => {
   await expect(page.getByRole("textbox", { name: "Location" })).toBeVisible();
 });
 
-test("the header copies the month as a picture, every event in it", async ({
+test("the header copies the month as a square picture", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -707,9 +708,9 @@ test("the header copies the month as a picture, every event in it", async ({
     "base64",
   );
   writeFileSync("artifacts/month-picture.png", png);
-  // A PNG, 4:3 at 1024 x 768 at twice the pixels; the busy week makes it
-  // taller rather than hide any of its events.
+  // A PNG, a 700pt square at twice the pixels (month-picture's SIDE),
+  // whatever the month holds: a busy day shows "+N" instead.
   expect(png.subarray(1, 4).toString()).toBe("PNG");
-  expect(png.readUInt32BE(16)).toBe(2048);
-  expect(png.readUInt32BE(20)).toBeGreaterThan(1536);
+  expect(png.readUInt32BE(16)).toBe(1400);
+  expect(png.readUInt32BE(20)).toBe(1400);
 });

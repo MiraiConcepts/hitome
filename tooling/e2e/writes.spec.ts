@@ -299,6 +299,9 @@ test("writes reach the server: create, edit, delete, undo, move, conflict", asyn
       .getByTestId(`day-cell-${dateString(day(20))}`)
       .click(HOLD);
     await page.getByTestId("editor-summary").fill("🧪 W Offline");
+    // The e2e calendar, as create() picks: left to the default, it could
+    // land in discover.spec's calendar on the same server.
+    await page.getByRole("radio", { name: "test/e2e", exact: true }).click();
     // The server vanishes for writes.
     await page.route("**/dav/**", (route) =>
       route.request().method() === "PUT"
