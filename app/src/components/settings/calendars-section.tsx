@@ -26,6 +26,7 @@ import {
   connectFailureMessage,
 } from '@/config/dav-config';
 import {
+  orderCalendars,
   roleOf,
   setCalendarRole,
   useCalendarRoles,
@@ -108,44 +109,47 @@ export function CalendarsSection() {
           <SettingsBusy label="Loading…" />
         </SettingsBlock>
       )}
-      {calendars?.map((calendar) => {
-        const selected = calendar.url === selectedUrl;
-        const role = roleOf(calendar.url, roles);
-        return (
-          <SettingsBlock
-            key={calendar.url}
-            onPress={
-              role === 'tray'
-                ? undefined
-                : () => setDefaultCalendar(calendar.url)
-            }
-            selected={selected}
-            testID={`settings-calendar-${calendar.name}`}
-          >
-            <View style={styles.row}>
-              <CalendarMark
-                icon={calendar.icon}
-                size={MARK_SIZE}
-                color={calendar.color ?? theme.textSecondary}
-              />
-              <ThemedText
-                type="small"
-                themeColor={role === 'hidden' ? 'placeholder' : undefined}
-                style={styles.name}
-              >
-                {calendar.name}
-              </ThemedText>
-              {selected && <CheckIcon size={CHECK_SIZE} color={AccentColor} />}
-              <CalendarRoleSwitch
-                name={calendar.name}
-                role={role}
-                onChange={(next) => changeRole(calendar.url, next)}
-                testID={`settings-calendar-role-${calendar.name}`}
-              />
-            </View>
-          </SettingsBlock>
-        );
-      })}
+      {calendars &&
+        orderCalendars(calendars, roles, selectedUrl).map((calendar) => {
+          const selected = calendar.url === selectedUrl;
+          const role = roleOf(calendar.url, roles);
+          return (
+            <SettingsBlock
+              key={calendar.url}
+              onPress={
+                role === 'tray'
+                  ? undefined
+                  : () => setDefaultCalendar(calendar.url)
+              }
+              selected={selected}
+              testID={`settings-calendar-${calendar.name}`}
+            >
+              <View style={styles.row}>
+                <CalendarMark
+                  icon={calendar.icon}
+                  size={MARK_SIZE}
+                  color={calendar.color ?? theme.textSecondary}
+                />
+                <ThemedText
+                  type="small"
+                  themeColor={role === 'hidden' ? 'placeholder' : undefined}
+                  style={styles.name}
+                >
+                  {calendar.name}
+                </ThemedText>
+                {selected && (
+                  <CheckIcon size={CHECK_SIZE} color={AccentColor} />
+                )}
+                <CalendarRoleSwitch
+                  name={calendar.name}
+                  role={role}
+                  onChange={(next) => changeRole(calendar.url, next)}
+                  testID={`settings-calendar-role-${calendar.name}`}
+                />
+              </View>
+            </SettingsBlock>
+          );
+        })}
       {calendars && calendars.length > 0 && (
         // What the tick means, once, at the foot of the card — the list
         // itself stays just the calendars.

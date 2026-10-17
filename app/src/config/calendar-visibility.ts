@@ -92,6 +92,28 @@ export function roleOf(url: string, current: CalendarRoles): CalendarRole {
 }
 
 /**
+ * Calendars in the order Settings lists them: the one new events go into
+ * first, then the rest of the shown ones, then discover, then hidden, A to Z
+ * within each (by name, as people read them; the server's own order was
+ * arbitrary). Re-sorted as roles change, so a row moves to its group.
+ */
+export function orderCalendars<T extends { url: string; name: string }>(
+  calendars: readonly T[],
+  current: CalendarRoles,
+  newEventsUrl: string | undefined
+): T[] {
+  const rank = (c: T) =>
+    c.url === newEventsUrl
+      ? 0
+      : { shown: 1, tray: 2, hidden: 3 }[roleOf(c.url, current)];
+  return [...calendars].sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  );
+}
+
+/**
  * True when an event is drawn on the month grid and the widget. Shown
  * calendars: every event but a cancelled one. Tray calendars: only events
  * you are going to (marked busy), and a cancelled one of those, crossed out,

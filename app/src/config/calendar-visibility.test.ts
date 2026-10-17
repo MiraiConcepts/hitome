@@ -1,6 +1,6 @@
 import type { CalEvent } from '@/caldav/types';
 
-import { onCalendar, roleOf } from './calendar-visibility';
+import { onCalendar, orderCalendars, roleOf } from './calendar-visibility';
 
 const roles = { hidden: ['store:2/'], tray: ['store:3/'] };
 const now = new Date(2026, 9, 13, 12);
@@ -57,5 +57,25 @@ describe('calendar roles', () => {
         now
       )
     ).toBe(false);
+  });
+});
+
+describe('orderCalendars', () => {
+  const cal = (url: string, name: string) => ({ url, name });
+  it('lists new events first, then shown, discover, hidden, A to Z in each', () => {
+    const list = [
+      cal('store:3/', 'Filmhouse'),
+      cal('store:5/', 'birthdays'),
+      cal('store:2/', 'Archive'),
+      cal('store:1/', 'Zed'),
+      cal('store:4/', 'Holidays'),
+    ];
+    expect(orderCalendars(list, roles, 'store:1/').map((c) => c.name)).toEqual([
+      'Zed',
+      'birthdays',
+      'Holidays',
+      'Filmhouse',
+      'Archive',
+    ]);
   });
 });
