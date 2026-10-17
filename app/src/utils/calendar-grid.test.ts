@@ -348,10 +348,42 @@ describe('isBanner', () => {
     ).toBe(false);
   });
 
-  it('is true for a timed event crossing midnight', () => {
+  it('is false for a short timed event crossing midnight (an evening)', () => {
     expect(
-      isBanner(ev('a', new Date(2026, 6, 8, 23), new Date(2026, 6, 9, 1)))
+      isBanner(
+        ev('a', new Date(2026, 6, 8, 23, 30), new Date(2026, 6, 9, 0, 30))
+      )
+    ).toBe(false);
+  });
+
+  it('is true for a timed event of a day or more crossing midnight', () => {
+    expect(
+      isBanner(ev('a', new Date(2026, 6, 8, 23), new Date(2026, 6, 10, 1)))
     ).toBe(true);
+  });
+
+  it('draws a late-night event as a chip on the day it starts', () => {
+    // Week of Monday 6 July 2026; the event starts on Wednesday the 8th.
+    const late = ev(
+      'late',
+      new Date(2026, 6, 8, 23, 30),
+      new Date(2026, 6, 9, 0, 30)
+    );
+    const layout = layoutWeek(new Date(2026, 6, 6), [late], 10);
+    expect(layout.banners).toEqual([]);
+    expect(layout.chips.map((c) => c.col)).toEqual([2]);
+  });
+
+  it('leaves a late-night event that began last week out of this one', () => {
+    // Sunday 12 July 23:30 to Monday 13 July 00:30, seen from the week of the 13th.
+    const late = ev(
+      'late',
+      new Date(2026, 6, 12, 23, 30),
+      new Date(2026, 6, 13, 0, 30)
+    );
+    const layout = layoutWeek(new Date(2026, 6, 13), [late], 10);
+    expect(layout.banners).toEqual([]);
+    expect(layout.chips).toEqual([]);
   });
 });
 

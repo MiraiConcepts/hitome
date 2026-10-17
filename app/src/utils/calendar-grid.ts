@@ -269,14 +269,20 @@ export type WeekLayout<T extends GridEventLike = GridEventLike> = {
   overflow: number[];
 };
 
+/** From this length a timed event that crosses midnight is a bar; a shorter
+ *  one (23:30 to 00:30) is an evening event, drawn on the day it starts. */
+const BANNER_MIN_TIMED_MS = 24 * 60 * 60 * 1000;
+
 /**
- * All-day events and anything touching more than one local day render as
- * spanning banners. Day coverage comes from eventLastMs (end exclusive at
- * exact midnight, matching eventDays) but NOT via eventDays(), whose 62-day
- * cap would truncate very long events.
+ * All-day events, and timed events of a day or more touching more than one
+ * local day, render as spanning banners. Day coverage comes from eventLastMs
+ * (end exclusive at exact midnight, matching eventDays) but NOT via
+ * eventDays(), whose 62-day cap would truncate very long events.
  */
 export function isBanner(event: GridEventLike): boolean {
   if (event.allDay) return true;
+  if (event.end.getTime() - event.start.getTime() < BANNER_MIN_TIMED_MS)
+    return false;
   const lastMs = eventLastMs(event.start, event.end);
   return toDateString(event.start) !== toDateString(new Date(lastMs));
 }
