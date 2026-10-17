@@ -162,11 +162,46 @@ async function putObject(event: CalEvent, data: string, op: string) {
   ensureOk(res, op);
 }
 
+/** The event's object as the server has it now; ConflictError if it is
+ *  gone. */
+async function latest(event: CalEvent): Promise<CalEvent> {
+  const client = await getClient();
+  const [object] = await client.fetchCalendarObjects({
+    calendar: await getCalendarFor(event.url),
+    objectUrls: [event.url],
+  });
+  if (!object?.data) throw new ConflictError();
+  return { ...event, raw: object.data, etag: object.etag ?? '' };
+}
+
+/**
+ * A save that wins: written under the etag as fetched, and if the object has
+ * changed since (412: another device, or afterimage), written once more onto
+ * the version there now. The edit carries only the fields changed in the
+ * editor, so those are yours and everything else keeps the other change
+ * (audit F-039: the editor used to close and drop what was typed).
+ */
+async function saveOver(
+  event: CalEvent,
+  write: (current: CalEvent) => Promise<void>
+): Promise<CalEvent> {
+  try {
+    await write(event);
+    return event;
+  } catch (err) {
+    if (!(err instanceof ConflictError)) throw err;
+    const current = await latest(event);
+    await write(current);
+    return current;
+  }
+}
+
 /**
  * Save edits. For a repeating event `scope` says which occurrences they
  * reach (see ics.ts): the whole series, this occurrence only, or this and
  * every later one — the last a split into two objects, written head first
- * so a failure can be put back.
+ * so a failure can be put back. Changed elsewhere meanwhile, the edit is
+ * written onto that version (see saveOver).
  */
 export async function updateEvent(
   event: CalEvent,
@@ -176,31 +211,39 @@ export async function updateEvent(
   const effective = effectiveScope(event, scope);
   if (effective === 'all') {
     // preserves unknown props; a time change shifts the series
-    await putObject(
-      event,
-      editPreserving(event.raw, changes, event.start),
-      'update'
+    await saveOver(event, (current) =>
+      putObject(
+        current,
+        editPreserving(current.raw, changes, event.start),
+        'update'
+      )
     );
     return;
   }
   const recurrenceStart = event.recurrenceStart!;
   if (effective === 'this') {
-    await putObject(
-      event,
-      editOccurrence(event.raw, recurrenceStart, event, changes),
-      'update'
+    await saveOver(event, (current) =>
+      putObject(
+        current,
+        editOccurrence(current.raw, recurrenceStart, event, changes),
+        'update'
+      )
     );
     return;
   }
   const uid = Crypto.randomUUID();
-  const { head, tail } = splitSeries(
-    event.raw,
-    recurrenceStart,
-    event,
-    changes,
-    uid
-  );
-  await putObject(event, head, 'update');
+  let tail = '';
+  const written = await saveOver(event, (current) => {
+    const parts = splitSeries(
+      current.raw,
+      recurrenceStart,
+      event,
+      changes,
+      uid
+    );
+    tail = parts.tail;
+    return putObject(current, parts.head, 'update');
+  });
   try {
     const client = await getClient();
     const res = await client.createCalendarObject({
@@ -212,7 +255,7 @@ export async function updateEvent(
   } catch (err) {
     // The head is already cut short; put the series back whole rather than
     // leave the later occurrences gone.
-    await revertEvent(event).catch(() => {});
+    await revertEvent(written).catch(() => {});
     throw err;
   }
 }

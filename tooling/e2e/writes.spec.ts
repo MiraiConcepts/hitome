@@ -6,10 +6,10 @@ const SHEET_CLOSE_MS = 15_000;
 
 // Write-path e2e: every way the app changes the server — create, edit and
 // delete with each repeat scope, undo of each delete, moving between
-// calendars, and a conflicting edit — checked twice: on the grid, and in the
-// throwaway Radicale itself (a GET on the calendar collection returns all of
-// its objects as one VCALENDAR). Lives in month + 6, which month-grid.spec
-// never touches.
+// calendars, and a clashing edit (the save wins) — checked twice: on the
+// grid, and in the throwaway Radicale itself (a GET on the calendar
+// collection returns all of its objects as one VCALENDAR). Lives in
+// month + 6, which month-grid.spec never touches.
 
 const pad = (n: number) => `${n}`.padStart(2, "0");
 const dateString = (d: Date) =>
@@ -245,7 +245,7 @@ test("writes reach the server: create, edit, delete, undo, move, conflict", asyn
     expect(await countOnServer(page, "🧪 W Move")).toBe(0);
   });
 
-  await test.step("a conflicting edit is refused, not written over", async () => {
+  await test.step("a clashing edit wins, and keeps the other side's fields", async () => {
     await create(page, 17, "🧪 W Conflict");
     await expect(chips(page, "🧪 W Conflict")).toHaveCount(1, {
       timeout: 30_000,
@@ -270,6 +270,7 @@ test("writes reach the server: create, edit, delete, undo, move, conflict", asyn
         "DTSTAMP:20260101T000000Z",
         `DTSTART;VALUE=DATE:${dateString(day(17)).replace(/-/g, "")}`,
         "SUMMARY:🧪 W Changed elsewhere",
+        "LOCATION:Somewhere else",
         "END:VEVENT",
         "END:VCALENDAR",
         "",
@@ -277,13 +278,20 @@ test("writes reach the server: create, edit, delete, undo, move, conflict", asyn
     });
     expect(put.ok()).toBe(true);
 
+    // Like Google Calendar, the save wins: the title typed here is written
+    // over the other change, and what was not touched here (the place they
+    // added) stays.
     await page.getByTestId("editor-summary").fill("🧪 W Mine");
     await page.getByTestId("editor-save").click();
-    await expect(page.getByText(/^Event changed elsewhere/)).toBeVisible({
-      timeout: 30_000,
+    await expect(page.getByTestId("event-editor")).toHaveCount(0, {
+      timeout: SHEET_CLOSE_MS,
     });
-    expect(await countOnServer(page, "🧪 W Mine")).toBe(0);
-    expect(await countOnServer(page, "🧪 W Changed elsewhere")).toBe(1);
+    expect(await countOnServer(page, "🧪 W Mine")).toBe(1);
+    expect(await countOnServer(page, "🧪 W Changed elsewhere")).toBe(0);
+    const mine = (await server(page))
+      .split(/BEGIN:VEVENT/)
+      .find((v) => v.includes("SUMMARY:🧪 W Mine"))!;
+    expect(mine).toContain("LOCATION:Somewhere else");
   });
 
   await test.step("offline: a failed save keeps the draft and says why", async () => {
