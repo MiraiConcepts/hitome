@@ -78,7 +78,7 @@ export function EventChip({
 }: ChipProps) {
   const title = event.summary || '(untitled)';
   const tint = calendarTint(event.color);
-  const dimmed = hoveredOccurrence.useDimmed(event.id);
+  const hovered = hoveredOccurrence.useIs(event.id);
   // A tray event you were going to that was called off: crossed out until
   // its day has passed (see onCalendar).
   // Discover mode: filled with the calendar's colour while not going,
@@ -101,9 +101,11 @@ export function EventChip({
       style={({ pressed }: { pressed: boolean }) => [
         styles.chip,
         style,
-        FOCUS_MOTION,
+        HOVER_MOTION,
         face && { backgroundColor: face.fill },
-        dimmed && styles.unfocused,
+        hovered && {
+          backgroundColor: face ? lift(face.fill) : HOVER_WASH,
+        },
         pressed && styles.chipPressed,
       ]}
       testID={`chip-${event.id}`}
@@ -214,18 +216,14 @@ function sharedOccurrence() {
       const get = useCallback(() => current === id, [id]);
       return useSyncExternalStore(subscribe, get, get);
     },
-    /** Whether another occurrence is the one (and this one is not). */
-    useDimmed(id: string): boolean {
-      const get = useCallback(() => current !== null && current !== id, [id]);
-      return useSyncExternalStore(subscribe, get, get);
-    },
   };
 }
 
 const pressedOccurrence = sharedOccurrence();
-/** The occurrence under the mouse (web), shared the same way. Hovering an
- *  event brings it into focus: every other event dims, and every strip of a
- *  multi-day one stays lit, in every week it crosses. */
+/** The occurrence under the mouse (web), shared the same way: the event
+ *  under it lifts a little, every piece of a multi-day one together, and
+ *  nothing else moves (dimming every other event, with a crosshair over
+ *  the days, flickered as the mouse crossed the grid; 2026-10-18). */
 const hoveredOccurrence = sharedOccurrence();
 
 /** How far going's title leans from the calendar's colour toward the dark
@@ -284,15 +282,15 @@ export function EventBanner({
   const fill = calendarTint(event.color);
   const ink = readableTextColor(fill);
   const pressed = pressedOccurrence.useIs(event.id);
-  const dimmed = hoveredOccurrence.useDimmed(event.id);
-  // Out of focus, or pressed, a banner fades by blending toward the grid's
-  // ground rather than turning see-through: it crosses the grid's rules (the
-  // weekend line among them), which showed through a translucent fill. A
-  // press washes it further than a hover: it has to read under a thumb.
+  const hovered = hoveredOccurrence.useIs(event.id);
+  // Pressed, a banner fades by blending toward the grid's ground rather than
+  // turning see-through (a translucent fill showed the lines through it);
+  // under the mouse, its fill lifts toward white.
   const theme = useTheme();
   const ground = theme.background;
-  const wash = pressed ? 1 - BANNER_PRESSED : dimmed ? 1 - UNFOCUSED : 0;
-  const fade = (color: string) => (wash ? mixHex(color, ground, wash) : color);
+  const fade = (color: string) =>
+    pressed ? mixHex(color, ground, 1 - BANNER_PRESSED) : color;
+  const shine = (color: string) => (hovered && !pressed ? lift(color) : color);
   const { onPressIn, onPressOut } = press;
   // Discover mode's going is inverted; not going is filled as usual.
   const face =
@@ -316,11 +314,11 @@ export function EventBanner({
       accessibilityLabel={label(event, look)}
       style={[
         styles.banner,
-        { backgroundColor: fade(face.fill) },
+        { backgroundColor: shine(fade(face.fill)) },
         trail &&
           trailFill(
-            fade(mixHex(face.fill, ground, trail.from)),
-            fade(mixHex(face.fill, ground, trail.to))
+            shine(fade(mixHex(face.fill, ground, trail.from))),
+            shine(fade(mixHex(face.fill, ground, trail.to)))
           ),
         style,
         BANNER_FOCUS_MOTION,
@@ -376,9 +374,12 @@ const CHIP_PAD_RIGHT = 3;
 const CHIP_BAR = 3;
 const CHIP_GAP = 3;
 
-/** The other events' strength while one is hovered (web only: nothing
- *  hovers on a phone), and how fast they dim and return. */
-const UNFOCUSED = 0.4;
+/** Under the mouse (web only: nothing hovers on a phone), an event lifts:
+ *  a filled one leans this far toward white, an unfilled chip (bar and
+ *  title) takes a faint white wash. */
+const HOVER_LIFT = 0.15;
+const HOVER_WASH = 'rgba(255, 255, 255, 0.08)';
+const lift = (color: string) => mixHex(color, '#FFFFFF', HOVER_LIFT);
 /** A banner's strength under a thumb: the fill is the event's whole face, so
  *  it goes further than a hover's. */
 const BANNER_PRESSED = 0.6;
@@ -390,7 +391,7 @@ const focusMotion = (property: string) =>
         transitionTimingFunction: 'ease-out',
       } as object)
     : null;
-const FOCUS_MOTION = focusMotion('opacity');
+const HOVER_MOTION = focusMotion('background-color');
 const BANNER_FOCUS_MOTION = focusMotion('background-color');
 const TITLE_FOCUS_MOTION = focusMotion('color');
 
@@ -401,10 +402,6 @@ const styles = StyleSheet.create({
   // A press on a timed event: a lighter dim than a banner's, as before.
   chipPressed: {
     opacity: 0.8,
-  },
-  // Every event but the hovered one, while one is.
-  unfocused: {
-    opacity: UNFOCUSED,
   },
   chip: {
     flexDirection: 'row',

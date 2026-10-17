@@ -21,7 +21,6 @@ import {
   CascadeCover,
 } from '@/components/calendar/cascade-cover';
 import { EventTags } from '@/components/calendar/event-tags';
-import { GridSpotlight } from '@/components/calendar/grid-spotlight';
 import { MonthGrid } from '@/components/calendar/month-grid';
 import { HEADER_GROUND, MonthHeader } from '@/components/calendar/month-header';
 import {
@@ -441,7 +440,7 @@ function SampleMonth() {
       <Specimen
         name="MonthGrid (real, sample events)"
         file={file}
-        shows="Scrolls by month like the app (±5 years). Tap events, busy days (+N), empty days; hold a day for a new event. The web hover crosshair (GridSpotlight) is on."
+        shows="Scrolls by month like the app (±5 years). Tap events, busy days (+N), empty days; hold a day for a new event."
         bare
       >
         <SampleMonthGrid />
@@ -538,7 +537,6 @@ function SampleMonthGrid({
             }
           />
         )}
-        <GridSpotlight />
       </View>
     </>
   );

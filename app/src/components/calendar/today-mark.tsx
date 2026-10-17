@@ -6,7 +6,7 @@ import { AccentColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { mixHex } from '@/utils/color';
 
-/** Today's colour on the grid (and the web's hover wash, a lighter shade). */
+/** Today's colour on the grid. */
 export const TODAY_COLOR = '#0060E0';
 /** How far today's fill leans from its colour toward the ground: enough
  *  colour to find the day at once, little enough that its events, drawn

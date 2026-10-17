@@ -63,7 +63,7 @@ function NotesSection() {
     <Section id="notes" title="Notes">
       <ThemedText style={styles.noteHead}>States I could not force</ThemedText>
       {[
-        'Hover (web): event strips dimming the others, the grid crosshair (GridSpotlight), SettingsValue rows and the day list bin lighting up. Live on this page with a mouse.',
+        'Hover (web): the event under the mouse lifting (every piece of a multi-day one), SettingsValue rows and the day list bin lighting up. Live on this page with a mouse.',
         'Pressed: buttons (0.85 opacity filled, raised ground for the rest), chips, banners washing out, the grid hold ink spreading from the finger. Live on this page.',
         'Keyboard focus: the 2 px accent outline (global.css) on buttons, links, switches and radios; text fields turn their border accent while focused. Press Tab, or click into a field.',
         'The month label sliding between months in MonthHeader, and the grid snapping by month: scroll the sample month.',

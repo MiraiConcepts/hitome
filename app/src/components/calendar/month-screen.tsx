@@ -55,7 +55,6 @@ import {
   CascadeCover,
 } from '@/components/calendar/cascade-cover';
 import type { EventLook } from '@/components/calendar/event-chip';
-import { GridSpotlight } from '@/components/calendar/grid-spotlight';
 import {
   EventEditor,
   type EditorResult,
@@ -1070,7 +1069,6 @@ export function MonthScreen() {
                   discover={headerDiscover}
                 />
               )}
-              <GridSpotlight discover={headerDiscover} />
               {cascade && gridSize && (
                 <CascadeCover
                   key={cascade.run}
