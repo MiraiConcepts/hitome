@@ -537,12 +537,13 @@ export function SettingsBlock({
   );
 }
 
-/** Message-line type: the size of the Calendars legend, which every note,
- *  confirmation and error now shares. */
+/** Message-line type: every note, confirmation and error, and the Calendars
+ *  legend, share it. 14 (was 12, with a 12 icon that sat small and high
+ *  beside a two-line note): the size of the cards' other small text. */
 const Message = {
-  size: 12,
-  lineHeight: 16,
-  icon: 12,
+  size: 14,
+  lineHeight: 20,
+  icon: 16,
   glyphNudge: 1,
 } as const;
 
