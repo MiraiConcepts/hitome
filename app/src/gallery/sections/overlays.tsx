@@ -100,7 +100,7 @@ function FieldsSpecimen({
 }
 
 export function OverlaysSection() {
-  const { openDay, openEditor } = useOverlays();
+  const { openDay, openEditor, openMonthPicker } = useOverlays();
   const wide = useIsWide();
   const recurring = SAMPLE.standup;
   return (
@@ -112,7 +112,7 @@ export function OverlaysSection() {
       <Specimen
         name="DayPopover (real)"
         file="components/calendar/day-popover.tsx"
-        shows="Today's 4 events; a 12-event day (scrolls); discover mode (a going box per row, the row opens the page, no Add event); Add event shows on the web only. Rows open the editor, the bin deletes (a repeating one asks first)."
+        shows="Today's 4 events; a 12-event day (scrolls); discover mode (a going box per row, the repeating Film club's asks this date or all dates first; the row opens the page, no Add event); Add event shows on the web only. Rows open the editor, the bin deletes (a repeating one asks first)."
       >
         <Row gap={Spacing.two}>
           <Open
@@ -136,6 +136,24 @@ export function OverlaysSection() {
           <Open
             label="Day list: discover mode"
             onPress={() => openDay(TODAY, SAMPLE_TRAY_EVENTS, true)}
+          />
+        </Row>
+      </Specimen>
+
+      <Specimen
+        name="MonthPicker (real)"
+        file="components/calendar/month-picker.tsx"
+        shows="What a hold on the month name opens: a year with arrows and its months (the shown month filled, today's outlined), and Today. Ends at 1900 and 2100. A month shows a toast here instead of scrolling."
+      >
+        <Row gap={Spacing.two}>
+          <Open label="Month picker" onPress={() => openMonthPicker()} />
+          <Open
+            label="Month picker: another year"
+            onPress={() => openMonthPicker({ year: 2034, month0: 6 })}
+          />
+          <Open
+            label="Month picker: at 2100"
+            onPress={() => openMonthPicker({ year: 2100, month0: 11 })}
           />
         </Row>
       </Specimen>

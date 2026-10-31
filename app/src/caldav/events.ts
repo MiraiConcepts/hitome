@@ -21,6 +21,7 @@ import {
   splitSeries,
   truncateSeries,
   type EditScope,
+  type GoingScope,
 } from './ics';
 import { expandObjects, isObjectUrl } from './objects';
 import type { CalEvent, EventChanges, EventIcon, EventInput } from './types';
@@ -133,7 +134,7 @@ export async function createEvent(
   ensureOk(res, 'create');
 }
 
-export type { EditScope };
+export type { EditScope, GoingScope };
 
 /**
  * The scope that actually applies: a one-off event, or "this and following"
@@ -262,17 +263,23 @@ export async function updateEvent(
 
 /**
  * Mark a tray event going (busy, with `alertMinutes` as its reminder when it
- * has none) or not (free, its reminder removed). The whole event, a series
- * included: tray calendars hold one-off showings. If-Match as every write:
- * a feed run that changed it since the fetch is a ConflictError.
+ * has none) or not (free, its reminder removed). A repeating one is marked
+ * as a whole, or with `scope` 'this' on its one date (see markGoing). If-Match
+ * as every write: a feed run that changed it since the fetch is a
+ * ConflictError.
  */
 export async function setGoing(
   event: CalEvent,
   going: boolean,
-  alertMinutes: number | null
+  alertMinutes: number | null,
+  scope: GoingScope = 'all'
 ): Promise<void> {
   const alert = alertMinutes === null ? null : { offsetMinutes: alertMinutes };
-  await putObject(event, markGoing(event.raw, going, alert), 'update');
+  const only =
+    scope === 'this' && event.recurring && event.recurrenceStart !== undefined
+      ? { recurrenceStart: event.recurrenceStart, occurrence: event }
+      : undefined;
+  await putObject(event, markGoing(event.raw, going, alert, only), 'update');
 }
 
 /** The calendar an event's object lives in (its URL is the calendar's plus

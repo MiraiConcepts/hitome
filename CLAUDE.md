@@ -120,7 +120,10 @@ helper scripts.
   colour (not going) or inverted, a light fill with the title in that colour
   (going), going ones first in each day. A tap opens the day list, whose box answers going / not
   (`setGoing`, which writes only TRANSP, always explicitly, and hitome's own
-  VALARM); a row or a hold opens its page. hitome never edits, moves or
+  VALARM). A repeating one asks "This date" or "All dates" first: all dates
+  marks the series and every override; this date marks that date's override
+  (Android: exception row), made as a copy of the series when it has none. A
+  row or a hold opens its page. hitome never edits, moves or
   deletes a discover event, nor creates into a discover calendar; on the
   calendar a going one opens its page. Going events show on the grid and
   widget; a cancelled one shows crossed out until its day has passed.

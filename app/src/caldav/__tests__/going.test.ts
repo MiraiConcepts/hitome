@@ -80,3 +80,86 @@ describe('markGoing', () => {
     expect(read(markGoing(bare, false, null)).free).toBe(true);
   });
 });
+
+// A weekly showing (Tuesdays 13, 20, 27 Oct) whose 20th the feed moved an
+// hour later: an override of its own.
+const WEEKLY = [
+  'BEGIN:VCALENDAR',
+  'VERSION:2.0',
+  'PRODID:-//catallenya//filmhouse//EN',
+  'BEGIN:VEVENT',
+  'UID:film-club@hitome',
+  'DTSTAMP:20261012T024500Z',
+  'DTSTART:20261013T110000Z',
+  'DTEND:20261013T130000Z',
+  'RRULE:FREQ=WEEKLY;COUNT=3',
+  'SUMMARY:Film club',
+  'TRANSP:TRANSPARENT',
+  'X-FEED-NOTE:kept',
+  'END:VEVENT',
+  'BEGIN:VEVENT',
+  'UID:film-club@hitome',
+  'DTSTAMP:20261012T024500Z',
+  'RECURRENCE-ID:20261020T110000Z',
+  'DTSTART:20261020T120000Z',
+  'DTEND:20261020T140000Z',
+  'SUMMARY:Film club',
+  'TRANSP:TRANSPARENT',
+  'END:VEVENT',
+  'END:VCALENDAR',
+].join('\r\n');
+
+const readAll = (ics: string) =>
+  expandEvents(ics, 'u', 'e', ...OCT).sort(
+    (a, b) => a.start.getTime() - b.start.getTime()
+  );
+
+describe('markGoing on a repeating event', () => {
+  it('marks every date, the one with its own override too', () => {
+    const all = readAll(markGoing(WEEKLY, true, { offsetMinutes: 30 }));
+    expect(all.map((e) => [e.start.getUTCDate(), !e.free, e.alarm])).toEqual([
+      [13, true, true],
+      [20, true, true],
+      [27, true, true],
+    ]);
+  });
+
+  it('marks one date only, as an override placed where it sits', () => {
+    const [, , third] = readAll(WEEKLY);
+    const ics = markGoing(
+      WEEKLY,
+      true,
+      { offsetMinutes: 30 },
+      {
+        recurrenceStart: third.recurrenceStart!,
+        occurrence: third,
+      }
+    );
+    const all = readAll(ics);
+    expect(all.map((e) => [e.start.getUTCDate(), !e.free])).toEqual([
+      [13, false],
+      [20, false],
+      [27, true],
+    ]);
+    expect(all[2].start).toEqual(third.start);
+    expect(all[2].end).toEqual(third.end);
+    expect(all[2].summary).toBe('Film club');
+    expect(all[2].alarm).toBe(true);
+    expect(all[0].alarm).toBeUndefined();
+    expect(ics).toContain('RECURRENCE-ID:20261027T110000Z');
+    expect(ics).toContain('X-FEED-NOTE:kept');
+  });
+
+  it('marks a date that has its own override on that override', () => {
+    const [, moved] = readAll(WEEKLY);
+    const ics = markGoing(WEEKLY, true, null, {
+      recurrenceStart: moved.recurrenceStart!,
+      occurrence: moved,
+    });
+    const all = readAll(ics);
+    expect(all.map((e) => !e.free)).toEqual([false, true, false]);
+    // Still the feed's own times for it, and no second override.
+    expect(all[1].start).toEqual(moved.start);
+    expect(ics.match(/RECURRENCE-ID/g)).toHaveLength(1);
+  });
+});

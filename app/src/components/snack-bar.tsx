@@ -3,22 +3,37 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { TrashIcon, type IconProps } from '@/components/icons';
-import { CardFrame, DashedLine } from '@/components/settings/settings-parts';
+import { Card, DashedLine } from '@/components/settings/settings-parts';
 import { ThemedText } from '@/components/themed-text';
+import { Motion } from '@/constants/motion';
 import { AccentColor, Colors, DangerColor, Spacing } from '@/constants/theme';
 
-/** How long a message stays: long enough that Undo is still there once the
- *  grid has visibly changed and the mistake sinks in. */
+/** How long a message with Undo stays: long enough that Undo is still there
+ *  once the grid has visibly changed and the mistake sinks in. */
 export const SNACK_MS = 8_000;
+
+/** How long a message with nothing to do about it stays ("Event copied"):
+ *  read and gone. */
+export const SNACK_PLAIN_MS = 4_000;
+
+/** How long a message stays, by whether it carries an action. */
+export const snackMs = (hasAction: boolean) =>
+  hasAction ? SNACK_MS : SNACK_PLAIN_MS;
 
 /** The toast's fade in and out: long enough to read as easing, short
  *  enough that a tap on Undo never waits on it. */
-const SNACK_FADE_MS = 150;
+const SNACK_FADE_MS = Motion.normal;
+
+/** The toast's ground, in both schemes: a step lighter than the dark
+ *  screen, so it stands off the grid it floats over (it was the screen's
+ *  own dark, and hard to tell apart from it). */
+const SNACK_GROUND = Colors.dark.backgroundSelected;
 
 /**
- * The toast, as the settings card: the accent edge and dotted top, what
- * happened (a glyph, then a sentence), and when there is something to do
- * about it, a ruled cell for that beside it.
+ * The toast: a plain bar with the settings card's dotted top, what happened
+ * (a glyph, then a sentence), and when there is something to do about it, a
+ * ruled cell for that beside it: an icon when the action has one (Undo),
+ * else its word.
  */
 export function SnackBar({
   icon: Icon,
@@ -29,24 +44,33 @@ export function SnackBar({
 }: {
   icon: ComponentType<IconProps>;
   message: string;
-  action?: { label: string; onPress: () => void };
+  /** `icon` stands in for the word, which a screen reader still hears. */
+  action?: {
+    label: string;
+    onPress: () => void;
+    icon?: ComponentType<IconProps>;
+  };
   /** A problem that stops the calendar (the connection banner): read out at
    *  once, over whatever a screen reader was saying. */
   urgent?: boolean;
   testID?: string;
 }) {
+  const ActionIcon = action?.icon;
   return (
     <Animated.View
       entering={FadeIn.duration(SNACK_FADE_MS)}
       exiting={FadeOut.duration(SNACK_FADE_MS)}
       style={styles.snack}
       // Read out as it appears, Undo included: a screen reader user would
-      // otherwise never learn the toast, or its eight seconds, were there.
+      // otherwise never learn the toast, or its seconds, were there.
       role={urgent ? 'alert' : 'status'}
       aria-live={urgent ? 'assertive' : 'polite'}
       testID={testID}
     >
-      <CardFrame style={styles.snackCard}>
+      <View style={styles.snackCard}>
+        <View style={styles.snackTop} pointerEvents="none">
+          <DashedLine weight={Card.dotted} dash={Card.dot} strong />
+        </View>
         <View style={styles.snackRow}>
           <View style={styles.snackBody}>
             <View style={styles.snackIcon}>
@@ -68,17 +92,25 @@ export function SnackBar({
               </View>
               <Pressable
                 accessibilityRole="button"
-                style={styles.snackAction}
+                accessibilityLabel={action.label}
+                style={[
+                  styles.snackAction,
+                  ActionIcon && styles.snackIconAction,
+                ]}
                 onPress={action.onPress}
               >
-                <ThemedText type="smallBold" style={styles.snackActionText}>
-                  {action.label}
-                </ThemedText>
+                {ActionIcon ? (
+                  <ActionIcon size={22} color={AccentColor} />
+                ) : (
+                  <ThemedText type="smallBold" style={styles.snackActionText}>
+                    {action.label}
+                  </ThemedText>
+                )}
               </Pressable>
             </>
           )}
         </View>
-      </CardFrame>
+      </View>
     </Animated.View>
   );
 }
@@ -106,12 +138,18 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'flex-end',
   },
-  // The card's own ground in both schemes: the toast keeps the dark palette.
-  // No shadow: the card frame's own is switched off (it floats over the grid,
-  // which is edge enough).
+  // No shadow: it floats over the grid, and its lighter ground is edge
+  // enough.
   snackCard: {
-    backgroundColor: Colors.dark.background,
-    boxShadow: '0px 0px 0px rgba(0, 0, 0, 0)',
+    position: 'relative',
+    paddingTop: Card.dotted,
+    backgroundColor: SNACK_GROUND,
+  },
+  snackTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
   snackRow: {
     flexDirection: 'row',
@@ -142,6 +180,12 @@ const styles = StyleSheet.create({
   snackAction: {
     justifyContent: 'center',
     paddingHorizontal: Spacing.three,
+  },
+  // A thumb-sized cell for the icon alone.
+  snackIconAction: {
+    minWidth: 48,
+    alignItems: 'center',
+    paddingHorizontal: Spacing.two,
   },
   snackActionText: {
     color: AccentColor,

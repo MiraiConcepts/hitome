@@ -17,6 +17,7 @@ export {
   updateEvent,
   type CalendarChoice,
   type EditScope,
+  type GoingScope,
 } from '@/caldav/events';
 
 /** Sync now. The web has nothing to ask — its fetches go to the server. */

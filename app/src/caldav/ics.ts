@@ -334,6 +334,9 @@ export function buildEventICS(input: EventInput, uid: string): string {
 /** Which occurrences of a repeating event an edit or delete applies to. */
 export type EditScope = 'this' | 'following' | 'all';
 
+/** Which dates of a repeating discover event going answers: one, or all. */
+export type GoingScope = Exclude<EditScope, 'following'>;
+
 /** Writes the field changes (not the repeat rule) onto one VEVENT. */
 function applyFieldChanges(
   vcalendar: ICAL.Component,
@@ -433,19 +436,36 @@ export function editPreserving(
  * event's reminder unless it already has one of ours; not going removes
  * ours. Everything else, the fields the feed owns included, is left as it
  * is, as editPreserving does.
+ *
+ * A repeating event is marked as a whole (the series and every date with
+ * its own override, which would otherwise keep its old answer) or, with
+ * `only`, on one date: that date's override, made from the series when it
+ * has none, as Google Calendar and Outlook answer one date of a series.
  */
 export function markGoing(
   ics: string,
   going: boolean,
-  alert: AlarmInput | null
+  alert: AlarmInput | null,
+  only?: {
+    recurrenceStart: number;
+    occurrence: { start: Date; end: Date; allDay: boolean };
+  }
 ): string {
   const vcalendar = new ICAL.Component(ICAL.parse(ics));
-  const vevent = masterVevent(vcalendar);
-  if (!vevent) return ics;
-  vevent.updatePropertyWithValue('transp', going ? 'OPAQUE' : 'TRANSPARENT');
-  if (!going) applyAlarm(vevent, null);
-  else if (alert && !findOurAlarm(vevent)) applyAlarm(vevent, alert);
-  touch(vevent);
+  const master = masterVevent(vcalendar);
+  if (!master) return ics;
+  const targets = only
+    ? [
+        ensureOverride(vcalendar, master, only.recurrenceStart, only.occurrence)
+          .override,
+      ]
+    : vcalendar.getAllSubcomponents('vevent');
+  for (const vevent of targets) {
+    vevent.updatePropertyWithValue('transp', going ? 'OPAQUE' : 'TRANSPARENT');
+    if (!going) applyAlarm(vevent, null);
+    else if (alert && !findOurAlarm(vevent)) applyAlarm(vevent, alert);
+    touch(vevent);
+  }
   return vcalendar.toString();
 }
 
@@ -582,11 +602,36 @@ function asEdited(occurrence: { start: Date; end: Date; allDay: boolean }): {
 }
 
 /**
- * Edit ONE occurrence: its override VEVENT (RECURRENCE-ID = the occurrence),
- * created from the master when it does not exist yet — a copy minus the rule
+ * One occurrence's override VEVENT (RECURRENCE-ID = the occurrence), created
+ * from the master when it does not exist yet — a copy minus the rule
  * (RRULE/RDATE/EXDATE belong to the series only), so attendees, X-* and the
- * rest carry over. `occurrence` is where it currently sits; a time change in
- * `changes` replaces that.
+ * rest carry over — and placed where the occurrence sits (a copy still has
+ * the master's first dates).
+ */
+function ensureOverride(
+  vcalendar: ICAL.Component,
+  master: ICAL.Component,
+  recurrenceStart: number,
+  occurrence: { start: Date; end: Date; allDay: boolean }
+): { override: ICAL.Component; created: boolean } {
+  const existing = overrideFor(vcalendar, recurrenceStart);
+  if (existing) return { override: existing, created: false };
+  const override = new ICAL.Component(structuredClone(master.jCal));
+  for (const name of ['rrule', 'rdate', 'exdate', 'recurrence-id'])
+    override.removeAllProperties(name);
+  const rid = new ICAL.Property('recurrence-id');
+  setLikeDtstart(rid, master, occurrenceTime(master, recurrenceStart));
+  override.addProperty(rid);
+  override.updatePropertyWithValue('dtstamp', utcNow());
+  vcalendar.addSubcomponent(override);
+  applyFieldChanges(vcalendar, override, {}, asEdited(occurrence));
+  return { override, created: true };
+}
+
+/**
+ * Edit ONE occurrence: its override VEVENT (see ensureOverride).
+ * `occurrence` is where it currently sits; a time change in `changes`
+ * replaces that.
  */
 export function editOccurrence(
   ics: string,
@@ -598,22 +643,16 @@ export function editOccurrence(
   const master = masterVevent(vcalendar);
   if (!master) return ics;
 
-  let override = overrideFor(vcalendar, recurrenceStart);
-  const created = !override;
-  if (!override) {
-    override = new ICAL.Component(structuredClone(master.jCal));
-    for (const name of ['rrule', 'rdate', 'exdate', 'recurrence-id'])
-      override.removeAllProperties(name);
-    const rid = new ICAL.Property('recurrence-id');
-    setLikeDtstart(rid, master, occurrenceTime(master, recurrenceStart));
-    override.addProperty(rid);
-    override.updatePropertyWithValue('dtstamp', utcNow());
-    vcalendar.addSubcomponent(override);
-  }
+  const { override } = ensureOverride(
+    vcalendar,
+    master,
+    recurrenceStart,
+    occurrence
+  );
 
-  // A time change replaces where the occurrence sits; with none, a fresh
-  // override (still carrying the master's first dates) is placed where the
-  // occurrence is, and an existing one keeps its own.
+  // A time change replaces where the occurrence sits; with none, it stays
+  // where it is (a fresh override was placed there, an existing one keeps
+  // its own).
   const times =
     changes.start && changes.end
       ? {
@@ -621,9 +660,7 @@ export function editOccurrence(
           end: changes.end,
           allDay: changes.allDay ?? occurrence.allDay,
         }
-      : created
-        ? asEdited(occurrence)
-        : undefined;
+      : undefined;
   applyFieldChanges(vcalendar, override, changes, times);
   touch(override);
   return vcalendar.toString();

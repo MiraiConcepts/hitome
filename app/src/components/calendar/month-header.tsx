@@ -28,6 +28,7 @@ import {
 } from '@/components/calendar/discover-fade';
 import { LoadingBar } from '@/components/loading-bar';
 import { ThemedText } from '@/components/themed-text';
+import { Motion } from '@/constants/motion';
 import {
   AccentColor,
   FontFamilyBold,
@@ -58,6 +59,11 @@ type Props = {
   /** When the server last answered; null until the first landed fetch. */
   fetchedAt: Date | null;
   onToday: () => void;
+  /** A hold on the month name: the month picker, for a far month. */
+  onPickMonth: () => void;
+  /** Settings › Gestures swapped the two: a tap picks a month, a hold goes
+   *  to today. */
+  tapPicksMonth?: boolean;
   onRefresh: () => void;
   onAdd: () => void;
   /** The month as a picture: copied on the web, shared on Android. */
@@ -109,17 +115,18 @@ export const HEADER_TITLE_TYPE = {
 } as const;
 
 /** Label slide-through when the visible month changes mid-scroll. */
-const LABEL_FADE_OUT_MS = 100;
-const LABEL_FADE_IN_MS = 160;
+const LABEL_FADE_OUT_MS = Motion.quick;
+const LABEL_FADE_IN_MS = Motion.normal;
 /** How far the label drifts while fading (px). */
 const LABEL_SHIFT_PX = 10;
 
-/** The freshness line when the server cannot be reached. Fixed rather than a
- *  palette token because the palette has no danger colour and this is the only
- *  place that wants one; light enough to carry on the header's black ground. */
+/** The freshness line when the server cannot be reached. Softer than
+ *  DangerColor on purpose: a warning that the calendar may be out of date,
+ *  not a failure, and light enough to read on the header's black ground. */
 const OFFLINE_COLOR = '#F09595';
 
-/** Header bar above the month grid: the label (tap → today) and refresh. */
+/** Header bar above the month grid: the label (tap → today, hold → the month
+ *  picker) and refresh. */
 export function MonthHeader({
   label,
   monthIndex,
@@ -130,6 +137,8 @@ export function MonthHeader({
   authFailed,
   fetchedAt,
   onToday,
+  onPickMonth,
+  tapPicksMonth = false,
   onRefresh,
   onAdd,
   onShareMonth,
@@ -205,12 +214,21 @@ export function MonthHeader({
         <View style={styles.labelWrap}>
           <Pressable
             testID="calendar-today"
-            onPress={onToday}
+            onPress={tapPicksMonth ? onPickMonth : onToday}
+            onLongPress={tapPicksMonth ? onToday : onPickMonth}
             hitSlop={8}
             // A button, named with the month it shows: "Go to today" alone
-            // hid which month a screen reader was on.
+            // hid which month a screen reader was on. TalkBack offers the
+            // hold as its own action.
             accessibilityRole="button"
-            accessibilityLabel={`${shown.label}, go to today`}
+            accessibilityLabel={
+              tapPicksMonth
+                ? `${shown.label}, pick a month`
+                : `${shown.label}, go to today`
+            }
+            accessibilityHint={
+              tapPicksMonth ? 'Hold to go to today' : 'Hold to pick a month'
+            }
           >
             <Animated.View style={labelStyle}>
               <ThemedText

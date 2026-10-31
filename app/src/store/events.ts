@@ -3,7 +3,7 @@
 // server. Same exports and meaning as caldav/events.ts — data/events picks
 // one per platform. The store is local, so writes never meet a network:
 // offline edits simply wait in the store for the sync app to send them.
-import type { EditScope } from '@/caldav/ics';
+import type { EditScope, GoingScope } from '@/caldav/ics';
 import type { CalEvent, EventChanges, EventInput } from '@/caldav/types';
 import { ensureDefaultCalendar } from '@/config/calendar-pref';
 import { ensureCalendarRoles, roleOf } from '@/config/calendar-visibility';
@@ -51,7 +51,7 @@ import {
   utcDayToLocal,
 } from './map';
 
-export type { EditScope };
+export type { EditScope, GoingScope };
 export type CalendarChoice = {
   url: string;
   name: string;
@@ -663,24 +663,60 @@ export async function updateEvent(
  * Mark a tray event going (busy, with `alertMinutes` as its reminder when it
  * has none) or not (free, its reminder removed). DAVx⁵ writes AVAILABILITY
  * up as TRANSP and the reminder as a VALARM, both of which the feed keeps.
+ *
+ * A repeating one is marked as a whole (the series and every date with an
+ * exception row of its own, which would otherwise keep its old answer) or,
+ * with `scope` 'this', on its one date: that date's exception row, made from
+ * the series when it has none.
  */
 export async function setGoing(
   event: CalEvent,
   going: boolean,
+  alertMinutes: number | null,
+  scope: GoingScope = 'all'
+): Promise<void> {
+  const values = {
+    availability: going ? AVAILABILITY_BUSY : AVAILABILITY_FREE,
+  };
+  if (scope === 'this' && event.recurring) {
+    const parsed = storeHandle(event);
+    let id = parsed.eventId;
+    if (event.etag.startsWith('series:'))
+      await store().update(URI.event(id), values, null, null);
+    else
+      id = await store().insert(URI.exceptions(parsed.eventId), {
+        originalInstanceTime: occurrenceMs(event),
+        ...values,
+      });
+    await answerReminders(id, going, alertMinutes);
+    return;
+  }
+  const seriesId = seriesIdOf(event);
+  const exceptions = event.recurring ? await exceptionRows(seriesId) : [];
+  const ids = [
+    seriesId,
+    ...exceptions
+      .filter((ex) => n(ex.eventStatus) !== STATUS_CANCELED)
+      .map((ex) => String(n(ex._id))),
+  ];
+  for (const id of ids) {
+    await store().update(URI.event(id), values, null, null);
+    await answerReminders(id, going, alertMinutes);
+  }
+}
+
+/** Going's reminder on one row: every reminder off when not going (not just
+ *  the soonest, as setAlarm would: a discover event's reminders are only
+ *  ever hitome's, and one left behind still rang), or `alertMinutes` added
+ *  when going and the row has none. */
+async function answerReminders(
+  id: string,
+  going: boolean,
   alertMinutes: number | null
 ): Promise<void> {
-  const seriesId = seriesIdOf(event);
-  await store().update(
-    URI.event(seriesId),
-    { availability: going ? AVAILABILITY_BUSY : AVAILABILITY_FREE },
-    null,
-    null
-  );
-  // Every reminder, not just the soonest (setAlarm): a discover event's
-  // reminders are only ever hitome's, and one left behind still rang.
-  if (!going) await setReminders(seriesId, []);
-  else if (alertMinutes !== null && !event.alarm)
-    await setAlarm(seriesId, alertMinutes);
+  if (!going) await setReminders(id, []);
+  else if (alertMinutes !== null && (await reminderRows(id)).length === 0)
+    await setAlarm(id, alertMinutes);
 }
 
 /**

@@ -9,12 +9,13 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { Motion } from '@/constants/motion';
 import { AccentColor } from '@/constants/theme';
 
 /** One sweep of the segment across the bar. */
 const SWEEP_MS = 1100;
 /** Fade in and out, so a fetch that lands quickly does not flash. */
-const FADE_MS = 160;
+const FADE_MS = Motion.normal;
 /** The moving segment, as a share of the bar's width. */
 const SEGMENT = 0.35;
 const LOADING_BAR_HEIGHT = 3;

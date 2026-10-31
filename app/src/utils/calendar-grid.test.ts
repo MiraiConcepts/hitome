@@ -54,13 +54,12 @@ describe('weekStartOf', () => {
 });
 
 describe('buildMonthRange', () => {
-  const today = new Date(2026, 6, 12);
-  const months = buildMonthRange(today);
+  const months = buildMonthRange();
 
-  it('spans today ± 5 years, one entry per month', () => {
-    expect(months.length).toBe(121);
-    expect(months[0]).toEqual({ year: 2021, month0: 6 });
-    expect(months[months.length - 1]).toEqual({ year: 2031, month0: 6 });
+  it('spans January 1900 to December 2100, one entry per month', () => {
+    expect(months.length).toBe(201 * 12);
+    expect(months[0]).toEqual({ year: 1900, month0: 0 });
+    expect(months[months.length - 1]).toEqual({ year: 2100, month0: 11 });
   });
 
   it('advances one month at a time across year boundaries', () => {
@@ -89,7 +88,7 @@ describe('monthIndexIn', () => {
   });
 
   it('round-trips through buildMonthRange', () => {
-    const months = buildMonthRange(new Date(2026, 6, 12));
+    const months = buildMonthRange();
     for (const month of [months[0], months[47], months[120]]) {
       expect(months[monthIndexIn(months[0], month)]).toEqual(month);
     }
@@ -120,13 +119,18 @@ describe('weeksBetween', () => {
 });
 
 describe('buildWeekRange', () => {
-  const months = buildMonthRange(new Date(2026, 6, 12));
+  const months = buildMonthRange();
   const { rangeStart, weeks } = buildWeekRange(months);
 
   it('opens on the week containing the first month\u2019s 1st', () => {
+    // Jan 1 1900 is itself a Monday.
+    expect(toDateString(rangeStart)).toBe('1900-01-01');
+    expect(weeks[0]).toBe('1900-01-01');
     // Jul 1 2021 is a Thursday \u2014 its week starts Mon Jun 28.
-    expect(toDateString(rangeStart)).toBe('2021-06-28');
-    expect(weeks[0]).toBe('2021-06-28');
+    const fromJuly = buildWeekRange(
+      months.slice(monthIndexIn(months[0], { year: 2021, month0: 6 }))
+    );
+    expect(toDateString(fromJuly.rangeStart)).toBe('2021-06-28');
   });
 
   it('steps one week per row throughout', () => {
@@ -147,7 +151,7 @@ describe('buildWeekRange', () => {
 });
 
 describe('monthStartWeekIndex', () => {
-  const months = buildMonthRange(new Date(2026, 6, 12));
+  const months = buildMonthRange();
   const { rangeStart, weeks } = buildWeekRange(months);
 
   it('points at the row holding the 1st', () => {
@@ -169,7 +173,7 @@ describe('monthStartWeekIndex', () => {
 });
 
 describe('monthStartWeekIndices', () => {
-  const months = buildMonthRange(new Date(2026, 6, 12));
+  const months = buildMonthRange();
   const { rangeStart, weeks } = buildWeekRange(months);
   const rows = monthStartWeekIndices(months, rangeStart);
 
@@ -197,7 +201,7 @@ describe('monthStartWeekIndices vs. the calendar itself', () => {
     // Independent cross-check: a month settles on a row iff some day of that
     // row is a 1st. Catches an off-by-one in the index math that a
     // self-consistent round-trip would not.
-    const months = buildMonthRange(new Date(2026, 6, 12));
+    const months = buildMonthRange();
     const { rangeStart, weeks } = buildWeekRange(months);
     const rows = new Set(monthStartWeekIndices(months, rangeStart));
     const holdsA1st = (weekStart: string) =>

@@ -13,8 +13,8 @@ import {
 } from 'react';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 
-import type { IconProps } from '@/components/icons';
-import { SnackBar } from '@/components/snack-bar';
+import { UndoIcon, type IconProps } from '@/components/icons';
+import { SnackBar, snackMs } from '@/components/snack-bar';
 import { ThemedText } from '@/components/themed-text';
 import { AccentColor, Colors, DangerColor, Spacing } from '@/constants/theme';
 
@@ -190,7 +190,10 @@ export function ToastHost({ children }: { children: ReactNode }) {
   );
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 8000);
+    const timer = setTimeout(
+      () => setToast(null),
+      snackMs(Boolean(toast.action))
+    );
     return () => clearTimeout(timer);
   }, [toast]);
   return (
@@ -204,7 +207,11 @@ export function ToastHost({ children }: { children: ReactNode }) {
             message={toast.message}
             action={
               toast.action
-                ? { label: toast.action, onPress: () => setToast(null) }
+                ? {
+                    label: toast.action,
+                    icon: toast.action === 'Undo' ? UndoIcon : undefined,
+                    onPress: () => setToast(null),
+                  }
                 : undefined
             }
           />

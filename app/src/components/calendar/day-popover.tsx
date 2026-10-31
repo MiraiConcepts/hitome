@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   BackHandler,
   Modal,
@@ -9,15 +9,22 @@ import {
   View,
 } from 'react-native';
 
+import type { GoingScope } from '@/caldav/ics';
 import type { CalEvent } from '@/caldav/types';
 import { BlurBackdrop } from '@/components/blur-backdrop';
 import { EventTags } from '@/components/calendar/event-tags';
-import { CheckIcon, ShareIcon, TrashIcon } from '@/components/icons';
+import {
+  CheckIcon,
+  RepeatIcon,
+  ShareIcon,
+  TrashIcon,
+} from '@/components/icons';
 import {
   DashedLine,
   SettingsBlock,
   SettingsButton,
   SettingsButtonRow,
+  SettingsMessage,
   SettingsSection,
   SettingsValue,
 } from '@/components/settings/settings-parts';
@@ -75,7 +82,9 @@ type Props = {
    *  no Add event. */
   discover?: {
     isGoing: (event: CalEvent) => boolean;
-    onToggle: (event: CalEvent) => void;
+    /** A repeating event's box asks first whether the answer is for this
+     *  date or every date; any other answers for itself ('all'). */
+    onToggle: (event: CalEvent, scope: GoingScope) => void;
     onOpen: (event: CalEvent) => void;
   };
   /** The screen's message bar while the list is open, placed by the screen
@@ -88,14 +97,15 @@ type Props = {
  * The dialog's layer. A Modal everywhere but Android, where it is a layer over
  * the month screen in the app's own window instead: a Modal is a window of its
  * own there, and the blur behind the popover can only reach what is in this
- * one. It sits outside the screen's blur target, as a sibling after it.
+ * one. It sits outside the screen's blur target, as a sibling after it. The
+ * month picker uses it too.
  */
-function Overlay({
+export function Overlay({
   label,
   onClose,
   children,
 }: {
-  /** The dialog's name: the day, as its heading says it. */
+  /** The dialog's name, as its heading says it (the day, the year). */
   label: string;
   onClose: () => void;
   children: ReactNode;
@@ -178,6 +188,53 @@ function GoingBox({
   );
 }
 
+/**
+ * Going on a repeating discover event: for this date only, or for all its
+ * dates, as Google Calendar and Outlook ask when you answer one date of a
+ * series. This date is the filled one, the least an answer reaches.
+ */
+function GoingScopeQuestion({
+  event,
+  going,
+  onChoose,
+  onBack,
+}: {
+  event: CalEvent;
+  /** The answer being given: going, or no longer. */
+  going: boolean;
+  onChoose: (scope: GoingScope) => void;
+  onBack: () => void;
+}) {
+  const name = event.summary || 'This event';
+  return (
+    <SettingsBlock>
+      <SettingsMessage icon={RepeatIcon} testID="day-popover-going-scope">
+        {going
+          ? `${name} repeats. Going to:`
+          : `${name} repeats. No longer going to:`}
+      </SettingsMessage>
+      <SettingsButtonRow>
+        <SettingsButton
+          label="Back"
+          onPress={onBack}
+          testID="day-popover-going-back"
+        />
+        <SettingsButton
+          label="All dates"
+          onPress={() => onChoose('all')}
+          testID="day-popover-going-all"
+        />
+        <SettingsButton
+          label="This date"
+          variant="filled"
+          onPress={() => onChoose('this')}
+          testID="day-popover-going-this"
+        />
+      </SettingsButtonRow>
+    </SettingsBlock>
+  );
+}
+
 function compareEvents(a: CalEvent, b: CalEvent): number {
   if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
   return a.start.getTime() - b.start.getTime();
@@ -205,6 +262,9 @@ export function DayPopover({
   const theme = useTheme();
   const compact = !useIsWide();
   const sorted = [...events].sort(compareEvents);
+  // A repeating discover event whose box was tapped: the list gives way to
+  // the question of which dates the answer is for.
+  const [asking, setAsking] = useState<CalEvent | null>(null);
   return (
     <Overlay label={dayLabel(day)} onClose={onClose}>
       <View style={[styles.backdrop, BACKDROP_BLUR]}>
@@ -235,152 +295,176 @@ export function DayPopover({
           <ThemedView style={styles.card} testID="day-popover">
             <ScrollView>
               <SettingsSection title={dayLabel(day)} large>
-                {sorted.map((event) => {
-                  const duration = durationLabel(
-                    event.start,
-                    event.end,
-                    event.allDay
-                  );
-                  return (
-                    <SettingsValue
-                      key={event.id}
-                      labelWidth={compact ? WHEN_COLUMN_COMPACT : WHEN_COLUMN}
-                      cellPaddingY={ROW_PAD_Y}
-                      valuePaddingX={ROW_PAD_X}
-                      centerValue
-                      onPress={() =>
-                        discover ? discover.onOpen(event) : onPressEvent(event)
-                      }
-                      pressLabel={
-                        discover
-                          ? `${event.summary || 'Event'}, open its page`
-                          : event.summary || '(untitled)'
-                      }
-                      trailingWidth={
-                        discover
-                          ? GOING_WIDTH
-                          : canDelete(event)
-                            ? ACTIONS_WIDTH
-                            : // Share alone: no empty half where delete was.
-                              ACTIONS_WIDTH / 2
-                      }
-                      trailing={
-                        discover ? (
-                          <GoingBox
-                            event={event}
-                            going={discover.isGoing(event)}
-                            onPress={() => discover.onToggle(event)}
-                          />
-                        ) : (
-                          <View style={styles.actions}>
-                            <Pressable
-                              onPress={() => onShare(event)}
-                              accessibilityRole="button"
-                              accessibilityLabel={`Share ${event.summary || 'event'}`}
-                              testID={`day-popover-share-${event.id}`}
-                              style={({
-                                pressed,
-                                hovered,
-                              }: {
-                                pressed: boolean;
-                                hovered?: boolean;
-                              }) => [
-                                styles.action,
-                                (pressed || hovered) && {
-                                  backgroundColor: theme.backgroundSelected,
-                                },
-                              ]}
-                            >
-                              <ShareIcon
-                                size={compact ? 18 : 20}
-                                color={AccentColor}
-                              />
-                            </Pressable>
-                            {canDelete(event) && (
-                              <>
-                                <View style={styles.actionRule}>
-                                  <View style={StyleSheet.absoluteFill}>
-                                    <DashedLine vertical />
+                {asking && discover && (
+                  <GoingScopeQuestion
+                    event={asking}
+                    going={!discover.isGoing(asking)}
+                    onChoose={(scope) => {
+                      setAsking(null);
+                      discover.onToggle(asking, scope);
+                    }}
+                    onBack={() => setAsking(null)}
+                  />
+                )}
+                {!asking &&
+                  sorted.map((event) => {
+                    const duration = durationLabel(
+                      event.start,
+                      event.end,
+                      event.allDay
+                    );
+                    return (
+                      <SettingsValue
+                        key={event.id}
+                        labelWidth={compact ? WHEN_COLUMN_COMPACT : WHEN_COLUMN}
+                        cellPaddingY={ROW_PAD_Y}
+                        valuePaddingX={ROW_PAD_X}
+                        centerValue
+                        onPress={() =>
+                          discover
+                            ? discover.onOpen(event)
+                            : onPressEvent(event)
+                        }
+                        pressLabel={
+                          discover
+                            ? `${event.summary || 'Event'}, open its page`
+                            : event.summary || '(untitled)'
+                        }
+                        trailingWidth={
+                          discover
+                            ? GOING_WIDTH
+                            : canDelete(event)
+                              ? ACTIONS_WIDTH
+                              : // Share alone: no empty half where delete was.
+                                ACTIONS_WIDTH / 2
+                        }
+                        trailing={
+                          discover ? (
+                            <GoingBox
+                              event={event}
+                              going={discover.isGoing(event)}
+                              onPress={() =>
+                                event.recurring
+                                  ? setAsking(event)
+                                  : discover.onToggle(event, 'all')
+                              }
+                            />
+                          ) : (
+                            <View style={styles.actions}>
+                              <Pressable
+                                onPress={() => onShare(event)}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Share ${event.summary || 'event'}`}
+                                testID={`day-popover-share-${event.id}`}
+                                style={({
+                                  pressed,
+                                  hovered,
+                                }: {
+                                  pressed: boolean;
+                                  hovered?: boolean;
+                                }) => [
+                                  styles.action,
+                                  (pressed || hovered) && {
+                                    backgroundColor: theme.backgroundSelected,
+                                  },
+                                ]}
+                              >
+                                <ShareIcon
+                                  size={compact ? 18 : 20}
+                                  color={AccentColor}
+                                />
+                              </Pressable>
+                              {canDelete(event) && (
+                                <>
+                                  <View style={styles.actionRule}>
+                                    <View style={StyleSheet.absoluteFill}>
+                                      <DashedLine vertical />
+                                    </View>
                                   </View>
-                                </View>
-                                <Pressable
-                                  onPress={() => onDelete(event)}
-                                  accessibilityRole="button"
-                                  accessibilityLabel={`Delete ${event.summary || 'event'}`}
-                                  testID={`day-popover-delete-${event.id}`}
-                                  style={({
-                                    pressed,
-                                    hovered,
-                                  }: {
-                                    pressed: boolean;
-                                    hovered?: boolean;
-                                  }) => [
-                                    styles.action,
-                                    (pressed || hovered) && {
-                                      backgroundColor: theme.backgroundSelected,
-                                    },
-                                  ]}
-                                >
-                                  <TrashIcon
-                                    size={compact ? 18 : 20}
-                                    color={DangerColor}
-                                  />
-                                </Pressable>
-                              </>
-                            )}
-                          </View>
-                        )
-                      }
-                      label={
-                        // When: the start, and how long it runs.
-                        <View>
-                          <ThemedText
-                            type="smallBold"
-                            style={[styles.when, compact && styles.whenCompact]}
-                          >
-                            {event.allDay ? 'All day' : formatTime(event.start)}
-                          </ThemedText>
-                          {duration ? (
+                                  <Pressable
+                                    onPress={() => onDelete(event)}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Delete ${event.summary || 'event'}`}
+                                    testID={`day-popover-delete-${event.id}`}
+                                    style={({
+                                      pressed,
+                                      hovered,
+                                    }: {
+                                      pressed: boolean;
+                                      hovered?: boolean;
+                                    }) => [
+                                      styles.action,
+                                      (pressed || hovered) && {
+                                        backgroundColor:
+                                          theme.backgroundSelected,
+                                      },
+                                    ]}
+                                  >
+                                    <TrashIcon
+                                      size={compact ? 18 : 20}
+                                      color={DangerColor}
+                                    />
+                                  </Pressable>
+                                </>
+                              )}
+                            </View>
+                          )
+                        }
+                        label={
+                          // When: the start, and how long it runs.
+                          <View>
                             <ThemedText
-                              type="small"
-                              themeColor="textSecondary"
+                              type="smallBold"
                               style={[
                                 styles.when,
                                 compact && styles.whenCompact,
                               ]}
                             >
-                              {duration}
+                              {event.allDay
+                                ? 'All day'
+                                : formatTime(event.start)}
                             </ThemedText>
-                          ) : null}
-                        </View>
-                      }
-                      value={
-                        // No view of its own around these: the cell lets a
-                        // press through its gaps to the row's button, and a
-                        // plain view would take it.
-                        <>
-                          <ThemedText
-                            style={[
-                              styles.title,
-                              compact && styles.titleCompact,
-                              // A link: the row opens the event's page.
-                              discover &&
-                                trayLink(event) && [
-                                  styles.linked,
-                                  // The calendar's own colour (the underline takes
-                                  // it too: Android draws it in the text's).
-                                  { color: calendarTint(event.color) },
-                                ],
-                            ]}
-                          >
-                            {event.summary || '(untitled)'}
-                          </ThemedText>
-                          <EventTags event={event} />
-                        </>
-                      }
-                    />
-                  );
-                })}
+                            {duration ? (
+                              <ThemedText
+                                type="small"
+                                themeColor="textSecondary"
+                                style={[
+                                  styles.when,
+                                  compact && styles.whenCompact,
+                                ]}
+                              >
+                                {duration}
+                              </ThemedText>
+                            ) : null}
+                          </View>
+                        }
+                        value={
+                          // No view of its own around these: the cell lets a
+                          // press through its gaps to the row's button, and a
+                          // plain view would take it.
+                          <>
+                            <ThemedText
+                              style={[
+                                styles.title,
+                                compact && styles.titleCompact,
+                                // A link: the row opens the event's page.
+                                discover &&
+                                  trayLink(event) && [
+                                    styles.linked,
+                                    // The calendar's own colour (the underline takes
+                                    // it too: Android draws it in the text's).
+                                    { color: calendarTint(event.color) },
+                                  ],
+                              ]}
+                            >
+                              {event.summary || '(untitled)'}
+                            </ThemedText>
+                            <EventTags event={event} />
+                          </>
+                        }
+                      />
+                    );
+                  })}
                 {!discover && (
                   <SettingsBlock>
                     <SettingsButtonRow>

@@ -17,6 +17,7 @@ import Animated, {
 import Svg, { Line } from 'react-native-svg';
 
 import { DayHeading } from '@/constants/heading';
+import { Motion } from '@/constants/motion';
 import { HEADER_GROUND } from '@/components/calendar/month-header';
 import {
   AlertCircleIcon,
@@ -419,7 +420,7 @@ const Toggle = {
   height: 22,
   knob: 14,
   inset: 3,
-  slideMs: 160,
+  slideMs: Motion.normal,
 } as const;
 
 /**

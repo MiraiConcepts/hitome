@@ -19,6 +19,7 @@ import { BootScreen } from '@/components/boot-screen';
 import { onCalendarReady } from '@/components/calendar/calendar-ready';
 import { SetupScreen } from '@/components/settings/setup-screen';
 import { declareBoldFace } from '@/constants/font-faces';
+import { Motion } from '@/constants/motion';
 import { ensureDefaultAlert } from '@/config/alert-pref';
 import { ensureSource, useSourceStatus } from '@/config/source';
 import { useAlarmReconcile } from '@/hooks/use-alarm-reconcile';
@@ -130,7 +131,7 @@ export default function RootLayout() {
   );
 }
 
-const SETUP_FADE_MS = 250;
+const SETUP_FADE_MS = Motion.slow;
 /** Fade anyway if the grid never says it is ready. */
 const SETUP_HOLD_MAX_MS = 1500;
 

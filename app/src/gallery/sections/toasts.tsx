@@ -8,6 +8,7 @@ import {
   CalendarPlusIcon,
   TrashIcon,
   WifiOffIcon,
+  UndoIcon,
 } from '@/components/icons';
 import { SettingsButton } from '@/components/settings/settings-parts';
 import { webConnectionProblem } from '@/config/dav-config';
@@ -53,7 +54,15 @@ export function ToastsSection() {
             <SnackBar
               icon={icon}
               message={message}
-              action={action ? { label: action, onPress: noop } : undefined}
+              action={
+                action
+                  ? {
+                      label: action,
+                      icon: action === 'Undo' ? UndoIcon : undefined,
+                      onPress: noop,
+                    }
+                  : undefined
+              }
             />
           </View>
         ))}

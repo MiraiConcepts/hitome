@@ -11,10 +11,12 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 
-import { SNACK_MS, SNACK_SPOT, SnackBar } from '@/components/snack-bar';
+import { UndoIcon } from '@/components/icons';
+import { SNACK_SPOT, SnackBar, snackMs } from '@/components/snack-bar';
 import { AboutSection } from '@/components/settings/about-section';
 import { CalendarsSection } from '@/components/settings/calendars-section';
 import { ConnectionSection } from '@/components/settings/connection-section';
+import { GesturesSection } from '@/components/settings/gestures-section';
 import { NotificationsSection } from '@/components/settings/notifications-section';
 import { SettingsHeader } from '@/components/settings/settings-parts';
 import { ThemedView } from '@/components/themed-view';
@@ -51,7 +53,10 @@ export function SettingsScreen() {
     }));
   useEffect(() => {
     if (!sample) return;
-    const timer = setTimeout(() => setSample(null), SNACK_MS);
+    const timer = setTimeout(
+      () => setSample(null),
+      snackMs(Boolean(MESSAGE_SAMPLES[sample.index].undo))
+    );
     return () => clearTimeout(timer);
   }, [sample]);
   const notifications = (
@@ -81,6 +86,7 @@ export function SettingsScreen() {
               </View>
               <View style={styles.column}>
                 {notifications}
+                <GesturesSection />
                 <AboutSection />
               </View>
             </>
@@ -89,6 +95,7 @@ export function SettingsScreen() {
               <ConnectionSection />
               <CalendarsSection />
               {notifications}
+              <GesturesSection />
               <AboutSection />
             </>
           )}
@@ -104,7 +111,9 @@ export function SettingsScreen() {
             icon={shown.icon}
             message={`${shown.message}  (${sample!.index + 1} of ${MESSAGE_SAMPLES.length})`}
             action={
-              shown.undo ? { label: 'Undo', onPress: () => {} } : undefined
+              shown.undo
+                ? { label: 'Undo', icon: UndoIcon, onPress: () => {} }
+                : undefined
             }
           />
         )}

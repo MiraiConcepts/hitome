@@ -20,6 +20,7 @@ import {
 import { CalendarRoleSwitch } from '@/components/settings/calendar-role-switch';
 import { AboutSection } from '@/components/settings/about-section';
 import { ConnectionSection } from '@/components/settings/connection-section';
+import { GesturesSection } from '@/components/settings/gestures-section';
 import {
   LoginFields,
   type LoginFormState,
@@ -441,6 +442,18 @@ export function SettingsPartsSection() {
         <View style={styles.cardBox}>
           <ViewOnly>
             <NotificationsSection />
+          </ViewOnly>
+        </View>
+      </Specimen>
+
+      <Specimen
+        name="GesturesSection"
+        file="components/settings/gestures-section.tsx"
+        shows="Live, view only: this device's real choices for a tap on an empty day, a tap on an event, a hold, and the month name; its chips would change them, so presses are off."
+      >
+        <View style={styles.cardBox}>
+          <ViewOnly>
+            <GesturesSection />
           </ViewOnly>
         </View>
       </Specimen>

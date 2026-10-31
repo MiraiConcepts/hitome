@@ -27,6 +27,7 @@ import {
   SLOT_HEIGHT,
   WeekRow,
 } from '@/components/calendar/week-row';
+import type { Gestures } from '@/config/gestures';
 import {
   addDays,
   buildMonthRange,
@@ -53,7 +54,7 @@ type Props = {
   width: number;
   height: number;
   events: CalEvent[];
-  /** Today's dateString; also anchors the ±5y month range. */
+  /** Today's dateString. */
   today: string;
   /** Month to land on at mount (deep-linked day's month or today's). */
   initialMonth: MonthAnchor;
@@ -76,6 +77,8 @@ type Props = {
   onOpenDay: (day: string) => void;
   onPressEvent: (event: CalEvent) => void;
   onCreateOnDay: (day: string) => void;
+  /** What taps and holds do (see WeekRow). */
+  gestures?: Gestures;
   /** Discover mode's drawing and hold (see WeekRow). */
   eventLook?: (event: CalEvent) => EventLook;
   onHoldEvent?: (event: CalEvent) => boolean;
@@ -185,7 +188,7 @@ function bucketByWeek(events: CalEvent[]): Map<string, CalEvent[]> {
 const keyExtractor = (week: string) => week;
 
 /**
- * The month grid: one continuous ribbon of week rows spanning today ± 5 years.
+ * The month grid: one continuous ribbon of week rows spanning 1900 to 2100.
  * Weeks — not months — are the list unit, because a month's own six rows always
  * overrun into the next month's six by one or two, and two month-sized pages
  * would each have to draw that shared week. One row per week means no week can
@@ -216,15 +219,13 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     eventLook,
     onHoldEvent,
     discover,
+    gestures,
   },
   ref
 ) {
   const listRef = useRef<FlatList<string>>(null);
 
-  const months = useMemo(
-    () => buildMonthRange(parseDay(today) ?? new Date()),
-    [today]
-  );
+  const months = useMemo(() => buildMonthRange(), []);
   const { rangeStart, weeks } = useMemo(() => buildWeekRange(months), [months]);
   /** Row index per month, index-parallel to `months`. */
   const snapRows = useMemo(
@@ -283,6 +284,12 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     return Math.min(Math.max(row, 0), weeks.length - VISIBLE_ROWS);
   }, [months, snapRows, initialIndex, today, rangeStart, weeks.length]);
   const currentIndex = useRef(initialIndex);
+  /** Still resting in the launch pose (today's week a row from the top, not
+   *  the month's first row) — until the first drag or jump. The offset there
+   *  is no measure of the month: in a month's last week it sits nearer the
+   *  next month's first row, so reading it opened 31 October as November,
+   *  October all dimmed. */
+  const inLaunchPose = useRef(launchRow !== snapRows[initialIndex]);
   /** The row the grid is actually on — the launch pose to begin with, then the
    *  month it settles on. Restored on a pane resize, where using the month's
    *  own row instead threw the pose away on every launch: the height settles a
@@ -358,6 +365,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     armSettle();
+    if (inLaunchPose.current) return;
     // The header follows the scroll live: the month is whichever one the
     // offset is nearest, with nothing to settle afterwards.
     const index = nearestSnapIndex(snapOffsets, e.nativeEvent.contentOffset.y);
@@ -370,6 +378,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   /** Note where a gesture began; its landing is measured from there. Only a
    *  real drag reaches this — the platform raises it for nothing else. */
   const beginGesture = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    inLaunchPose.current = false;
     dragFrom.current = currentIndex.current;
     dragFromOffset.current = e.nativeEvent.contentOffset.y;
   };
@@ -445,6 +454,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     ref,
     () => ({
       scrollToMonth(year, month0, animated) {
+        inLaunchPose.current = false;
         const index = indexOfMonth({ year, month0 });
         const adjacent = Math.abs(index - currentIndex.current) <= 1;
         currentIndex.current = index;
@@ -474,12 +484,12 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   // FlatList treats its cells as pure: they re-render when `data` or
   // `extraData` changes and not otherwise. Both of the things a mounted row
   // draws from live outside `data` — which month is focused (dimming) and the
-  // fetched events — so without this a row mounted before a jump keeps the
+  // fetched events, and what a tap does (gestures) — so without this a row mounted before a jump keeps the
   // focus and the chips it first rendered with. Pressing Today four months
   // back landed on the right month with every day dimmed and no events on it.
   const extraData = useMemo(
-    () => ({ focusedMonth, weekEvents, pulse, eventLook, discover }),
-    [focusedMonth, weekEvents, pulse, eventLook, discover]
+    () => ({ focusedMonth, weekEvents, pulse, eventLook, discover, gestures }),
+    [focusedMonth, weekEvents, pulse, eventLook, discover, gestures]
   );
 
   const renderItem = ({ item, index }: ListRenderItemInfo<string>) => (
@@ -501,6 +511,7 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
       eventLook={eventLook}
       onHoldEvent={onHoldEvent}
       discover={discover}
+      gestures={gestures}
     />
   );
 

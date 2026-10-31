@@ -9,7 +9,9 @@ import {
   AlertCircleOutlineBody,
   CalendarEventOutlineBody,
   CheckOutlineBody,
+  ArrowBackUpOutlineBody,
   ChevronLeftOutlineBody,
+  ChevronRightOutlineBody,
   InfoCircleOutlineBody,
   CircleDashedOutlineBody,
   LockOutlineBody,
@@ -63,6 +65,14 @@ export function SettingsIcon({ size = 24, color }: IconProps) {
 
 export function ChevronLeftIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(ChevronLeftOutlineBody, size, color)} />;
+}
+
+export function UndoIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(ArrowBackUpOutlineBody, size, color)} />;
+}
+
+export function ChevronRightIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(ChevronRightOutlineBody, size, color)} />;
 }
 
 export function ServerIcon({ size = 24, color }: IconProps) {

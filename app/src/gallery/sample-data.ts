@@ -179,6 +179,19 @@ export const SAMPLE_TRAY_EVENTS: CalEvent[] = [
     }),
   },
   {
+    // Repeating, so its going box asks "this date or all dates".
+    ...event({
+      id: 'tray-film-club',
+      summary: 'Film club',
+      start: at(0, 19),
+      end: at(0, 21),
+      calendar: SAMPLE_TRAY_CALENDAR,
+      location: 'Filmhouse',
+      rrule: 'FREQ=WEEKLY',
+    }),
+    free: true,
+  },
+  {
     ...event({
       id: 'tray-photo-walk',
       summary: 'Night photo walk, old town gate to the river and back',

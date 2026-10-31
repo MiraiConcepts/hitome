@@ -33,6 +33,8 @@ import {
 import { TodayMark } from '@/components/calendar/today-mark';
 import { titleWidth as measureTitle } from '@/components/calendar/title-width';
 import { ThemedText } from '@/components/themed-text';
+import { DEFAULT_GESTURES, type Gestures } from '@/config/gestures';
+import { Motion } from '@/constants/motion';
 import { AccentColor, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -123,6 +125,9 @@ type WeekRowProps = {
   onHoldEvent?: (event: CalEvent) => boolean;
   /** Discover mode is on: today's fill turns orange. */
   discover?: boolean;
+  /** What a tap on an empty day, a tap on an event and a hold do (Settings ›
+   *  Gestures); how hitome has always behaved without. */
+  gestures?: Gestures;
 };
 
 /** How far a multi-day event's trail fades toward the ground by its last
@@ -204,7 +209,7 @@ function bannerTitleLines(summary: string, widthPx: number): number {
 const OTHER_MONTH_FILL = '#2E3135';
 
 /** How long a neighbouring month's shading takes to settle in or out. */
-const DIM_MS = 200;
+const DIM_MS = Motion.normal;
 
 /** How long a hold must last to count as one. Stated here rather than left to
  *  Pressable's own default because the ink below is timed to it: the wash
@@ -219,10 +224,10 @@ const LONG_PRESS_MS = 350;
 const PRESS_DELAY_MS = 90;
 /** How fast the ink clears once the finger lifts — quick, so a plain tap
  *  flashes rather than lingering. */
-const INK_RELEASE_MS = 150;
+const INK_RELEASE_MS = Motion.normal;
 /** How fast the ink reaches full strength. Short: the colour arrives at once,
  *  and it is the spreading circle, not the tint, that reports the hold. */
-const INK_FADE_MS = 90;
+const INK_FADE_MS = Motion.quick;
 /** How long a press on an event lasts before the day's ink starts. A tap
  *  opens the event, and lights the event; only a press held past this is
  *  turning into a hold, which creates on the day, so only then does the day
@@ -285,6 +290,7 @@ export const WeekRow = memo(function WeekRow({
   eventLook,
   onHoldEvent,
   discover,
+  gestures = DEFAULT_GESTURES,
 }: WeekRowProps) {
   const theme = useTheme();
 
@@ -463,21 +469,23 @@ export const WeekRow = memo(function WeekRow({
   const todayCol = days.findIndex((d) => toDateString(d) === todayStr);
 
   /** Tap: the day's list. An empty day has no list, so a tap there starts a
-   *  new event on it, on the phone as on the web (a hold does the same, on a
-   *  day with events too). */
+   *  new event on it by default (Settings › Gestures can make it open the
+   *  empty day, or do nothing). */
+  const { emptyDayTap, eventTap, dayHold } = gestures;
   const openDay = useCallback(
     (col: number) => {
       const day = dayAt(col);
-      if (daysWithEvents.has(day)) onOpenDay(day);
-      else onCreateOnDay(day);
+      if (daysWithEvents.has(day) || emptyDayTap === 'day') onOpenDay(day);
+      else if (emptyDayTap === 'create') onCreateOnDay(day);
     },
-    [dayAt, daysWithEvents, onOpenDay, onCreateOnDay]
+    [dayAt, daysWithEvents, onOpenDay, onCreateOnDay, emptyDayTap]
   );
 
-  /** Hold: a new event on that day. */
+  /** Hold: a new event on that day, or (Settings › Gestures) its list. */
   const createOn = useCallback(
-    (col: number) => onCreateOnDay(dayAt(col)),
-    [dayAt, onCreateOnDay]
+    (col: number) =>
+      dayHold === 'day' ? onOpenDay(dayAt(col)) : onCreateOnDay(dayAt(col)),
+    [dayAt, onCreateOnDay, onOpenDay, dayHold]
   );
 
   /** A hold reaching its threshold. On a phone that is the gesture: the
@@ -510,10 +518,10 @@ export const WeekRow = memo(function WeekRow({
    *  only place the hidden ones can be reached. */
   const pressEvent = useCallback(
     (event: CalEvent, col: number) => {
-      if (layout.overflow[col] > 0) openDay(col);
+      if (layout.overflow[col] > 0 || eventTap === 'day') openDay(col);
       else onPressEvent(event);
     },
-    [layout, openDay, onPressEvent]
+    [layout, openDay, onPressEvent, eventTap]
   );
 
   // What each day draws: the piece of every all-day or multi-day event

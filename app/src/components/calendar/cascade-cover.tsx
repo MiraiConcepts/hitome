@@ -9,12 +9,14 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { Motion } from '@/constants/motion';
+
 /** One tile per day of a six-week month. */
 const COLS = 7;
 const ROWS = 6;
 /** How far behind its neighbour each tile clears, and how long it takes. */
 const STAGGER_MS = 18;
-const FADE_MS = 200;
+const FADE_MS = Motion.normal;
 const LAST_DELAY_MS = (COLS - 1 + ROWS - 1) * STAGGER_MS;
 /** When the last tile has cleared (two frames' grace included). */
 export const CASCADE_DONE_MS = LAST_DELAY_MS + FADE_MS + 40;

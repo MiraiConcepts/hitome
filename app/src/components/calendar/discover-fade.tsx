@@ -8,6 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { RULE_WIDTH } from '@/components/calendar/grid-scale';
+import { Motion } from '@/constants/motion';
 import { AccentColor } from '@/constants/theme';
 
 /**
@@ -16,7 +17,7 @@ import { AccentColor } from '@/constants/theme';
  */
 
 /** How long the bar takes to fade into discover mode's colours and back. */
-export const DISCOVER_FADE_MS = 260;
+export const DISCOVER_FADE_MS = Motion.slow;
 
 /**
  * Discover mode's colours, faded in: `ground` for an orange layer laid under

@@ -34,7 +34,7 @@ import { Note, Row, Section, Specimen, Swatch } from '../parts';
 const LOCAL_COLOURS = [
   ['OTHER_MONTH_FILL', '#2E3135', 'calendar/week-row.tsx:143'],
   ['INK_COLOR (hold ink)', '#5B9DFF', 'calendar/week-row.tsx:174'],
-  ['OFFLINE_COLOR', '#F09595', 'calendar/month-header.tsx:94'],
+  ['OFFLINE_COLOR', '#F09595', 'calendar/month-header.tsx:122'],
   ['DIVIDER (editor actions)', '#60646C', 'calendar/event-editor-form.tsx:522'],
   [
     'Button cooldown',

@@ -90,6 +90,47 @@ describe('store backend', () => {
     expect(after.alarm).toBeUndefined();
   });
 
+  it('marks one date of a repeating event going, and only that date', async () => {
+    const series = await weekly('Film club');
+    await setGoing(series[0], false, null);
+    const free = (await fetchMonth(FROM, TO)).filter(
+      (e) => e.summary === 'Film club'
+    );
+    expect(free.every((e) => e.free)).toBe(true);
+    await setGoing(free[1], true, 30, 'this');
+    const after = (await fetchMonth(FROM, TO)).filter(
+      (e) => e.summary === 'Film club'
+    );
+    expect(after.map((e) => [e.start.getDate(), !e.free])).toEqual([
+      [5, false],
+      [12, true],
+      [19, false],
+      [26, false],
+    ]);
+    expect(after[1].alarm).toBe(true);
+    // And back, on that date alone (now an exception row of its own).
+    await setGoing(after[1], false, null, 'this');
+    const back = (await fetchMonth(FROM, TO)).filter(
+      (e) => e.summary === 'Film club'
+    );
+    expect(back.every((e) => e.free)).toBe(true);
+    expect(back[1].alarm).toBeUndefined();
+  });
+
+  it('marks every date going, those with their own exception too', async () => {
+    const series = await weekly('Film club');
+    await setGoing(series[0], false, null);
+    const [, second] = await fetchMonth(FROM, TO);
+    // The feed moved one showing: an exception row of its own.
+    await updateEvent(second, { summary: 'Film club (moved)' }, 'this');
+    const before = await fetchMonth(FROM, TO);
+    expect(before.every((e) => e.free)).toBe(true);
+    await setGoing(before[0], true, 30, 'all');
+    const after = await fetchMonth(FROM, TO);
+    expect(after.map((e) => !e.free)).toEqual([true, true, true, true]);
+    expect(after.every((e) => e.alarm)).toBe(true);
+  });
+
   it('keeps a cancelled one-off event, flagged, and reads free', async () => {
     await createEvent(
       { summary: 'Gig', start: at(9, 20), end: at(9, 22), allDay: false },

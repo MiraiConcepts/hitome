@@ -12,6 +12,7 @@ import {
 
 import type { CalEvent } from '@/caldav/types';
 import { DayPopover } from '@/components/calendar/day-popover';
+import { MonthPicker } from '@/components/calendar/month-picker';
 import type { EditorResult } from '@/components/calendar/use-event-editor';
 import {
   CalendarPlusIcon,
@@ -21,6 +22,7 @@ import {
   TrashIcon,
 } from '@/components/icons';
 
+import type { MonthAnchor } from '@/utils/calendar-grid';
 import { shareEvent } from '@/utils/share-event';
 
 import { Messages } from '@/constants/messages';
@@ -36,11 +38,14 @@ type Overlays = {
   /** `discover`: the list as discover mode shows it (going boxes). */
   openDay: (day: string, events: CalEvent[], discover?: boolean) => void;
   openEditor: (request: EditorRequest) => void;
+  /** The month picker, opened on `shown` (this month by default). */
+  openMonthPicker: (shown?: MonthAnchor) => void;
 };
 
 const OverlayContext = createContext<Overlays>({
   openDay: () => {},
   openEditor: () => {},
+  openMonthPicker: () => {},
 });
 
 export function useOverlays() {
@@ -82,10 +87,12 @@ export function OverlayHost({ children }: { children: ReactNode }) {
     setDay(null);
     setEditor((prev) => ({ ...request, key: (prev?.key ?? 0) + 1 }));
   }, []);
+  const [picker, setPicker] = useState<MonthAnchor | null>(null);
   const value = useMemo<Overlays>(
     () => ({
       openDay: (d, events, discover) => setDay({ day: d, events, discover }),
       openEditor,
+      openMonthPicker: (shown) => setPicker(shown ?? thisMonth()),
     }),
     [openEditor]
   );
@@ -123,6 +130,8 @@ export function OverlayHost({ children }: { children: ReactNode }) {
               ? {
                   isGoing: (event) => going[event.id] ?? !event.free,
                   onToggle: (event) => {
+                    // One sample per series here, so this date and all
+                    // dates mark the same row.
                     const next = !(going[event.id] ?? !event.free);
                     setGoing((g) => ({ ...g, [event.id]: next }));
                     toast({
@@ -161,6 +170,32 @@ export function OverlayHost({ children }: { children: ReactNode }) {
           }}
         />
       )}
+      {picker && (
+        <MonthPicker
+          shown={picker}
+          today={thisMonth()}
+          onPick={(month) => {
+            setPicker(null);
+            toast({
+              icon: CheckIcon,
+              message: `Goes to ${monthLabel(month)}`,
+            });
+          }}
+          onToday={() => setPicker(null)}
+          onClose={() => setPicker(null)}
+        />
+      )}
     </OverlayContext.Provider>
   );
 }
+
+function thisMonth(): MonthAnchor {
+  const now = new Date();
+  return { year: now.getFullYear(), month0: now.getMonth() };
+}
+
+const monthLabel = ({ year, month0 }: MonthAnchor) =>
+  new Date(year, month0, 1).toLocaleDateString(undefined, {
+    month: 'short',
+    year: 'numeric',
+  });

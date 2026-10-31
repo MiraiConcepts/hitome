@@ -7,8 +7,13 @@ import { eventLastMs, toDateString } from '@/utils/date';
 const DAY_MS = 86_400_000;
 const WEEK_MS = 7 * DAY_MS;
 
-/** Grid range: today ± this many years of week rows. */
-const RANGE_YEARS = 5;
+/** Grid range: January of the first year through December of the last. Wide
+ *  enough to read as endless; only the week rows on screen are drawn, so the
+ *  length costs one list built at launch (about 10,500 rows, a millisecond or
+ *  so on a laptop). Fixed rather than counted from today, so a new day never
+ *  moves a month to another index. */
+export const FIRST_YEAR = 1900;
+export const LAST_YEAR = 2100;
 
 /** Calendar-safe day arithmetic (setDate-style); also normalizes to local midnight. */
 export function addDays(d: Date, n: number): Date {
@@ -59,16 +64,13 @@ export type MonthAnchor = { year: number; month0: number };
 const ordinalOf = ({ year, month0 }: MonthAnchor) => year * 12 + month0;
 
 /**
- * The bounded month ribbon: every month from RANGE_YEARS before `today`
- * through RANGE_YEARS after. Not the list data — it names the months a swipe
- * can land on, and is what `monthStartWeekIndices` runs index-parallel to.
+ * The bounded month ribbon: every month from FIRST_YEAR through LAST_YEAR.
+ * Not the list data — it names the months a swipe can land on, and is what
+ * `monthStartWeekIndices` runs index-parallel to.
  */
-export function buildMonthRange(today: Date): MonthAnchor[] {
-  const first = ordinalOf({
-    year: today.getFullYear() - RANGE_YEARS,
-    month0: today.getMonth(),
-  });
-  const count = RANGE_YEARS * 2 * 12 + 1;
+export function buildMonthRange(): MonthAnchor[] {
+  const first = ordinalOf({ year: FIRST_YEAR, month0: 0 });
+  const count = (LAST_YEAR - FIRST_YEAR + 1) * 12;
   return Array.from({ length: count }, (_, i) => ({
     year: Math.floor((first + i) / 12),
     month0: (first + i) % 12,

@@ -91,7 +91,7 @@ function Header(
     discover: { open: boolean };
   }>
 ) {
-  const { openEditor } = useOverlays();
+  const { openEditor, openMonthPicker } = useOverlays();
   const now = new Date();
   const anchor = props.anchor ?? {
     year: now.getFullYear(),
@@ -108,6 +108,7 @@ function Header(
       authFailed={props.authFailed ?? false}
       fetchedAt={props.fetchedAt === undefined ? now : props.fetchedAt}
       onToday={noop}
+      onPickMonth={() => openMonthPicker(anchor)}
       onRefresh={noop}
       onAdd={() => openEditor({ event: null, defaultDay: TODAY })}
       onShareMonth={noop}
@@ -440,7 +441,7 @@ function SampleMonth() {
       <Specimen
         name="MonthGrid (real, sample events)"
         file={file}
-        shows="Scrolls by month like the app (±5 years). Tap events, busy days (+N), empty days; hold a day for a new event."
+        shows="Scrolls by month like the app (1900 to 2100). Tap events, busy days (+N), empty days; hold a day for a new event."
         bare
       >
         <SampleMonthGrid />

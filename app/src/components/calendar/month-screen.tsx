@@ -35,6 +35,7 @@ import {
   deleteEvent,
   undoDelete as undoDeleteOnServer,
   type EditScope,
+  type GoingScope,
   requestSync,
   setGoing,
   listCalendars,
@@ -64,8 +65,9 @@ import {
   type MonthGridHandle,
 } from '@/components/calendar/month-grid';
 import { HEADER_GROUND, MonthHeader } from '@/components/calendar/month-header';
+import { MonthPicker } from '@/components/calendar/month-picker';
 import { MonthPicture } from '@/components/calendar/month-picture';
-import { SNACK_MS, SNACK_SPOT, SnackBar } from '@/components/snack-bar';
+import { SNACK_SPOT, SnackBar, snackMs } from '@/components/snack-bar';
 import {
   AlertCircleIcon,
   CalendarPlusIcon,
@@ -76,6 +78,7 @@ import {
   TelescopeIcon,
   TrashIcon,
   WifiOffIcon,
+  UndoIcon,
 } from '@/components/icons';
 import { Spinner } from '@/components/spinner';
 import { ThemedText } from '@/components/themed-text';
@@ -90,6 +93,7 @@ import {
 } from '@/config/dav-config';
 import { recheckSource } from '@/config/source';
 import { ensureDefaultAlert } from '@/config/alert-pref';
+import { DEFAULT_GESTURES, useGestures } from '@/config/gestures';
 import { useCalendarKeys } from '@/hooks/use-calendar-keys';
 import { useEscapeKey } from '@/hooks/use-escape-key';
 import { useDeepLink } from '@/hooks/use-deep-link';
@@ -195,6 +199,8 @@ export function MonthScreen() {
   );
   const [snack, setSnack] = useState<Snack>(null);
   const [popoverDay, setPopoverDay] = useState<string | null>(null);
+  const [pickingMonth, setPickingMonth] = useState(false);
+  const gestures = useGestures();
   // Spins the header's refresh icon — only for button-pressed refreshes, not
   // the fetches that follow scrolling or the foreground poll.
   const [manualRefreshing, setManualRefreshing] = useState(false);
@@ -420,7 +426,8 @@ export function MonthScreen() {
   // pointing at. Held until the grid is actually visible: firing it under the
   // popover would spend the whole animation behind it. Reads the pre-update
   // popover, so the render that opens one does not also flash beneath it.
-  const overlayOpen = editor.mode !== 'closed' || popoverDay !== null;
+  const overlayOpen =
+    editor.mode !== 'closed' || popoverDay !== null || pickingMonth;
   if (arrivedDay && !overlayOpen) {
     setPulse((prev) => ({ day: arrivedDay, nonce: (prev?.nonce ?? 0) + 1 }));
     setArrivedDay(null);
@@ -434,11 +441,14 @@ export function MonthScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snack]);
 
-  // Auto-dismiss the snackbar — after 8s, so Undo is still there once the
-  // grid has visibly changed and the mistake sinks in.
+  // Auto-dismiss the snackbar: after 8s with Undo, so it is still there once
+  // the grid has visibly changed and the mistake sinks in; 4s without.
   useEffect(() => {
     if (!snack) return;
-    const timer = setTimeout(() => setSnack(null), SNACK_MS);
+    const timer = setTimeout(
+      () => setSnack(null),
+      snackMs(Boolean(snack.undo || snack.revert))
+    );
     return () => clearTimeout(timer);
   }, [snack]);
 
@@ -671,15 +681,24 @@ export function MonthScreen() {
     else setSnack({ message: Messages.linkMissing, icon: InfoCircleIcon });
   }
 
-  /** Discover mode's tap: going, or no longer. The chip changes at once. */
-  function toggleGoing(event: CalEvent) {
+  /** Discover mode's tap: going, or no longer, on one date of a repeating
+   *  event or all of them. The chips change at once. */
+  function toggleGoing(event: CalEvent, scope: GoingScope) {
     const next = !isGoing(event);
-    setAsked((a) => ({ ...a, [event.id]: next }));
-    onSetGoing(event, next).catch(() =>
-      setAsked((a) => {
-        const { [event.id]: _, ...rest } = a;
-        return rest;
-      })
+    const ids =
+      scope === 'all'
+        ? allEvents.filter((e) => e.url === event.url).map((e) => e.id)
+        : [event.id];
+    setAsked((a) => ({
+      ...a,
+      ...Object.fromEntries(ids.map((id) => [id, next])),
+    }));
+    onSetGoing(event, next, scope).catch(() =>
+      setAsked((a) =>
+        Object.fromEntries(
+          Object.entries(a).filter(([id]) => !ids.includes(id))
+        )
+      )
     );
   }
 
@@ -709,9 +728,18 @@ export function MonthScreen() {
   /** Mark a discover event going (busy, with the default reminder) or not,
    *  with an Undo that marks it back. Throws when it could not be written,
    *  after saying why, so the chip goes back. */
-  async function onSetGoing(event: CalEvent, going: boolean): Promise<void> {
+  async function onSetGoing(
+    event: CalEvent,
+    going: boolean,
+    scope: GoingScope = 'all'
+  ): Promise<void> {
     try {
-      await setGoing(event, going, going ? await ensureDefaultAlert() : null);
+      await setGoing(
+        event,
+        going,
+        going ? await ensureDefaultAlert() : null,
+        scope
+      );
     } catch (err) {
       refresh();
       setSnack(
@@ -739,7 +767,7 @@ export function MonthScreen() {
         setSnack(null);
         const fresh =
           latestEvents.current.find((e) => e.id === event.id) ?? event;
-        onSetGoing(fresh, !going).catch(() => {});
+        onSetGoing(fresh, !going, scope).catch(() => {});
       },
     });
   }
@@ -952,9 +980,13 @@ export function MonthScreen() {
       message={snack.message}
       action={
         snack.undo
-          ? { label: 'Undo', onPress: () => undoDelete(snack.undo!) }
+          ? {
+              label: 'Undo',
+              icon: UndoIcon,
+              onPress: () => undoDelete(snack.undo!),
+            }
           : snack.revert
-            ? { label: 'Undo', onPress: snack.revert }
+            ? { label: 'Undo', icon: UndoIcon, onPress: snack.revert }
             : undefined
       }
     />
@@ -994,6 +1026,8 @@ export function MonthScreen() {
               authFailed={authFailed}
               fetchedAt={fetchedAt}
               onToday={goToday}
+              onPickMonth={() => setPickingMonth(true)}
+              tapPicksMonth={gestures.monthTap === 'picker'}
               onRefresh={onManualRefresh}
               onAdd={() => setEditor({ mode: 'create', day: addDay })}
               onShareMonth={onShareMonth}
@@ -1064,6 +1098,9 @@ export function MonthScreen() {
                   onCreateOnDay={discover ? ignoreDay : onCreateOnDay}
                   eventLook={eventLook}
                   onHoldEvent={onHoldEvent}
+                  // Discover mode keeps its own: a tap opens the day list,
+                  // a hold the event's page.
+                  gestures={discover ? DEFAULT_GESTURES : gestures}
                   // With the header: today's outline fades to orange as the
                   // bar does.
                   discover={headerDiscover}
@@ -1180,6 +1217,22 @@ export function MonthScreen() {
             setPopoverDay(null);
             setEditor({ mode: 'create', day: popoverDay });
           }}
+        />
+      )}
+
+      {pickingMonth && (
+        <MonthPicker
+          shown={month}
+          today={monthOfDay(null, new Date())}
+          onPick={(target) => {
+            setPickingMonth(false);
+            gridRef.current?.scrollToMonth(target.year, target.month0, true);
+          }}
+          onToday={() => {
+            setPickingMonth(false);
+            goToday();
+          }}
+          onClose={() => setPickingMonth(false)}
         />
       )}
 
