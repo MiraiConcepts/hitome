@@ -17,9 +17,10 @@ its reminders on the device itself.
 - Every calendar on the account is read at once, and each event carries its own
   calendar's colour and marker glyph, so the month reads as one calendar without
   the calendars being merged.
-- The grid is a single ribbon of weeks spanning five years either side of today,
-  snapped to month starts. A month boundary is a landing point rather than a
-  separate screen, so a week is never drawn twice and scrolling never restarts.
+- The grid is a single ribbon of weeks from 1900 to 2100, snapped to month
+  starts. A month boundary is a landing point rather than a separate screen, so
+  a week is never drawn twice and scrolling never restarts. Holding the month
+  name opens a picker for jumping straight to any month of any year.
 - Fetched months accumulate and are only ever replaced by a fresher fetch,
   never dropped on navigation, which is what used to make events vanish
   mid-scroll. Neighbouring months are prefetched outward in waves.
@@ -34,6 +35,17 @@ its reminders on the device itself.
 - A repeating event is edited or deleted for this occurrence, this and the
   following ones, or all of them; the series' exceptions move with it. Undo
   puts back exactly what was there, into the calendar it came from.
+- Each calendar is shown, hidden, or kept for discover mode: a calendar that
+  something else fills with things that might be worth doing, such as a
+  cinema's showings. The telescope turns the grid over to those, and a tick
+  marks one as going, which puts it on the calendar and the widget with a
+  reminder. For a repeating one it asks whether the answer is for that date or
+  every date. hitome never edits, moves or deletes a discover event, so the
+  feed that writes it stays in charge.
+- What a tap and a hold do is a setting, per device: whether tapping an empty
+  day starts an event, opens the day or does nothing, whether tapping an event
+  opens it or its day, what a hold does, and whether tapping the month name
+  goes to today or opens the month picker.
 - Reminders are scheduled as one alarm per concrete occurrence inside a rolling
   two-week horizon, because the platform has no recurring trigger. Every open
   re-derives the whole set and reschedules it, since a force-stop can wipe the
