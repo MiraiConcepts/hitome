@@ -80,8 +80,9 @@ export const MaxContentWidth = 800;
 export const WideLayoutMinWidth = 768;
 
 /**
- * Satoshi — the app's single typeface (files in assets/fonts). One family
- * name resolves everywhere: RN + web (@font-face), and the RNAW widget,
+ * Satoshi — the app's single typeface (files in assets/fonts, fetched from
+ * Fontshare at install by scripts/fetch-fonts.mjs). One family name resolves
+ * everywhere: RN + web (@font-face), and the RNAW widget,
  * which loads assets/fonts/<name>.otf by basename. Bold is a separate face.
  */
 export const FontFamily = 'Satoshi';

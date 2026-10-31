@@ -115,3 +115,12 @@ keep them in step with your server. [DAVx⁵](https://www.davx5.com) does that.
    hitome. Tapping an event opens it; the plus adds one.
 
 Problems and ideas: the link under Settings, About.
+
+# Credits
+
+The app icon is based on [Third Eye](https://thenounproject.com/icon/2268205/)
+by Eliricon, from the Noun Project. The typeface is
+[Satoshi](https://www.fontshare.com/fonts/satoshi) by the Indian Type Foundry,
+from Fontshare; its licence lets the app embed it but not share the font files,
+so they are downloaded from Fontshare when the app's packages are installed
+rather than kept in this repository.

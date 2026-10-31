@@ -48,3 +48,7 @@ modules/*/android/build/
 
 # hitome dev server sessions (bun run server:dev)
 .hitome-dev/
+
+# Satoshi: fetched from Fontshare by scripts/fetch-fonts.mjs (its licence
+# does not allow publishing the font files)
+assets/fonts/*.otf

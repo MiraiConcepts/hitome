@@ -1,7 +1,7 @@
 # Event Editor Refresh — Implementation Plan
 
 Created: 2026-07-19 · Status: COMPLETE
-Repo: `/Users/addison/Desktop/<repo>` (work happens under `app/` unless noted)
+Repo: the repository root (work happens under `app/` unless noted)
 
 ## Context
 

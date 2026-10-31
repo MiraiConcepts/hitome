@@ -19,8 +19,10 @@
 FROM --platform=$BUILDPLATFORM oven/bun:1.4.2 AS build
 WORKDIR /app
 COPY package.json bun.lock ./
-# patchedDependencies (bun patch) must be present at install time
+# patchedDependencies (bun patch) must be present at install time, and the
+# postinstall fetches the Satoshi font (scripts/fetch-fonts.mjs)
 COPY patches ./patches
+COPY scripts ./scripts
 RUN bun install --frozen-lockfile
 COPY . .
 

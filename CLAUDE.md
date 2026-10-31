@@ -66,6 +66,10 @@ helper scripts.
   `bun run format:check`.
 - Tests: local jest is broken under bun's runtime — run `bun test <files>`
   instead; CI runs jest via `bun run test`.
+- The Satoshi font files are not in the repo (Fontshare's licence forbids
+  publishing them): `bun install`'s postinstall fetches them into
+  `app/assets/fonts/` (`app/scripts/fetch-fonts.mjs`), and the Dockerfile
+  copies `scripts/` in before installing. Never commit them back.
 - Install Expo packages with `bunx expo install` (SDK 56 line), never
   `bun add expo-*@latest` (SDK 57 is out).
 
