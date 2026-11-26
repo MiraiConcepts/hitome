@@ -31,7 +31,7 @@ export default function Root({ children }: PropsWithChildren) {
         */}
         <ScrollViewStyleReset />
 
-        {/* Web runs the dark palette only (see hooks/use-color-scheme.web.ts).
+        {/* Web runs the dark palette only (see constants/theme.ts).
             Declaring it here paints the page — and the browser's own form
             controls and scrollbars — dark from the first frame, instead of a
             white flash before React mounts. */}

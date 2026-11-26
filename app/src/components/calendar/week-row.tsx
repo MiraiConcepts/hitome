@@ -35,7 +35,7 @@ import { titleWidth as measureTitle } from '@/components/calendar/title-width';
 import { ThemedText } from '@/components/themed-text';
 import { DEFAULT_GESTURES, type Gestures } from '@/config/gestures';
 import { Motion } from '@/constants/motion';
-import { AccentColor, Spacing } from '@/constants/theme';
+import { AccentColor, Colors, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   addDays,
@@ -233,11 +233,10 @@ const INK_FADE_MS = Motion.quick;
  *  turning into a hold, which creates on the day, so only then does the day
  *  ink — the rest of LONG_PRESS_MS, so it still fills as the hold fires. */
 const EVENT_INK_DELAY_MS = 150;
-/** The ink itself. Fixed rather than a palette token, for the same reason as
- *  the fills above: it has to read on the bare background, on a neighbouring
- *  month's grey AND on today's blue, and one value does all three — the dark
- *  scheme's link blue, light enough to lift even off a blue event. */
-const INK_COLOR = '#5B9DFF';
+/** The ink itself: the app's one blue, at full strength. It has to read on
+ *  the bare background, on a neighbouring month's grey AND on today's fill,
+ *  which is the same blue faded toward the ground, so it still lifts off it. */
+const INK_COLOR = Colors.dark.link;
 /** The ink at full strength. */
 const INK_OPACITY = 0.28;
 

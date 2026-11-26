@@ -5,12 +5,11 @@ Web) client against self-hosted Radicale over CalDAV, with an Android home-scree
 agenda widget and exact alarms. Targets web + Android (Obtainium) — no iOS.
 
 Split out of a sibling notes app, which keeps the notes canvas and its
-Hocuspocus/blob backend. The two share a design language via
-`MiraiConcepts/tokens`; the primitives in `src/constants/theme.ts` and
-`src/components/` are currently a **verbatim copy** of that app's — keep them
-byte-identical until both move onto `MiraiConcepts/components` (currently
-diverged on corner radius — see Invariants — and on three theme colours
-hitome added: `placeholder`, and `rule`/`ruleStrong` for the settings card).
+Hocuspocus/blob backend. The two are separate apps: hitome's
+`src/constants/theme.ts` and `src/components/` are its own, not a copy to
+keep in step. hitome may later take its palette from `MiraiConcepts/tokens`,
+the dark half only: `Colors.dark` keeps that palette's key names so it can be
+swapped in as it stands.
 
 ## Layout
 
@@ -108,9 +107,12 @@ helper scripts.
 - UI is square: no corner radius on cards, buttons, fields, chips, sheets or
   the widget (changed from 4px on 2026-10-04). A calendar is marked by an
   icon in its colour (`CalendarMark`: gift for a calendar named birthday,
-  confetti for one named holiday, else a calendar), not a dot. Only the month grid's tap ripple stays round. This breaks
-  byte-identity with the notes app's `theme.ts`/`src/components/` until it
-  makes the same change.
+  confetti for one named holiday, else a calendar), not a dot. Only the month grid's tap ripple stays round.
+- **Dark only**, on every platform and in the widget (whose light half is
+  the same dark agenda). There is no light palette: `useTheme()` returns
+  `Colors.dark`. One blue, `Colors.dark.link` (#5B9DFF): links, today's fill,
+  the hold ink and the location tag, which takes dark ink like the accent's
+  chips.
 - **Discover mode** (plan: `.claude/plans/discover-tray-plan.md`): each
   calendar is shown, discover ("tray" in code), or hidden (Settings ›
   Calendars, per device, `src/config/calendar-visibility.ts`). Discover

@@ -2,7 +2,6 @@
 // 'YYYY-MM-DD' regardless of locale display. Geometry/behavior twin:
 // date-field.tsx (Compose dialog).
 import { FontFamilyMedium } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
 import { FieldChrome, type DateFieldProps } from './field-chrome';
@@ -17,7 +16,6 @@ export function DateField({
   testID,
 }: DateFieldProps) {
   const theme = useTheme();
-  const scheme = useColorScheme() ?? 'light';
   ensureFieldCss();
 
   return (
@@ -49,7 +47,7 @@ export function DateField({
         color: theme.text,
         fontFamily: FontFamilyMedium,
         // Flips the browser picker popup + glyphs to the app's scheme.
-        colorScheme: scheme,
+        colorScheme: 'dark',
         width: '100%',
         boxSizing: 'border-box',
       }}

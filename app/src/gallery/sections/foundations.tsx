@@ -33,7 +33,6 @@ import { Note, Row, Section, Specimen, Swatch } from '../parts';
 /** Literals that are not exported, with where they live. */
 const LOCAL_COLOURS = [
   ['OTHER_MONTH_FILL', '#2E3135', 'calendar/week-row.tsx:143'],
-  ['INK_COLOR (hold ink)', '#5B9DFF', 'calendar/week-row.tsx:174'],
   ['OFFLINE_COLOR', '#F09595', 'calendar/month-header.tsx:122'],
   ['DIVIDER (editor actions)', '#60646C', 'calendar/event-editor-form.tsx:522'],
   [
@@ -178,22 +177,11 @@ export function Foundations() {
     <Section
       id="foundations"
       title="Foundations"
-      intro="Colour tokens, type, spacing and fixed measures. The app is dark only; Colors.light is used by the widget's light half."
+      intro="Colour tokens, type, spacing and fixed measures. The app and the widget are dark only."
     >
       <Specimen name="Colors.dark" file="constants/theme.ts">
         <Row>
           {Object.entries(Colors.dark).map(([name, value]) => (
-            <Swatch key={name} name={name} value={value} />
-          ))}
-        </Row>
-      </Specimen>
-      <Specimen
-        name="Colors.light"
-        file="constants/theme.ts"
-        shows="Not used by the app's screens (dark only); the widget renders a light half from it."
-      >
-        <Row>
-          {Object.entries(Colors.light).map(([name, value]) => (
             <Swatch key={name} name={name} value={value} />
           ))}
         </Row>

@@ -33,7 +33,7 @@ import {
 import { SettingsButton } from '@/components/settings/settings-parts';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { AccentColor, Colors, Spacing } from '@/constants/theme';
+import { AccentColor, Colors, OnAccentColor, Spacing } from '@/constants/theme';
 import {
   getFirstDayOfWeek,
   weekStartOf,
@@ -151,7 +151,7 @@ function SampleCascade() {
       >
         <ThemedText
           type="subtitle"
-          style={side === 'discover' && { color: Colors.light.text }}
+          style={side === 'discover' && { color: OnAccentColor }}
         >
           {side === 'mine' ? 'Your month' : 'Discover'}
         </ThemedText>

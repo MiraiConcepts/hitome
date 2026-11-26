@@ -2,7 +2,6 @@
 // 'HH:MM' regardless of locale display. Geometry/behavior twin:
 // time-field.tsx (Compose dialog).
 import { FontFamilyMedium } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
 import { FieldChrome, type TimeFieldProps } from './field-chrome';
@@ -10,7 +9,6 @@ import { ensureFieldCss } from './web-input-css';
 
 export function TimeField({ value, onChange, label, testID }: TimeFieldProps) {
   const theme = useTheme();
-  const scheme = useColorScheme() ?? 'light';
   ensureFieldCss();
 
   return (
@@ -37,7 +35,7 @@ export function TimeField({ value, onChange, label, testID }: TimeFieldProps) {
         backgroundColor: 'transparent',
         color: theme.text,
         fontFamily: FontFamilyMedium,
-        colorScheme: scheme,
+        colorScheme: 'dark',
         width: '100%',
         boxSizing: 'border-box',
       }}

@@ -1,6 +1,12 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * hitome's colours. The app is dark only, on every platform and in the
+ * widget: the calendar is drawn dark-first (black header block, accent-orange
+ * ink, dark out-of-month fills), and a light scheme only ever produced a
+ * half-light screen.
+ *
+ * `Colors.dark` keeps the key names of the shared MiraiConcepts/tokens dark
+ * palette, so hitome can take that palette as it stands (dark half only)
+ * without renaming anything. Colours below it are hitome's own.
  */
 
 import '@/global.css';
@@ -8,36 +14,29 @@ import '@/global.css';
 import { Platform } from 'react-native';
 
 export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-    /** Placeholder text in empty fields: quieter than textSecondary, so a
-     *  hint never reads as something already typed. */
-    placeholder: '#A1A5AC',
-    /** Dashed dividers inside a settings card — between rows and columns. */
-    rule: '#BBBBBB',
-    /** The dotted top edge of a settings card; a step stronger than `rule`. */
-    ruleStrong: '#999999',
-    /** Tappable text (Firefox brand blue; lightened in dark for legibility). */
-    link: '#0060E0',
-  },
   dark: {
     text: '#ffffff',
     background: '#1C1B22',
     backgroundElement: '#000000',
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
+    /** Placeholder text in empty fields: quieter than textSecondary, so a
+     *  hint never reads as something already typed. (hitome's own.) */
     placeholder: '#6C7078',
+    /** Dashed dividers inside a settings card, between rows and columns.
+     *  (hitome's own.) */
     rule: '#3F4249',
+    /** The dotted top edge of a settings card; a step stronger than `rule`.
+     *  (hitome's own.) */
     ruleStrong: '#5C6068',
+    /** hitome's one blue: tappable text, today's fill, the hold ink and the
+     *  location tag. Light enough to read as text on the dark ground (6.3:1);
+     *  anything drawn on it takes dark ink. */
     link: '#5B9DFF',
   },
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+export type ThemeColor = keyof typeof Colors.dark;
 
 export const Fonts = Platform.select({
   ios: {
@@ -108,6 +107,6 @@ export const AccentColor = '#FFBD4F';
 export const BrandColor = '#F5820D';
 /** Destructive actions / validation errors. */
 export const DangerColor = '#FF505F';
-/** Text/icons on an accent-colored surface, in both schemes — dark ink, since
+/** Text/icons on an accent-colored surface: dark ink, since
  * the Firefox orange is too light for white to stay readable on it. */
 export const OnAccentColor = '#000000';

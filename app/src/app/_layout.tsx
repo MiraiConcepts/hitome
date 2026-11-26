@@ -2,7 +2,7 @@ import '@/polyfills';
 
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import Head from 'expo-router/head';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
@@ -23,7 +23,6 @@ import { Motion } from '@/constants/motion';
 import { ensureDefaultAlert } from '@/config/alert-pref';
 import { ensureSource, useSourceStatus } from '@/config/source';
 import { useAlarmReconcile } from '@/hooks/use-alarm-reconcile';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { DeepLinkProvider } from '@/hooks/use-deep-link';
 import { useDeepLinkSource } from '@/hooks/use-deep-link-source';
 import { useHydrated } from '@/hooks/use-hydrated';
@@ -34,7 +33,6 @@ import { refreshAgendaWidget } from '@/widget/app-refresh';
 declareBoldFace();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   // Web loads Satoshi at runtime (@font-face injection); native embeds
   // it via the expo-font config plugin (and the widget reads assets/fonts).
   const [fontsLoaded, fontError] = useFonts({
@@ -92,7 +90,7 @@ export default function RootLayout() {
       <Head>
         <title>hitome</title>
       </Head>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <ThemeProvider value={DarkTheme}>
         {/* Bottom sheets (event editor on narrow layouts) portal here, above
             the router content. */}
         <BlurTargetProvider>

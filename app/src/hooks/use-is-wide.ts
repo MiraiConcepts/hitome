@@ -6,7 +6,7 @@ import { useHydrated } from '@/hooks/use-hydrated';
 /**
  * Whether the window is wide enough for the side-by-side layout. Reports
  * narrow until hydration so the client's first render matches the static
- * HTML (same pattern as use-color-scheme.web.ts).
+ * HTML.
  */
 export function useIsWide() {
   const hasHydrated = useHydrated();

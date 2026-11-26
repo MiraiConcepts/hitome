@@ -2,8 +2,8 @@ import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import type { CalEvent } from '@/caldav/types';
 import { ThemedText } from '@/components/themed-text';
-import { LOCATION_FILL, TAG } from '@/constants/tags';
-import { AccentColor, Colors, OnAccentColor } from '@/constants/theme';
+import { LOCATION_FILL, ON_LOCATION_FILL, TAG } from '@/constants/tags';
+import { AccentColor, OnAccentColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { linkHost } from '@/widget/format';
 import { toWidgetEvent } from '@/widget/select-upcoming';
@@ -29,7 +29,7 @@ export function EventTags({ event }: { event: CalEvent }) {
           text={location}
           uri={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`}
           background={LOCATION_FILL}
-          color={Colors.dark.text}
+          color={ON_LOCATION_FILL}
         />
       ) : null}
       {meetingLink ? (

@@ -33,7 +33,7 @@ import {
   OnAccentColor,
   type ThemeColor,
 } from '@/constants/theme';
-import { LOCATION_FILL, TAG } from '@/constants/tags';
+import { LOCATION_FILL, ON_LOCATION_FILL, TAG } from '@/constants/tags';
 import { formatTime } from '@/utils/date';
 
 import {
@@ -281,7 +281,7 @@ function EventRow({
           label="Open location in maps"
           text={event.location}
           background={LOCATION_FILL}
-          color={Colors.dark.text}
+          color={ON_LOCATION_FILL}
         />
       ) : null}
       {event.meetingLink && dayIndex === 1 ? (
@@ -526,8 +526,8 @@ function Agenda({
   );
 }
 
-/** Light/dark pair so the launcher can match the system theme; `now` fixed once
- * so both halves and every day header agree. `configured` is passed in rather
+/** The launcher asks for a light and a dark half; both are the dark agenda.
+ * `configured` is passed in rather
  * than read here: the render is synchronous and the stored config is not, so
  * the caller is the one that can have awaited it. */
 export function renderAgenda(
@@ -535,22 +535,14 @@ export function renderAgenda(
   configured: boolean
 ): WidgetRepresentation {
   const now = new Date();
-  return {
-    light: (
-      <Agenda
-        cache={cache}
-        now={now}
-        palette={Colors.light}
-        configured={configured}
-      />
-    ),
-    dark: (
-      <Agenda
-        cache={cache}
-        now={now}
-        palette={Colors.dark}
-        configured={configured}
-      />
-    ),
-  };
+  // Dark on a light phone too: hitome has one scheme (see constants/theme).
+  const agenda = (
+    <Agenda
+      cache={cache}
+      now={now}
+      palette={Colors.dark}
+      configured={configured}
+    />
+  );
+  return { light: agenda, dark: agenda };
 }
