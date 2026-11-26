@@ -209,28 +209,63 @@ export async function updateEvent(
   changes: EventChanges,
   scope: EditScope = 'all'
 ): Promise<void> {
+  await writeUpdate(event, changes, scope);
+}
+
+/**
+ * updateEvent, and a way to take it back: the drag on the web grid offers
+ * Undo, as a delete does. Undo puts the object back as it was before the
+ * save (no If-Match, as a delete's Undo: the etag changed with the save),
+ * and for "this and following" removes the new series made for the later
+ * occurrences.
+ */
+export async function updateEventUndoable(
+  event: CalEvent,
+  changes: EventChanges,
+  scope: EditScope = 'all'
+): Promise<() => Promise<void>> {
+  const { written, tailUrl } = await writeUpdate(event, changes, scope);
+  return async () => {
+    if (tailUrl) {
+      const client = await getClient();
+      const res = await client.deleteCalendarObject({
+        calendarObject: { url: tailUrl, etag: '' },
+      });
+      ensureOk(res, 'restore');
+    }
+    await revertEvent(written);
+  };
+}
+
+/** The save itself: the object as it was before (`written`), and the URL of
+ *  the series made for "this and following", if one was. */
+async function writeUpdate(
+  event: CalEvent,
+  changes: EventChanges,
+  scope: EditScope
+): Promise<{ written: CalEvent; tailUrl?: string }> {
   const effective = effectiveScope(event, scope);
   if (effective === 'all') {
     // preserves unknown props; a time change shifts the series
-    await saveOver(event, (current) =>
+    const written = await saveOver(event, (current) =>
       putObject(
         current,
         editPreserving(current.raw, changes, event.start),
         'update'
       )
     );
-    return;
+    return { written };
   }
   const recurrenceStart = event.recurrenceStart!;
   if (effective === 'this') {
-    await saveOver(event, (current) =>
+    const written = await saveOver(event, (current) =>
       putObject(
         current,
         editOccurrence(current.raw, recurrenceStart, event, changes),
         'update'
       )
     );
-    return;
+    return { written };
   }
   const uid = Crypto.randomUUID();
   let tail = '';
@@ -245,10 +280,13 @@ export async function updateEvent(
     tail = parts.tail;
     return putObject(current, parts.head, 'update');
   });
+  let tailUrl = '';
   try {
     const client = await getClient();
+    const calendar = await getCalendarFor(event.url);
+    tailUrl = new URL(`${uid}.ics`, calendar.url).href;
     const res = await client.createCalendarObject({
-      calendar: await getCalendarFor(event.url),
+      calendar,
       filename: `${uid}.ics`,
       iCalString: tail,
     });
@@ -259,6 +297,7 @@ export async function updateEvent(
     await revertEvent(written).catch(() => {});
     throw err;
   }
+  return { written, tailUrl };
 }
 
 /**

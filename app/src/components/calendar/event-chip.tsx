@@ -39,6 +39,11 @@ type PressProps = {
   /** Beat a touch must stay put before it counts as a press, so a scroll that
    *  starts on an event does not light it — see PRESS_DELAY_MS in week-row. */
   unstable_pressDelay: number;
+  /** Web: a press going down, handed to the grid's drag (see event-drag). */
+  onPointerDown?: (e: { nativeEvent: unknown; currentTarget: unknown }) => void;
+  /** Web: this is the event being dragged to another day; it stays here
+   *  faded, outlined in dashes, while a copy follows the mouse. */
+  dragging?: boolean;
 };
 
 /**
@@ -74,6 +79,7 @@ export function EventChip({
   time,
   titleLines,
   style,
+  dragging,
   ...press
 }: ChipProps) {
   const title = event.summary || '(untitled)';
@@ -107,6 +113,7 @@ export function EventChip({
           backgroundColor: face ? lift(face.fill) : HOVER_WASH,
         },
         pressed && styles.chipPressed,
+        dragging && styles.dragGhost,
       ]}
       testID={`chip-${event.id}`}
     >
@@ -275,6 +282,7 @@ export function EventBanner({
   titleLines,
   fade: trail,
   style,
+  dragging,
   ...press
 }: BannerProps) {
   const { event } = placement;
@@ -322,6 +330,7 @@ export function EventBanner({
           ),
         style,
         BANNER_FOCUS_MOTION,
+        dragging && styles.dragGhost,
       ]}
     >
       {!trail && (
@@ -402,6 +411,13 @@ const styles = StyleSheet.create({
   // A press on a timed event: a lighter dim than a banner's, as before.
   chipPressed: {
     opacity: 0.8,
+  },
+  /** Left behind while dragged: the event's place, faded and dashed. */
+  dragGhost: {
+    opacity: 0.35,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#B0B4BA',
   },
   chip: {
     flexDirection: 'row',

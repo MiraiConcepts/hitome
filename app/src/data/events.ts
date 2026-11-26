@@ -19,6 +19,7 @@ export {
   type EditScope,
   type GoingScope,
 } from '@/caldav/events';
+export { loadSearchIndex } from '@/caldav/search';
 
 /** Sync now. The web has nothing to ask — its fetches go to the server. */
 export async function requestSync(): Promise<boolean> {

@@ -100,7 +100,7 @@ function FieldsSpecimen({
 }
 
 export function OverlaysSection() {
-  const { openDay, openEditor, openMonthPicker } = useOverlays();
+  const { openDay, openEditor, openMonthPicker, openSearch } = useOverlays();
   const wide = useIsWide();
   const recurring = SAMPLE.standup;
   return (
@@ -155,6 +155,17 @@ export function OverlaysSection() {
             label="Month picker: at 2100"
             onPress={() => openMonthPicker({ year: 2100, month0: 11 })}
           />
+        </Row>
+      </Specimen>
+
+      <Specimen
+        name="SearchScreen (real, sample events)"
+        file="components/calendar/search-screen.tsx"
+        shows="What the header's magnifier (or / on the web) opens: a page on a phone, a box over the grid on a wide window. Try gym (every date, opens at today), den (word starts), birthday (a hidden calendar's, greyed), or a discover title (dashed when not going). Offline: only the loaded months, with its note."
+      >
+        <Row gap={Spacing.two}>
+          <Open label="Search" onPress={() => openSearch()} />
+          <Open label="Search: offline" onPress={() => openSearch(true)} />
         </Row>
       </Specimen>
 

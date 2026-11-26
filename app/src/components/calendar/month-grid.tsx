@@ -17,10 +17,16 @@ import {
   type NativeSyntheticEvent,
   type ViewStyle,
   type ViewToken,
+  View,
 } from 'react-native';
 
 import type { CalEvent } from '@/caldav/types';
 import type { EventLook } from '@/components/calendar/event-chip';
+import {
+  DragCopy,
+  MoveScopeAsk,
+  useEventDrag,
+} from '@/components/calendar/event-drag';
 import {
   COUNTER_FOOTPRINT,
   DAY_NUMBER_HEIGHT,
@@ -29,6 +35,7 @@ import {
   WeekRow,
 } from '@/components/calendar/week-row';
 import type { Gestures } from '@/config/gestures';
+import type { EditScope } from '@/data/events';
 import {
   addDays,
   buildMonthRange,
@@ -42,6 +49,7 @@ import {
   type MonthAnchor,
 } from '@/utils/calendar-grid';
 import { parseDay, toDateString } from '@/utils/date';
+import { dayAtPoint } from '@/utils/event-drag';
 
 export type MonthGridHandle = {
   /** Jump to (year, month0)'s row. Animated only for an adjacent month — a
@@ -85,6 +93,18 @@ type Props = {
   onHoldEvent?: (event: CalEvent) => boolean;
   /** Discover mode is on (today's fill turns orange). */
   discover?: boolean;
+  /** Web: an event dragged to another day (see event-drag). Which events
+   *  may be, which dates a repeating one asks about (more than one answer
+   *  asks; one is taken as given), and the move itself, which the drag's
+   *  marks wait for. Without `onMoveEvent` nothing drags. */
+  canMoveEvent?: (event: CalEvent) => boolean;
+  moveScopes?: (event: CalEvent) => EditScope[];
+  onMoveEvent?: (
+    event: CalEvent,
+    fromDay: string,
+    toDay: string,
+    scope: EditScope
+  ) => Promise<void>;
 };
 
 /**
@@ -221,6 +241,9 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     onHoldEvent,
     discover,
     gestures,
+    canMoveEvent,
+    moveScopes,
+    onMoveEvent,
   },
   ref
 ) {
@@ -270,6 +293,63 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   // Map identity changes per fetch, so mounted rows re-render exactly when
   // data does.
   const weekEvents = useMemo(() => bucketByWeek(events), [events]);
+
+  // Dragging an event to another day (web; see event-drag). The day under
+  // the mouse is worked out from the layout, not asked of the page.
+  const [moveAsk, setMoveAsk] = useState<{
+    at: { x: number; y: number };
+    scopes: EditScope[];
+    choose: (scope: EditScope | null) => void;
+  } | null>(null);
+  const paneBox = useCallback(() => {
+    const node = scrollerNode(listRef.current);
+    return node ? node.getBoundingClientRect() : null;
+  }, []);
+  const locate = useCallback(
+    (x: number, y: number) => {
+      const node = scrollerNode(listRef.current);
+      if (!node) return null;
+      const box = node.getBoundingClientRect();
+      return dayAtPoint({
+        x: x - box.left,
+        y: y - box.top,
+        width: box.width,
+        height: box.height,
+        scrollTop: node.scrollTop,
+        rowHeight,
+        weeks,
+      });
+    },
+    [rowHeight, weeks]
+  );
+  const drag = useEventDrag({
+    enabled: Platform.OS === 'web' && onMoveEvent !== undefined,
+    canDrag: (event) => canMoveEvent?.(event) ?? true,
+    locate,
+    onDrop: async (event, fromDay, toDay, at) => {
+      if (!onMoveEvent) return;
+      const scopes = moveScopes?.(event) ?? ['all'];
+      let scope: EditScope | null = scopes[0] ?? 'all';
+      if (scopes.length > 1) {
+        const box = paneBox();
+        scope = await new Promise<EditScope | null>((choose) =>
+          setMoveAsk({
+            at: { x: at.x - (box?.left ?? 0), y: at.y - (box?.top ?? 0) },
+            scopes,
+            choose,
+          })
+        );
+        setMoveAsk(null);
+      }
+      if (scope) await onMoveEvent(event, fromDay, toDay, scope);
+    },
+  });
+  const dragId = drag.state?.event.id ?? null;
+  const dropOver = drag.state?.over ?? null;
+  const copyOrigin = useCallback(() => {
+    const box = paneBox();
+    return { left: box?.left ?? 0, top: box?.top ?? 0 };
+  }, [paneBox]);
 
   const initialIndex = indexOfMonth(initialMonth);
   /** The row the grid opens on. Today's own month opens a row above today's
@@ -518,8 +598,26 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
   // focus and the chips it first rendered with. Pressing Today four months
   // back landed on the right month with every day dimmed and no events on it.
   const extraData = useMemo(
-    () => ({ focusedMonth, weekEvents, pulse, eventLook, discover, gestures }),
-    [focusedMonth, weekEvents, pulse, eventLook, discover, gestures]
+    () => ({
+      focusedMonth,
+      weekEvents,
+      pulse,
+      eventLook,
+      discover,
+      gestures,
+      dragId,
+      dropOver,
+    }),
+    [
+      focusedMonth,
+      weekEvents,
+      pulse,
+      eventLook,
+      discover,
+      gestures,
+      dragId,
+      dropOver,
+    ]
   );
 
   const renderItem = ({ item, index }: ListRenderItemInfo<string>) => (
@@ -542,46 +640,68 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
       onHoldEvent={onHoldEvent}
       discover={discover}
       gestures={gestures}
+      dragId={dragId}
+      // Only the row it falls in, so a move across the grid redraws two
+      // rows rather than every one mounted.
+      dropDay={dropOver?.week === item ? dropOver.day : null}
+      onDragEvent={onMoveEvent ? drag.begin : undefined}
     />
   );
 
   return (
-    <FlatList
-      ref={listRef}
-      testID="month-grid"
-      style={[styles.list, WEB_SNAP_CONTAINER]}
-      data={weeks}
-      renderItem={renderItem}
-      keyExtractor={keyExtractor}
-      extraData={extraData}
-      getItemLayout={(_, index) => ({
-        length: rowHeight,
-        offset: rowHeight * index,
-        index,
-      })}
-      initialScrollIndex={launchRow}
-      initialNumToRender={8}
-      windowSize={7}
-      // No pagingEnabled: its threshold is half a page and is not tunable, so
-      // handleScrollEndDrag decides instead. Zero deceleration means the
-      // content stops dead under the finger on release, leaving that decision
-      // — and the glide to the chosen month — entirely ours. Web has no
-      // momentum to suppress and is snapped by the browser instead.
-      decelerationRate={Platform.OS === 'web' ? undefined : 0}
-      onScrollBeginDrag={Platform.OS === 'web' ? undefined : beginGesture}
-      onScrollEndDrag={Platform.OS === 'web' ? undefined : handleScrollEndDrag}
-      onViewableItemsChanged={handleViewableItemsChanged}
-      viewabilityConfig={VIEWABILITY_CONFIG}
-      scrollEventThrottle={16}
-      onScroll={handleScroll}
-      onContentSizeChange={handleContentSizeChange}
-      onScrollToIndexFailed={({ index }) => jumpTo(index * rowHeight, false)}
-      showsVerticalScrollIndicator={false}
-    />
+    <View style={styles.pane}>
+      <FlatList
+        ref={listRef}
+        testID="month-grid"
+        style={[styles.list, WEB_SNAP_CONTAINER]}
+        data={weeks}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        extraData={extraData}
+        getItemLayout={(_, index) => ({
+          length: rowHeight,
+          offset: rowHeight * index,
+          index,
+        })}
+        initialScrollIndex={launchRow}
+        initialNumToRender={8}
+        windowSize={7}
+        // No pagingEnabled: its threshold is half a page and is not tunable, so
+        // handleScrollEndDrag decides instead. Zero deceleration means the
+        // content stops dead under the finger on release, leaving that decision
+        // — and the glide to the chosen month — entirely ours. Web has no
+        // momentum to suppress and is snapped by the browser instead.
+        decelerationRate={Platform.OS === 'web' ? undefined : 0}
+        onScrollBeginDrag={Platform.OS === 'web' ? undefined : beginGesture}
+        onScrollEndDrag={
+          Platform.OS === 'web' ? undefined : handleScrollEndDrag
+        }
+        onViewableItemsChanged={handleViewableItemsChanged}
+        viewabilityConfig={VIEWABILITY_CONFIG}
+        scrollEventThrottle={16}
+        onScroll={handleScroll}
+        onContentSizeChange={handleContentSizeChange}
+        onScrollToIndexFailed={({ index }) => jumpTo(index * rowHeight, false)}
+        showsVerticalScrollIndicator={false}
+      />
+      <DragCopy lift={drag.lift} origin={copyOrigin} />
+      {moveAsk && (
+        <MoveScopeAsk
+          at={moveAsk.at}
+          pane={{ width, height }}
+          scopes={moveAsk.scopes}
+          onChoose={moveAsk.choose}
+          onCancel={() => moveAsk.choose(null)}
+        />
+      )}
+    </View>
   );
 });
 
 const styles = StyleSheet.create({
+  pane: {
+    flex: 1,
+  },
   list: {
     flex: 1,
   },

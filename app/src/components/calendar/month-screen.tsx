@@ -41,12 +41,15 @@ import {
   listCalendars,
   type CalendarChoice,
 } from '@/data/events';
+import { moveToDay } from '@/data/event-move';
+import { readRecurrence } from '@/caldav/rrule';
 import type { CalEvent } from '@/caldav/types';
 import { BlurTarget } from '@/components/blur-backdrop';
 import { LARGE_SPINNER } from '@/components/boot-screen';
 import { markCalendarReady } from '@/components/calendar/calendar-ready';
 import { ConnectionProblem } from '@/components/calendar/connection-problem';
 import { DayPopover } from '@/components/calendar/day-popover';
+import { SearchScreen } from '@/components/calendar/search-screen';
 import {
   DiscoverGround,
   useDiscoverFade,
@@ -105,6 +108,7 @@ import {
 } from '@/config/calendar-visibility';
 import { getFirstDayOfWeek, type MonthAnchor } from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
+import { dayDelta, shiftByDays } from '@/utils/event-drag';
 import { trayLink } from '@/utils/discover';
 import { shareEvent } from '@/utils/share-event';
 import {
@@ -200,6 +204,9 @@ export function MonthScreen() {
   const [snack, setSnack] = useState<Snack>(null);
   const [popoverDay, setPopoverDay] = useState<string | null>(null);
   const [pickingMonth, setPickingMonth] = useState(false);
+  const [searching, setSearching] = useState(false);
+  /** Bumped by a save made from a search result: search reads again. */
+  const [searchReload, setSearchReload] = useState(0);
   const gestures = useGestures();
   // Spins the header's refresh icon — only for button-pressed refreshes, not
   // the fetches that follow scrolling or the foreground poll.
@@ -427,7 +434,10 @@ export function MonthScreen() {
   // popover would spend the whole animation behind it. Reads the pre-update
   // popover, so the render that opens one does not also flash beneath it.
   const overlayOpen =
-    editor.mode !== 'closed' || popoverDay !== null || pickingMonth;
+    editor.mode !== 'closed' ||
+    popoverDay !== null ||
+    pickingMonth ||
+    searching;
   if (arrivedDay && !overlayOpen) {
     setPulse((prev) => ({ day: arrivedDay, nonce: (prev?.nonce ?? 0) + 1 }));
     setArrivedDay(null);
@@ -772,6 +782,100 @@ export function MonthScreen() {
     });
   }
 
+  /** Web: may this event be dragged to another day? Neither a discover
+   *  event (hitome never moves one) nor one in a read-only calendar (absent
+   *  from the list, as for the day list's delete). */
+  const canMoveEvent = useCallback(
+    (event: CalEvent) =>
+      roleOf(event.url, calendarRoles) !== 'tray' &&
+      (calendarList.length === 0 ||
+        calendarList.some((c) => event.url.startsWith(c.url))),
+    [calendarRoles, calendarList]
+  );
+
+  /** Which dates a dragged repeating event asks about: all three, as the
+   *  editor's Save does, but only this one for a custom rule (moving its
+   *  series by a day would leave the rule behind, see scopesFor). A
+   *  one-off event asks nothing. */
+  const moveScopes = useCallback((event: CalEvent): EditScope[] => {
+    if (!event.recurring) return ['all'];
+    return readRecurrence(event.raw) === 'custom'
+      ? ['this']
+      : ['this', 'following', 'all'];
+  }, []);
+
+  /** An event dropped on another day: moved there, its time of day and its
+   *  length kept, with an Undo that puts it back. */
+  const onMoveEvent = useCallback(
+    async (
+      event: CalEvent,
+      fromDay: string,
+      toDay: string,
+      scope: EditScope
+    ) => {
+      const days = dayDelta(fromDay, toDay);
+      if (days === 0) return;
+      const calendarName = calendarNameRef.current(event);
+      let undo: () => Promise<void>;
+      try {
+        undo = await moveToDay(
+          event,
+          { ...shiftByDays(event, days), allDay: event.allDay },
+          scope
+        );
+      } catch (err) {
+        refresh();
+        setSnack(
+          err instanceof ConflictError
+            ? { message: Messages.changedElsewhere, icon: RefreshIcon }
+            : { message: Messages.moveFailed, icon: AlertCircleIcon }
+        );
+        return;
+      }
+      await refresh();
+      refreshAgendaWidget();
+      runAlarmReconcile();
+      setSnack({
+        message: Messages.saved(calendarName),
+        icon: CheckIcon,
+        revert: () => {
+          setSnack(null);
+          undo()
+            .then(() => {
+              refresh();
+              refreshAgendaWidget();
+              runAlarmReconcile();
+            })
+            .catch(() =>
+              setSnack({
+                message: Messages.restoreFailed,
+                icon: AlertCircleIcon,
+              })
+            );
+        },
+      });
+    },
+    [refresh]
+  );
+
+  /** A search result: opened as a tap on the grid opens it, the grid moving
+   *  to its month behind the search (not for a hidden calendar's, which the
+   *  grid would not show). Search stays open under it. */
+  function pickResult(event: CalEvent) {
+    const role = roleOf(event.url, calendarRoles);
+    if (role === 'tray') {
+      openPage(event);
+      return;
+    }
+    if (role === 'shown')
+      gridRef.current?.scrollToMonth(
+        event.start.getFullYear(),
+        event.start.getMonth(),
+        false
+      );
+    setEditor({ mode: 'edit', event });
+  }
+
   function goToday() {
     const target = monthOfDay(null, new Date());
     gridRef.current?.scrollToMonth(target.year, target.month0, true);
@@ -784,6 +888,7 @@ export function MonthScreen() {
     enabled: pathname === '/' && !overlayOpen,
     onNew: () => setEditor({ mode: 'create', day: addDay }),
     onToday: goToday,
+    onSearch: () => setSearching(true),
     onStepMonth: (step) => {
       const target = new Date(month.year, month.month0 + step, 1);
       gridRef.current?.scrollToMonth(
@@ -867,6 +972,7 @@ export function MonthScreen() {
   function onEditorDone(result: EditorResult, calendarName?: string) {
     setEditor({ mode: 'closed' });
     refresh();
+    if (searching) setSearchReload((n) => n + 1);
     // The home-screen widget has no other way to learn about this mutation
     // (its background cycle is unreliable on aggressive ROMs); foreground
     // refresh here is the one dependable trigger. Same story for scheduled
@@ -1032,6 +1138,7 @@ export function MonthScreen() {
               onAdd={() => setEditor({ mode: 'create', day: addDay })}
               onShareMonth={onShareMonth}
               onSettings={() => router.navigate('/settings')}
+              onSearch={() => setSearching(true)}
               pullHandlers={
                 Platform.OS === 'web' ? undefined : pullResponder.panHandlers
               }
@@ -1104,6 +1211,13 @@ export function MonthScreen() {
                   // With the header: today's outline fades to orange as the
                   // bar does.
                   discover={headerDiscover}
+                  // Web: drag an event to another day. Not in discover
+                  // mode, where every event shown is a discover one.
+                  canMoveEvent={canMoveEvent}
+                  moveScopes={moveScopes}
+                  onMoveEvent={
+                    Platform.OS === 'web' && !discover ? onMoveEvent : undefined
+                  }
                 />
               )}
               {cascade && gridSize && (
@@ -1148,7 +1262,7 @@ export function MonthScreen() {
               testID="error-banner"
             />
           )}
-          {!popoverDay && snackBar}
+          {!popoverDay && !searching && snackBar}
         </View>
 
         {neverLoaded && problem && (
@@ -1233,6 +1347,28 @@ export function MonthScreen() {
             goToday();
           }}
           onClose={() => setPickingMonth(false)}
+        />
+      )}
+
+      {searching && (
+        <SearchScreen
+          loaded={allEvents}
+          reload={searchReload}
+          roleOf={(event) => roleOf(event.url, calendarRoles)}
+          calendarName={calendarNameOf}
+          onPick={pickResult}
+          onClose={() => setSearching(false)}
+          covered={editor.mode !== 'closed'}
+          toast={
+            snackBar ? (
+              <View
+                pointerEvents="box-none"
+                style={[SNACK_SPOT, { bottom: bottomInset }]}
+              >
+                {snackBar}
+              </View>
+            ) : null
+          }
         />
       )}
 

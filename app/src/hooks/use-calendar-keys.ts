@@ -5,6 +5,8 @@ export type CalendarKeys = {
   enabled: boolean;
   onNew: () => void;
   onToday: () => void;
+  /** Open search. */
+  onSearch: () => void;
   /** -1 for the month before the one in view, +1 for the one after. */
   onStepMonth: (step: -1 | 1) => void;
   /** Bring a day's month into view (an arrow key left the visible month). */

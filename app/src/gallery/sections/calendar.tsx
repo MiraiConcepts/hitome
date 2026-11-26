@@ -39,11 +39,19 @@ import {
   weekStartOf,
   type MonthAnchor,
 } from '@/utils/calendar-grid';
+import type { EditScope } from '@/data/events';
 import { eventDays, toDateString } from '@/utils/date';
+import { dayDelta, shiftByDays } from '@/utils/event-drag';
 
 import { useOverlays } from '../overlays';
 import { Note, Row, Section, Specimen, Tag } from '../parts';
-import { GRID_EVENTS, SAMPLE, SAMPLE_TRAY_EVENTS, TODAY } from '../sample-data';
+import {
+  GRID_EVENTS,
+  SAMPLE,
+  SAMPLE_TRAY_CALENDAR,
+  SAMPLE_TRAY_EVENTS,
+  TODAY,
+} from '../sample-data';
 
 const noop = () => {};
 
@@ -91,7 +99,7 @@ function Header(
     discover: { open: boolean };
   }>
 ) {
-  const { openEditor, openMonthPicker } = useOverlays();
+  const { openEditor, openMonthPicker, openSearch } = useOverlays();
   const now = new Date();
   const anchor = props.anchor ?? {
     year: now.getFullYear(),
@@ -113,6 +121,7 @@ function Header(
       onAdd={() => openEditor({ event: null, defaultDay: TODAY })}
       onShareMonth={noop}
       onSettings={noop}
+      onSearch={openSearch}
       discover={
         props.discover ? { ...props.discover, onPress: noop } : undefined
       }
@@ -363,6 +372,57 @@ export function CalendarSection() {
       </Specimen>
 
       <Specimen
+        name="EventChip and EventBanner while dragged (web, dragging)"
+        file="components/calendar/event-chip.tsx, event-drag.tsx"
+        shows="What stays on the event's own day while a mouse drags it to another: faded, outlined in dashes"
+      >
+        <Row gap={Spacing.two}>
+          <View style={styles.stripCell}>
+            <Tag>chip</Tag>
+            <Strip width={cell} lines={1}>
+              {(style) => (
+                <EventChip
+                  event={SAMPLE.dentist}
+                  titleLines={1}
+                  style={style}
+                  dragging
+                  {...press(SAMPLE.dentist)}
+                />
+              )}
+            </Strip>
+          </View>
+          <View style={styles.stripCell}>
+            <Tag>banner</Tag>
+            <Strip width={cell} lines={1}>
+              {(style) => (
+                <EventBanner
+                  placement={{
+                    event: banners[0][1],
+                    startCol: 0,
+                    span: 1,
+                    slot: 0,
+                    rows: 1,
+                    continuesLeft: false,
+                    continuesRight: false,
+                  }}
+                  titleLines={1}
+                  style={style}
+                  dragging
+                  {...press(banners[0][1])}
+                />
+              )}
+            </Strip>
+          </View>
+        </Row>
+        <Note>
+          A copy framed in amber follows the mouse and the day under it is
+          framed in amber (WeekRow dropDay); a repeating one asks which dates
+          where it is dropped (MoveScopeAsk). Try it live on the MonthGrid
+          below, which moves the sample events.
+        </Note>
+      </Specimen>
+
+      <Specimen
         name="EventTags"
         file="components/calendar/event-tags.tsx"
         shows="place (blue, opens maps); Join Meeting (accent); plain link (shown as its host); all three; a long place that wraps"
@@ -502,6 +562,26 @@ function SampleMonthGrid({
     null
   );
   const height = Math.max(420, Math.min(720, windowHeight - 220));
+  // Dragged events move here, in the page only (see event-drag).
+  const [events, setEvents] = useState(GRID_EVENTS);
+  const moveEvent = async (
+    event: CalEvent,
+    fromDay: string,
+    toDay: string,
+    scope: EditScope
+  ) => {
+    const days = dayDelta(fromDay, toDay);
+    // This date alone, or (roughly, for the page) it and its series' later
+    // dates, or every date.
+    const reaches = (e: CalEvent) =>
+      e.id === event.id ||
+      (scope !== 'this' &&
+        e.uid === event.uid &&
+        (scope === 'all' || e.start >= event.start));
+    setEvents((list) =>
+      list.map((e) => (reaches(e) ? { ...e, ...shiftByDays(e, days) } : e))
+    );
+  };
   return (
     <>
       <Header anchor={month} />
@@ -521,7 +601,7 @@ function SampleMonthGrid({
           <MonthGrid
             width={size.width}
             height={size.height}
-            events={GRID_EVENTS}
+            events={events}
             today={TODAY}
             initialMonth={initial}
             focusedMonth={settled}
@@ -536,6 +616,13 @@ function SampleMonthGrid({
             onCreateOnDay={(day) =>
               openEditor({ event: null, defaultDay: day })
             }
+            canMoveEvent={(event) =>
+              !event.url.startsWith(SAMPLE_TRAY_CALENDAR.url)
+            }
+            moveScopes={(event) =>
+              event.recurring ? ['this', 'following', 'all'] : ['all']
+            }
+            onMoveEvent={Platform.OS === 'web' ? moveEvent : undefined}
           />
         )}
       </View>

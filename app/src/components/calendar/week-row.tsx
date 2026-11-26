@@ -30,6 +30,10 @@ import {
   RULE_WIDTH,
   scaled,
 } from '@/components/calendar/grid-scale';
+import {
+  dragJustEnded,
+  type DragStart,
+} from '@/components/calendar/event-drag';
 import { TodayMark } from '@/components/calendar/today-mark';
 import { titleWidth as measureTitle } from '@/components/calendar/title-width';
 import { ThemedText } from '@/components/themed-text';
@@ -128,6 +132,13 @@ type WeekRowProps = {
   /** What a tap on an empty day, a tap on an event and a hold do (Settings ›
    *  Gestures); how hitome has always behaved without. */
   gestures?: Gestures;
+  /** Web: an event being dragged to another day (its pieces fade where
+   *  they are), the day it would land on if in this row (framed in amber),
+   *  and where a press on a strip is handed over to start one (see
+   *  event-drag). */
+  dragId?: string | null;
+  dropDay?: string | null;
+  onDragEvent?: DragStart;
 };
 
 /** How far a multi-day event's trail fades toward the ground by its last
@@ -290,6 +301,9 @@ export const WeekRow = memo(function WeekRow({
   onHoldEvent,
   discover,
   gestures = DEFAULT_GESTURES,
+  dragId = null,
+  dropDay = null,
+  onDragEvent,
 }: WeekRowProps) {
   const theme = useTheme();
 
@@ -466,6 +480,8 @@ export const WeekRow = memo(function WeekRow({
 
   const dayAt = useCallback((col: number) => toDateString(days[col]), [days]);
   const todayCol = days.findIndex((d) => toDateString(d) === todayStr);
+  const dropCol =
+    dropDay === null ? -1 : days.findIndex((d) => toDateString(d) === dropDay);
 
   /** Tap: the day's list. An empty day has no list, so a tap there starts a
    *  new event on it by default (Settings › Gestures can make it open the
@@ -501,7 +517,9 @@ export const WeekRow = memo(function WeekRow({
       const finish = (create: boolean) => () => {
         window.removeEventListener('pointerup', onUp);
         window.removeEventListener('pointercancel', onCancel);
-        if (create) createOn(col);
+        // A hold that armed before the mouse moved off with the event
+        // (a drag, see event-drag) creates nothing.
+        if (create && !dragJustEnded()) createOn(col);
       };
       const onUp = finish(true);
       const onCancel = finish(false);
@@ -689,6 +707,12 @@ export const WeekRow = memo(function WeekRow({
                     fade={trailOf(banner.startCol, banner.span, col)}
                     onPress={() => pressEvent(banner.event, col)}
                     look={eventLook?.(banner.event)}
+                    dragging={dragId === banner.event.id}
+                    onPointerDown={
+                      onDragEvent &&
+                      ((e) =>
+                        onDragEvent(e, banner.event, dayAt(col), 'banner'))
+                    }
                     onLongPress={() => {
                       if (onHoldEvent?.(banner.event)) return;
                       holdOn(col);
@@ -726,6 +750,11 @@ export const WeekRow = memo(function WeekRow({
                         }
                       : { titleLines: Math.min(2, chip.span) })}
                     look={eventLook?.(chip.event)}
+                    dragging={dragId === chip.event.id}
+                    onPointerDown={
+                      onDragEvent &&
+                      ((e) => onDragEvent(e, chip.event, dayAt(col), 'chip'))
+                    }
                     onPress={() => pressEvent(chip.event, col)}
                     onLongPress={() => {
                       if (onHoldEvent?.(chip.event)) return;
@@ -773,6 +802,14 @@ export const WeekRow = memo(function WeekRow({
             </View>
           );
         })}
+        {/* Over everything in the row: where a dragged event would land. */}
+        {dropCol >= 0 && (
+          <View
+            pointerEvents="none"
+            testID={`drop-target-${dayAt(dropCol)}`}
+            style={[styles.dropFrame, { left: pct(dropCol) }]}
+          />
+        )}
       </View>
     </View>
   );
@@ -868,6 +905,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
+  },
+  /** The day a dragged event would land on: framed in amber, inside its
+   *  rules. */
+  dropFrame: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: pct(1),
+    borderWidth: 2,
+    borderColor: AccentColor,
   },
   moreBox: {
     position: 'absolute',

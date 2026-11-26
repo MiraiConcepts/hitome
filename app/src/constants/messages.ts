@@ -41,6 +41,8 @@ export const Messages = {
   notGoing: (event: string) => `Not going to ${event}`,
   linkMissing: 'Event link missing',
   updateFailed: 'Event update failed',
+  /** An event dragged to another day (web) that could not be written. */
+  moveFailed: 'Event move failed',
 } as const;
 
 export type MessageSample = {
@@ -68,4 +70,5 @@ export const MESSAGE_SAMPLES: readonly MessageSample[] = [
   { message: Messages.notGoing('Aftersun'), icon: TelescopeIcon, undo: true },
   { message: Messages.linkMissing, icon: InfoCircleIcon },
   { message: Messages.updateFailed, icon: AlertCircleIcon },
+  { message: Messages.moveFailed, icon: AlertCircleIcon },
 ];

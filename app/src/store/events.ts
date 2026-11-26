@@ -8,6 +8,7 @@ import type { CalEvent, EventChanges, EventInput } from '@/caldav/types';
 import { ensureDefaultCalendar } from '@/config/calendar-pref';
 import { ensureCalendarRoles, roleOf } from '@/config/calendar-visibility';
 import { isStoreDisconnected } from '@/config/store-connection';
+import type { SearchEntry, SearchIndex } from '@/utils/search';
 
 import {
   CalendarStore,
@@ -220,6 +221,75 @@ export async function fetchMonth(
     .map((row) => instanceToEvent(row, { alarms, overridden }))
     .filter((e) => e.end > rangeStart && e.start < rangeEnd);
 }
+
+/**
+ * Search: every event row of every synced calendar (hitome's hidden ones
+ * too), read once, and the dates of the matching series a stretch at a time,
+ * read as the grid reads them. A changed occurrence is a row of its own, so
+ * its words count, under its series' key.
+ */
+export async function loadSearchIndex(): Promise<SearchIndex> {
+  const visible = await calendars();
+  if (visible.length === 0) return { entries: [], occurrences: async () => [] };
+  const ids = visible.map((c) => c.id);
+  const rows = await store().query(
+    URI.events,
+    SEARCH_COLUMNS,
+    `calendar_id IN (${ids.map(() => '?').join(',')}) AND deleted = 0`,
+    ids,
+    null
+  );
+  const text = (v: StoreRow[string]) =>
+    typeof v === 'string' && v !== '' ? v : undefined;
+  const entries: SearchEntry[] = rows
+    .filter((row) => ids.includes(String(n(row.calendar_id))))
+    .map((row) => {
+      const first = n(row.dtstart);
+      const end = row.dtend == null ? first : n(row.dtend);
+      return {
+        key: String(n(row.original_id ?? row._id)),
+        summary: text(row.title),
+        location: text(row.eventLocation),
+        description: text(row.description),
+        first,
+        // LAST_DATE is the provider's own end of a series; none when it
+        // repeats for ever.
+        last: row.rrule
+          ? row.lastDate == null
+            ? null
+            : n(row.lastDate)
+          : Math.max(first, end),
+      };
+    });
+  const read = new Map<string, Promise<CalEvent[]>>();
+  return {
+    entries,
+    async occurrences(keys, start, end) {
+      const span = `${start.getTime()}|${end.getTime()}`;
+      let events = read.get(span);
+      if (!events) {
+        events = fetchMonth(start, end);
+        read.set(span, events);
+        events.catch(() => read.delete(span));
+      }
+      const uids = new Set([...keys].map((k) => `store-${k}`));
+      return (await events).filter((e) => uids.has(e.uid));
+    },
+  };
+}
+
+const SEARCH_COLUMNS = [
+  '_id',
+  'calendar_id',
+  'original_id',
+  'title',
+  'eventLocation',
+  'description',
+  'dtstart',
+  'dtend',
+  'lastDate',
+  'rrule',
+];
 
 async function firstAlarms(eventIds: string[]): Promise<Map<string, number>> {
   const out = new Map<string, number>();

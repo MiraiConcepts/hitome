@@ -13,6 +13,9 @@ import {
 import type { CalEvent } from '@/caldav/types';
 import { DayPopover } from '@/components/calendar/day-popover';
 import { MonthPicker } from '@/components/calendar/month-picker';
+import { SearchScreen } from '@/components/calendar/search-screen';
+import type { CalendarRole } from '@/config/calendar-visibility';
+import type { SearchIndex } from '@/utils/search';
 import type { EditorResult } from '@/components/calendar/use-event-editor';
 import {
   CalendarPlusIcon,
@@ -30,7 +33,13 @@ import { Messages } from '@/constants/messages';
 import { SampleEventEditor } from './editor-shells';
 import { useGalleryToast } from './parts';
 import type { SampleEditorOptions } from './sample-editor';
-import { TODAY } from './sample-data';
+import {
+  GRID_EVENTS,
+  SAMPLE_CALENDARS,
+  SAMPLE_TRAY_CALENDAR,
+  SAMPLE_TRAY_EVENTS,
+  TODAY,
+} from './sample-data';
 
 type EditorRequest = Omit<SampleEditorOptions, 'onDone'>;
 
@@ -40,12 +49,16 @@ type Overlays = {
   openEditor: (request: EditorRequest) => void;
   /** The month picker, opened on `shown` (this month by default). */
   openMonthPicker: (shown?: MonthAnchor) => void;
+  /** Search over the sample events; `offline`: as when they cannot be read
+   *  (only the loaded months, with its note). */
+  openSearch: (offline?: boolean) => void;
 };
 
 const OverlayContext = createContext<Overlays>({
   openDay: () => {},
   openEditor: () => {},
   openMonthPicker: () => {},
+  openSearch: () => {},
 });
 
 export function useOverlays() {
@@ -88,11 +101,13 @@ export function OverlayHost({ children }: { children: ReactNode }) {
     setEditor((prev) => ({ ...request, key: (prev?.key ?? 0) + 1 }));
   }, []);
   const [picker, setPicker] = useState<MonthAnchor | null>(null);
+  const [search, setSearch] = useState<{ offline: boolean } | null>(null);
   const value = useMemo<Overlays>(
     () => ({
       openDay: (d, events, discover) => setDay({ day: d, events, discover }),
       openEditor,
       openMonthPicker: (shown) => setPicker(shown ?? thisMonth()),
+      openSearch: (offline) => setSearch({ offline: offline ?? false }),
     }),
     [openEditor]
   );
@@ -152,6 +167,29 @@ export function OverlayHost({ children }: { children: ReactNode }) {
           }
         />
       )}
+      {search && (
+        <SearchScreen
+          loaded={GRID_EVENTS}
+          reload={0}
+          load={search.offline ? failedSearch : sampleSearch}
+          roleOf={sampleRole}
+          calendarName={(event) =>
+            [...SAMPLE_CALENDARS, SAMPLE_TRAY_CALENDAR].find((c) =>
+              event.url.startsWith(c.url)
+            )?.name
+          }
+          onPick={(event) => {
+            if (sampleRole(event) === 'tray')
+              toast({
+                icon: CheckIcon,
+                message: `Opens ${event.summary}'s page`,
+              });
+            else openEditor({ event, defaultDay: TODAY });
+          }}
+          onClose={() => setSearch(null)}
+          covered={editor !== null}
+        />
+      )}
       {editor && (
         <SampleEventEditor
           key={editor.key}
@@ -187,6 +225,35 @@ export function OverlayHost({ children }: { children: ReactNode }) {
       )}
     </OverlayContext.Provider>
   );
+}
+
+/** The sample calendars' roles here: Birthdays hidden, to show the greyed
+ *  rows; Things to do a discover one. */
+function sampleRole(event: CalEvent): CalendarRole {
+  if (event.url.startsWith(SAMPLE_TRAY_CALENDAR.url)) return 'tray';
+  if (event.url.startsWith('gallery://birthdays/')) return 'hidden';
+  return 'shown';
+}
+
+/** Search over the sample month: each event its own entry. */
+async function sampleSearch(): Promise<SearchIndex> {
+  const events = [...GRID_EVENTS, ...SAMPLE_TRAY_EVENTS];
+  return {
+    entries: events.map((e) => ({
+      key: e.id,
+      summary: e.summary,
+      location: e.location,
+      description: e.description,
+      first: e.start.getTime(),
+      last: e.end.getTime(),
+    })),
+    occurrences: async (keys, start, end) =>
+      events.filter((e) => keys.has(e.id) && e.start < end && e.end > start),
+  };
+}
+
+async function failedSearch(): Promise<SearchIndex> {
+  throw new Error('offline');
 }
 
 function thisMonth(): MonthAnchor {

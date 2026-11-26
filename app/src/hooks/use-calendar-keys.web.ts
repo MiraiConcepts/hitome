@@ -34,7 +34,7 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 /**
- * N new event, T today, PageUp/PageDown a month, and the arrow keys walk
+ * N new event, T today, / search, PageUp/PageDown a month, and the arrow keys walk
  * the focus from day to day (Enter then opens the focused day, as a click
  * does, since each cell is a button).
  */
@@ -91,6 +91,10 @@ export function useCalendarKeys(keys: CalendarKeys): void {
         case 'T':
           e.preventDefault();
           k.onToday();
+          break;
+        case '/':
+          e.preventDefault();
+          k.onSearch();
           break;
         case 'PageUp':
           e.preventDefault();

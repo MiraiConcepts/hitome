@@ -19,6 +19,7 @@ import {
   CalendarEventIcon,
   PhotoShareIcon,
   RefreshIcon,
+  SearchIcon,
   SettingsIcon,
   TelescopeIcon,
 } from '@/components/icons';
@@ -69,6 +70,8 @@ type Props = {
   /** The month as a picture: copied on the web, shared on Android. */
   onShareMonth: () => void;
   onSettings: () => void;
+  /** Search every calendar (the magnifier, first in the row). */
+  onSearch: () => void;
   /** The discover button, shown when some calendar is a discover one, and
    *  whether discover mode is on (the bar then turns orange). */
   discover?: { open: boolean; onPress: () => void };
@@ -143,6 +146,7 @@ export function MonthHeader({
   onAdd,
   onShareMonth,
   onSettings,
+  onSearch,
   discover,
   pullHandlers,
 }: Props) {
@@ -272,6 +276,16 @@ export function MonthHeader({
         </View>
       </View>
       <View style={styles.controls}>
+        <Pressable
+          testID="calendar-search"
+          onPress={onSearch}
+          hitSlop={8}
+          style={styles.iconButton}
+          accessibilityRole="button"
+          accessibilityLabel="Search"
+        >
+          <SearchIcon size={Bar.iconSize} color={ink} />
+        </Pressable>
         {discover && (
           <Pressable
             testID="calendar-discover"

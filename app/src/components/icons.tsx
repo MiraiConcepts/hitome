@@ -41,6 +41,8 @@ import {
   ShareOutlineBody,
   TrashOutlineBody,
   WifiOffOutlineBody,
+  SearchOutlineBody,
+  XOutlineBody,
 } from '@/constants/icon-paths';
 
 export type IconProps = { size?: number; color: string };
@@ -193,4 +195,12 @@ export function TrashIcon({ size = 24, color }: IconProps) {
 
 export function WifiOffIcon({ size = 24, color }: IconProps) {
   return <SvgXml xml={svg(WifiOffOutlineBody, size, color)} />;
+}
+
+export function SearchIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(SearchOutlineBody, size, color)} />;
+}
+
+export function XIcon({ size = 24, color }: IconProps) {
+  return <SvgXml xml={svg(XOutlineBody, size, color)} />;
 }
