@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -363,9 +364,22 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
     []
   );
 
+  /** The offset a pane resize just put the grid back on, until the scroll is
+   *  seen there. Scroll events raised around the resize carry the old offset,
+   *  which read against the new row height names a month far earlier (a
+   *  window made twice as tall halves it: years back). Taken as the month, it
+   *  replaced currentRow and the restore then went to it. */
+  const resizeTarget = useRef<number | null>(null);
+  const resizeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     armSettle();
     if (inLaunchPose.current) return;
+    if (resizeTarget.current !== null) {
+      if (Math.abs(e.nativeEvent.contentOffset.y - resizeTarget.current) >= 1)
+        return;
+      resizeTarget.current = null;
+    }
     // The header follows the scroll live: the month is whichever one the
     // offset is nearest, with nothing to settle afterwards.
     const index = nearestSnapIndex(snapOffsets, e.nativeEvent.contentOffset.y);
@@ -443,12 +457,28 @@ export const MonthGrid = forwardRef<MonthGridHandle, Props>(function MonthGrid(
 
   // Pane resize (rotation / window resize): the row height changed, so put the
   // current month back under the viewport.
+  // A layout effect, so the jump lands in the same frame as the new row
+  // heights, before the browser raises a scroll for the stale offset.
   const prevHeight = useRef(height);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (prevHeight.current === height) return;
     prevHeight.current = height;
-    jumpTo(currentRow.current * rowHeight, false);
+    const offset = currentRow.current * rowHeight;
+    resizeTarget.current = offset;
+    if (resizeTimer.current) clearTimeout(resizeTimer.current);
+    // Let go even if the scroll never reports the target (already there).
+    resizeTimer.current = setTimeout(() => {
+      resizeTarget.current = null;
+      resizeTimer.current = null;
+    }, SNAP_RESTORE_MS);
+    jumpTo(offset, false);
   }, [height, rowHeight, jumpTo]);
+  useEffect(
+    () => () => {
+      if (resizeTimer.current) clearTimeout(resizeTimer.current);
+    },
+    []
+  );
 
   useImperativeHandle(
     ref,

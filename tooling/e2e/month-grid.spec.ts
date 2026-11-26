@@ -714,3 +714,49 @@ test("the header copies the month as a square picture", async ({
   expect(png.readUInt32BE(16)).toBe(1400);
   expect(png.readUInt32BE(20)).toBe(1400);
 });
+
+/** Grows the window from 900x600 to 2560x1440 the way macOS fullscreen
+ *  does: a burst of sizes a frame apart, not one jump. */
+async function growToFullscreen(page: Page, steps: number) {
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    await page.setViewportSize({
+      width: Math.round(900 + (2560 - 900) * t),
+      height: Math.round(600 + (1440 - 600) * t),
+    });
+    await page.waitForTimeout(16);
+  }
+}
+
+async function expectTodaysMonth(page: Page) {
+  await page.waitForTimeout(1500);
+  await expect(page.getByTestId("calendar-header-label")).toHaveText(
+    monthTitle(now),
+  );
+  await expect(
+    grid(page).getByTestId(`day-cell-${dateString(now)}`),
+  ).toBeInViewport();
+}
+
+for (const [name, waitForGrid, steps] of [
+  ["once the grid shows, in one jump", true, 1],
+  ["once the grid shows, animated", true, 30],
+  ["straight after launch, in one jump", false, 1],
+  ["straight after launch, animated", false, 30],
+] as const) {
+  test(`going fullscreen ${name} keeps today's month`, async ({ page }) => {
+    // Growing the rows under an unchanged scroll offset used to be read as a
+    // month years back, which the grid then restored to.
+    await page.setViewportSize({ width: 900, height: 600 });
+    await page.goto("/");
+    if (waitForGrid) {
+      await expect(
+        grid(page).getByTestId(`day-cell-${dateString(now)}`),
+      ).toBeVisible({ timeout: 30_000 });
+    } else {
+      await expect(grid(page)).toBeAttached({ timeout: 30_000 });
+    }
+    await growToFullscreen(page, steps);
+    await expectTodaysMonth(page);
+  });
+}
