@@ -150,6 +150,9 @@ test("drag: move, undo, click, own day, repeating, discover", async ({
     .click({ timeout: 30_000 });
   await openMonth(page);
   await expect(chip(page, "Dragdentist")).toBeVisible({ timeout: 30_000 });
+  // Until the chip itself takes the mouse: while the month first loads, a
+  // cover can lie over a chip that already counts as visible.
+  await chip(page, "Dragdentist").first().hover();
 
   // The server's answer to the save is held back, to see what shows first.
   let answer = () => {};
@@ -212,8 +215,8 @@ test("drag: move, undo, click, own day, repeating, discover", async ({
   // A plain click still opens it.
   await chip(page, "Dragdentist").click();
   await expect(page.getByTestId("event-editor")).toBeVisible();
-  // The phone's sheet takes no Escape while it is still sliding up.
-  await page.waitForTimeout(1_000);
+  // At once, while the phone's sheet is still sliding up: it closes once
+  // it has settled.
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("event-editor")).toHaveCount(0, {
     timeout: 15_000,

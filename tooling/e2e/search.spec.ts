@@ -149,8 +149,8 @@ test("search: words, repeats, hidden, cancelled, open and back", async ({
   // Open one, close it: back in the results, same words.
   await rows(page).first().click();
   await expect(page.getByTestId("event-editor")).toBeVisible();
-  // The phone's sheet takes no Escape while it is still sliding up.
-  await page.waitForTimeout(1_000);
+  // At once, while the phone's sheet is still sliding up: it closes once
+  // it has settled.
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("event-editor")).toHaveCount(0, {
     timeout: 15_000,

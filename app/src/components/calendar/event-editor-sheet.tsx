@@ -232,7 +232,17 @@ export function EventEditorSheet({ editor, onClose }: Props) {
   function close() {
     closing.current = true;
     dismissing.current = true;
-    sheetRef.current?.dismiss();
+    shut();
+  }
+
+  // The library ignores a dismiss while the sheet is still sliding up: an
+  // Escape or Back pressed in that second was lost, and the sheet stayed.
+  // One asked for then is held, and the sheet closes once it has settled.
+  const settled = useRef(false);
+  const closeOnSettle = useRef(false);
+  function shut() {
+    if (settled.current) sheetRef.current?.dismiss();
+    else closeOnSettle.current = true;
   }
 
   /** Any other way out: steps back one level (out of an open question, or
@@ -309,7 +319,7 @@ export function EventEditorSheet({ editor, onClose }: Props) {
       if (!latest.current.requestDismiss()) return true;
       closing.current = true;
       dismissing.current = true;
-      sheetRef.current?.dismiss();
+      shut();
       return true;
     });
     return () => sub.remove();
@@ -367,6 +377,12 @@ export function EventEditorSheet({ editor, onClose }: Props) {
       // keyboard rises under a resting sheet rather than a moving one.
       onChange={(index) => {
         if (index < 0) return;
+        settled.current = true;
+        if (closeOnSettle.current) {
+          closeOnSettle.current = false;
+          sheetRef.current?.dismiss();
+          return;
+        }
         // Settled open again — a dismissal that did not take (a pan-down let
         // go short of the threshold). Back is ours once more.
         dismissing.current = false;
