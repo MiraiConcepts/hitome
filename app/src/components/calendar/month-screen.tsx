@@ -108,7 +108,12 @@ import {
 } from '@/config/calendar-visibility';
 import { getFirstDayOfWeek, type MonthAnchor } from '@/utils/calendar-grid';
 import { eventDays, parseDay, toDateString } from '@/utils/date';
-import { dayDelta, shiftByDays } from '@/utils/event-drag';
+import {
+  applyMoves,
+  dayDelta,
+  shiftByDays,
+  type MovePreview,
+} from '@/utils/event-drag';
 import { trayLink } from '@/utils/discover';
 import { shareEvent } from '@/utils/share-event';
 import {
@@ -306,13 +311,26 @@ export function MonthScreen() {
     [settledMonth]
   );
   const {
-    events: allEvents,
+    events: fetchedEvents,
     loading,
     error,
     authFailed,
     refresh,
     fetchedAt,
   } = useMonthEvents(settledDate);
+  // Moves dropped on the grid that the server has yet to confirm: shown at
+  // once, as Google Calendar does, and taken back if the save fails. A
+  // saved one holds only until the next fetch lands, which has the move in
+  // it: dropped in that same render, so the event never shows moved twice.
+  const [movePreviews, setMovePreviews] = useState<ShownMove[]>([]);
+  const allEvents = useMemo(
+    () =>
+      applyMoves(
+        fetchedEvents,
+        movePreviews.filter((p) => !p.savedOn || p.savedOn === fetchedEvents)
+      ),
+    [fetchedEvents, movePreviews]
+  );
   // Calendars hidden in settings, or discover ones, stay fetched and
   // cached: only drawn less.
   const calendarRoles = useCalendarRoles();
@@ -384,8 +402,8 @@ export function MonthScreen() {
     () => allEvents.filter((e) => onCalendar(e, calendarRoles)),
     [allEvents, calendarRoles]
   );
-  const latestEvents = useRef(allEvents);
-  latestEvents.current = allEvents;
+  const latestEvents = useRef(fetchedEvents);
+  latestEvents.current = fetchedEvents;
 
   // A widget row's id, resolved against the month's events — reconciled during
   // render like the other deep links above, not in an effect.
@@ -805,7 +823,9 @@ export function MonthScreen() {
   }, []);
 
   /** An event dropped on another day: moved there, its time of day and its
-   *  length kept, with an Undo that puts it back. */
+   *  length kept, with an Undo that puts it back. Shown on the new day at
+   *  once; the save runs behind it, and a failed one puts it back. */
+  const previewKey = useRef(0);
   const onMoveEvent = useCallback(
     async (
       event: CalEvent,
@@ -816,44 +836,84 @@ export function MonthScreen() {
       const days = dayDelta(fromDay, toDay);
       if (days === 0) return;
       const calendarName = calendarNameRef.current(event);
-      let undo: () => Promise<void>;
-      try {
-        undo = await moveToDay(
-          event,
-          { ...shiftByDays(event, days), allDay: event.allDay },
-          scope
+      const show = (moveDays: number): MovePreview => {
+        const preview: MovePreview = {
+          key: ++previewKey.current,
+          id: event.id,
+          url: event.url,
+          ...(event.recurrenceStart === undefined
+            ? {}
+            : { recurrenceStart: event.recurrenceStart }),
+          scope,
+          days: moveDays,
+        };
+        setMovePreviews((all) => [
+          ...all.filter(
+            (p) => !p.savedOn || p.savedOn === latestEvents.current
+          ),
+          preview,
+        ]);
+        return preview;
+      };
+      const drop = (preview: MovePreview) =>
+        setMovePreviews((all) => all.filter((p) => p.key !== preview.key));
+      /** Saved: kept until the fetch that follows has landed. */
+      const saved = (preview: MovePreview) => {
+        const on = latestEvents.current;
+        setMovePreviews((all) =>
+          all.map((p) => (p.key === preview.key ? { ...p, savedOn: on } : p))
         );
-      } catch (err) {
-        refresh();
-        setSnack(
-          err instanceof ConflictError
-            ? { message: Messages.changedElsewhere, icon: RefreshIcon }
-            : { message: Messages.moveFailed, icon: AlertCircleIcon }
-        );
-        return;
-      }
-      await refresh();
-      refreshAgendaWidget();
-      runAlarmReconcile();
-      setSnack({
-        message: Messages.saved(calendarName),
-        icon: CheckIcon,
-        revert: () => {
-          setSnack(null);
-          undo()
-            .then(() => {
-              refresh();
-              refreshAgendaWidget();
-              runAlarmReconcile();
-            })
-            .catch(() =>
-              setSnack({
-                message: Messages.restoreFailed,
-                icon: AlertCircleIcon,
+        return refresh();
+      };
+      const moved = show(days);
+      // Not awaited: the grid lets go of the drag as soon as this returns.
+      void (async () => {
+        let undo: () => Promise<void>;
+        try {
+          undo = await moveToDay(
+            event,
+            { ...shiftByDays(event, days), allDay: event.allDay },
+            scope
+          );
+        } catch (err) {
+          drop(moved);
+          refresh();
+          setSnack(
+            err instanceof ConflictError
+              ? { message: Messages.changedElsewhere, icon: RefreshIcon }
+              : { message: Messages.moveFailed, icon: AlertCircleIcon }
+          );
+          return;
+        }
+        await saved(moved);
+        refreshAgendaWidget();
+        runAlarmReconcile();
+        setSnack({
+          message: Messages.saved(calendarName),
+          icon: CheckIcon,
+          revert: () => {
+            setSnack(null);
+            // Back at once too, but not "this and following": the later
+            // dates now live in a series of their own, which the preview
+            // cannot name, so that Undo waits for the server.
+            const back = scope === 'following' ? null : show(-days);
+            undo()
+              .then(async () => {
+                if (back) await saved(back);
+                else await refresh();
+                refreshAgendaWidget();
+                runAlarmReconcile();
               })
-            );
-        },
-      });
+              .catch(() => {
+                if (back) drop(back);
+                setSnack({
+                  message: Messages.restoreFailed,
+                  icon: AlertCircleIcon,
+                });
+              });
+          },
+        });
+      })();
     },
     [refresh]
   );
@@ -1397,6 +1457,9 @@ const PULL_HOLD = 64;
 const PULL_BACK_MS = 200;
 const PULL_SPINNER_SIZE = 24;
 const ignoreDay = () => {};
+
+/** A move being shown, and the fetch it was saved against, once it is. */
+type ShownMove = MovePreview & { savedOn?: CalEvent[] };
 const MIN_REFRESH_BAR_MS = 900;
 
 const styles = StyleSheet.create({

@@ -64,3 +64,59 @@ export function dayAtPoint(p: {
   start.setDate(start.getDate() + col);
   return { week, day: toDateString(start) };
 }
+
+/**
+ * A move shown before the server has it: the dates a drop moves (one date,
+ * it and the later ones, or all of them, as the drop's scope says), each by
+ * `days`. Dropped once the save and the month's reload have landed, or put
+ * back when the save fails.
+ */
+export type MovePreview = {
+  /** Tells two moves of the same event apart. */
+  key: number;
+  /** The dragged occurrence, and the object it belongs to. */
+  id: string;
+  url: string;
+  /** For "this and following": the dragged occurrence's original start,
+   *  unix seconds (CalEvent.recurrenceStart). */
+  recurrenceStart?: number;
+  scope: 'this' | 'following' | 'all';
+  days: number;
+};
+
+type Movable = {
+  id: string;
+  url: string;
+  start: Date;
+  end: Date;
+  recurrenceStart?: number;
+};
+
+function moves(event: Movable, move: MovePreview): boolean {
+  // One date of a series by which date it is, not by its id: the id names
+  // where it starts, which the move itself changes (an Undo looks for it
+  // where it now is).
+  if (move.scope === 'this')
+    return move.recurrenceStart === undefined
+      ? event.id === move.id
+      : event.url === move.url &&
+          event.recurrenceStart === move.recurrenceStart;
+  if (event.url !== move.url) return false;
+  if (move.scope === 'all') return true;
+  const at = event.recurrenceStart ?? Math.floor(event.start.getTime() / 1000);
+  return at >= (move.recurrenceStart ?? 0);
+}
+
+/** The events with every move still being saved applied, in order. The
+ *  same array when there are none. */
+export function applyMoves<T extends Movable>(
+  events: T[],
+  previews: readonly MovePreview[]
+): T[] {
+  if (previews.length === 0) return events;
+  return events.map((event) => {
+    let days = 0;
+    for (const move of previews) if (moves(event, move)) days += move.days;
+    return days === 0 ? event : { ...event, ...shiftByDays(event, days) };
+  });
+}

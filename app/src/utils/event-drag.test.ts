@@ -1,4 +1,9 @@
-import { dayAtPoint, dayDelta, shiftByDays } from '@/utils/event-drag';
+import {
+  applyMoves,
+  dayAtPoint,
+  dayDelta,
+  shiftByDays,
+} from '@/utils/event-drag';
 
 describe('dayDelta', () => {
   it('counts whole days either way', () => {
@@ -115,5 +120,55 @@ describe('dayAtPoint', () => {
     expect(dayAtPoint({ ...grid, x: 10, y: 300 })).toBeNull();
     expect(dayAtPoint({ ...grid, x: 700, y: 10 })).toBeNull();
     expect(dayAtPoint({ ...grid, scrollTop: 150, x: 10, y: 260 })).toBeNull();
+  });
+});
+
+describe('applyMoves', () => {
+  const at = (day: number, rs?: number) => ({
+    id: `s:${day}`,
+    url: '/cal/series.ics',
+    start: new Date(2026, 10, day, 9),
+    end: new Date(2026, 10, day, 10),
+    ...(rs === undefined ? {} : { recurrenceStart: rs }),
+  });
+  const weekly = [at(2, 2), at(9, 9), at(16, 16)];
+  const other = { ...at(3), id: 'o', url: '/cal/other.ics' };
+  const days = (events: { start: Date }[]) =>
+    events.map((e) => e.start.getDate());
+  const move = (scope: 'this' | 'following' | 'all', id = 's:9') => ({
+    key: 1,
+    id,
+    url: '/cal/series.ics',
+    recurrenceStart: 9,
+    scope,
+    days: 2,
+  });
+
+  it('gives back the same array with nothing to apply', () => {
+    expect(applyMoves(weekly, [])).toBe(weekly);
+  });
+
+  it('moves one date, it and the later ones, or all of them', () => {
+    expect(days(applyMoves([...weekly, other], [move('this')]))).toEqual([
+      2, 11, 16, 3,
+    ]);
+    expect(days(applyMoves([...weekly, other], [move('following')]))).toEqual([
+      2, 11, 18, 3,
+    ]);
+    expect(days(applyMoves([...weekly, other], [move('all')]))).toEqual([
+      4, 11, 18, 3,
+    ]);
+  });
+
+  it('keeps the time and length, and adds up two moves', () => {
+    const [moved] = applyMoves(
+      [other],
+      [
+        { ...move('all', 'o'), url: '/cal/other.ics' },
+        { ...move('all', 'o'), key: 2, url: '/cal/other.ics', days: -1 },
+      ]
+    );
+    expect(moved.start).toEqual(new Date(2026, 10, 4, 9));
+    expect(moved.end).toEqual(new Date(2026, 10, 4, 10));
   });
 });
